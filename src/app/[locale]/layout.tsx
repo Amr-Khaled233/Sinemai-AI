@@ -42,8 +42,8 @@ export default async function LocaleLayout({
         <NextIntlClientProvider messages={messages}>
           <Providers>
             <TopBar locale={locale} />
-            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</main>
-            <footer className="mx-auto max-w-7xl px-4 pb-10 pt-6 text-xs text-muted/70 sm:px-6">
+            <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">{children}</main>
+            <footer className="mx-auto mt-10 max-w-7xl border-t border-line/60 px-4 pb-10 pt-6 text-xs text-muted/70 sm:px-6">
               Sinemai AI · سينمائي — production intelligence for film &amp; advertising.
             </footer>
           </Providers>

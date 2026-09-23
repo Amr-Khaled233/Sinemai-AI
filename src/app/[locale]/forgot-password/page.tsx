@@ -10,7 +10,7 @@ export default async function ForgotPasswordPage({ params }: { params: Promise<{
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md animate-fade-up pt-4 sm:pt-10">
       <Card title={t('forgotTitle')} subtitle={t('forgotSubtitle')}>
         <ForgotPasswordForm />
         <p className="mt-5 text-xs text-muted">

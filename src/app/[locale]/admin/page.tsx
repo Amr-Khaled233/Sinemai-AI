@@ -4,6 +4,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { countEmbeddableDops } from '@/lib/embeddings';
 import { Badge, Card, Stat } from '@/components/ui';
+import { AnimatedNumber, Reveal } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -90,11 +91,23 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
       <h1 className="text-xl font-semibold text-strong">{t('overview')}</h1>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-        <Stat label={t('projects')} value={projectCount} />
-        <Stat label={t('scriptsAnalyzed')} value={readyCount} />
-        <Stat label={t('vendorsApproved')} value={vendorsApproved} hint={`${vendorsPending} pending`} />
-        <Stat label={t('dopsApproved')} value={dopsApproved} hint={`${dopsPending} pending`} />
-        <Stat label="Style vectors" value={embedded} hint={`${dopsApproved - embedded} missing`} />
+        <Stat label={t('projects')} value={<AnimatedNumber value={projectCount} />} />
+        <Stat label={t('scriptsAnalyzed')} value={<AnimatedNumber value={readyCount} />} />
+        <Stat
+          label={t('vendorsApproved')}
+          value={<AnimatedNumber value={vendorsApproved} />}
+          hint={`${vendorsPending} pending`}
+        />
+        <Stat
+          label={t('dopsApproved')}
+          value={<AnimatedNumber value={dopsApproved} />}
+          hint={`${dopsPending} pending`}
+        />
+        <Stat
+          label="Style vectors"
+          value={<AnimatedNumber value={embedded} />}
+          hint={`${dopsApproved - embedded} missing`}
+        />
       </div>
 
       {(vendorsPending > 0 || dopsPending > 0) && (

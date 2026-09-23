@@ -1,6 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import type { BudgetTier, Prisma } from '@prisma/client';
 import { Badge, Card, MeterBar, Stat } from '@/components/ui';
+import { MeterFill, Reveal } from '@/components/motion';
 import { InquiryButton } from '@/components/sheet/inquiry-form';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import type {
@@ -97,11 +98,15 @@ export async function ProductionSheet({
   return (
     <div className="space-y-6">
       {/* ---------------------------------------------------------- header */}
-      <header className="card p-5">
+      <header className="card relative overflow-hidden p-5 sm:p-7">
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent"
+        />
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-accent">{t('title')}</p>
-            <h1 className="mt-2 text-2xl font-semibold text-strong">{project.name}</h1>
+            <p className="eyebrow">{t('title')}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-strong sm:text-3xl">{project.name}</h1>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
               <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
@@ -305,7 +310,10 @@ export async function ProductionSheet({
         ) : (
           <ul className="grid gap-3 md:grid-cols-2">
             {dops.map((dop) => (
-              <li key={dop.dopId} className="rounded-xl border border-line bg-surface-sunken p-4">
+              <li
+                key={dop.dopId}
+                className="card card-interactive bg-surface-sunken/60 p-4"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-semibold text-strong">{dop.name}</h3>
@@ -323,10 +331,10 @@ export async function ProductionSheet({
                   </div>
                 </div>
 
-                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-line">
-                  <div
-                    className="h-full rounded-full bg-brass-500"
-                    style={{ width: `${Math.min(100, Math.max(4, dop.score * 100))}%` }}
+                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-line/70">
+                  <MeterFill
+                    pct={Math.min(100, Math.max(4, dop.score * 100))}
+                    className="bg-gradient-to-r from-brass-600 to-brass-400"
                   />
                 </div>
 
@@ -381,7 +389,7 @@ export async function ProductionSheet({
         ) : (
           <div className="space-y-4">
             {vendors.map((vendor) => (
-              <div key={vendor.vendorId} className="rounded-xl border border-line bg-surface-sunken p-4">
+              <div key={vendor.vendorId} className="card bg-surface-sunken/60 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">
@@ -491,7 +499,7 @@ export async function ProductionSheet({
 
             <div>
               <p className="label">{t('total')}</p>
-              <dl className="space-y-2 rounded-xl border border-line bg-surface-sunken p-4 text-sm">
+              <dl className="space-y-2.5 rounded-2xl border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-transparent p-5 text-sm">
                 <Row label={t('equipmentRental')} value={money(budget.equipmentRental)} />
                 <Row label={t('crew')} value={money(budget.crewTotal)} />
                 <Row

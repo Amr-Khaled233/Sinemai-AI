@@ -16,7 +16,7 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md animate-fade-up pt-4 sm:pt-10">
       <Card title={t('signInTitle')} subtitle={t('signInSubtitle')}>
         <SignInForm />
         <p className="mt-4 text-xs">

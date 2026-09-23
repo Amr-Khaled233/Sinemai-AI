@@ -16,7 +16,7 @@ export default async function RegisterPage({ params }: { params: Promise<{ local
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div className="mx-auto max-w-lg animate-fade-up pt-4 sm:pt-10">
       <Card title={t('signUpTitle')} subtitle={t('signUpSubtitle')}>
         <SignUpForm locale={locale} />
         <p className="mt-5 text-xs text-muted">

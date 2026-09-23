@@ -5,8 +5,9 @@ import { auth, homeForRole } from '@/lib/auth';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { SignOutButton } from '@/components/sign-out-button';
+import { NavLinks, type NavLink } from '@/components/nav-links';
 
-const NAV_BY_ROLE: Record<Role, Array<{ href: string; key: string }>> = {
+const NAV_BY_ROLE: Record<Role, NavLink[]> = {
   PRODUCER: [
     { href: '/producer', key: 'projects' },
     { href: '/producer/projects/new', key: 'newProject' },
@@ -35,35 +36,34 @@ export async function TopBar({ locale }: { locale: string }) {
   const links = role ? NAV_BY_ROLE[role] : [];
 
   return (
-    <header className="sticky top-0 z-30 border-b border-line bg-page/80 backdrop-blur">
+    <header className="glass sticky top-0 z-40 border-b border-line/70">
       <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
         <Link href={role ? homeForRole(role) : '/'} className="group flex items-center gap-2.5">
-          <span className="grid size-8 place-items-center rounded-md border border-accent/60 bg-accent/10 text-sm font-bold text-accent">
+          <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl border border-accent/40 bg-gradient-to-br from-accent/20 to-transparent text-sm font-bold text-accent transition-transform duration-300 ease-smooth group-hover:scale-105">
             س
+            {/* A light sweep on hover, mirrored automatically in RTL. */}
+            <span
+              aria-hidden
+              className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-smooth group-hover:translate-x-full"
+            />
           </span>
-          <span className="text-sm font-semibold tracking-wide text-strong group-hover:text-accent">
+          <span className="text-sm font-semibold tracking-wide text-strong transition-colors group-hover:text-accent">
             Sinemai <span className="text-accent">AI</span>
           </span>
         </Link>
 
         <nav className="hidden flex-1 items-center gap-1 md:flex">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="rounded-md px-3 py-1.5 text-sm text-muted transition-colors hover:bg-surface-raised hover:text-strong"
-            >
-              {t(link.key)}
-            </Link>
-          ))}
+          <NavLinks links={links} />
         </nav>
 
-        <div className="ms-auto flex items-center gap-2">
+        <div className="ms-auto flex items-center gap-1.5">
           <ThemeToggle />
           <LocaleSwitcher locale={locale} />
           {session?.user ? (
             <>
-              <span className="hidden text-xs text-muted sm:inline">{session.user.name}</span>
+              <span className="ms-1 hidden max-w-[12rem] truncate text-xs text-muted sm:inline">
+                {session.user.name}
+              </span>
               <SignOutButton label={t('logout')} locale={locale} />
             </>
           ) : (
@@ -80,16 +80,8 @@ export async function TopBar({ locale }: { locale: string }) {
       </div>
 
       {links.length > 0 && (
-        <nav className="flex gap-1 overflow-x-auto border-t border-line px-4 py-2 md:hidden">
-          {links.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="whitespace-nowrap rounded-md px-3 py-1.5 text-xs text-muted hover:text-strong"
-            >
-              {t(link.key)}
-            </Link>
-          ))}
+        <nav className="flex gap-1.5 overflow-x-auto border-t border-line/60 px-4 py-2 md:hidden">
+          <NavLinks links={links} variant="pills" />
         </nav>
       )}
     </header>

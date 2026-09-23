@@ -3,6 +3,7 @@ import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Badge, Card, EmptyState, SectionTitle } from '@/components/ui';
+import { Reveal } from '@/components/motion';
 import { formatDate, formatMoney } from '@/lib/utils';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -61,13 +62,15 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
         />
       ) : (
         <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project) => (
-            <li key={project.id}>
-              <Link href={`/producer/projects/${project.id}`} className="block transition-transform hover:-translate-y-0.5">
-                <Card className="h-full hover:border-accent/60">
+          {projects.map((project, index) => (
+            <Reveal as="li" key={project.id} delay={index * 60}>
+              <Link href={`/producer/projects/${project.id}`} className="block h-full">
+                <Card interactive className="h-full">
                   <div className="flex items-start justify-between gap-3">
                     <h3 className="text-sm font-semibold text-strong">{project.name}</h3>
-                    <Badge tone={STATUS_TONE[project.status]}>{t(`status.${project.status}`)}</Badge>
+                    <Badge tone={STATUS_TONE[project.status]} pulse={project.status === 'ANALYZING'}>
+                      {t(`status.${project.status}`)}
+                    </Badge>
                   </div>
 
                   <p className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
@@ -106,7 +109,7 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
                   </dl>
                 </Card>
               </Link>
-            </li>
+            </Reveal>
           ))}
         </ul>
       )}

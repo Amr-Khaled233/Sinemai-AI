@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { Field, Input } from '@/components/ui';
+import { Field, Input, Spinner } from '@/components/ui';
 
 export function ForgotPasswordForm() {
   const t = useTranslations('auth');
@@ -26,7 +26,7 @@ export function ForgotPasswordForm() {
   }
 
   if (sent) {
-    return <p className="rounded-lg border border-info/40 bg-info/10 p-3 text-sm text-info">{t('resetSent')}</p>;
+    return <p className="animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetSent')}</p>;
   }
 
   return (
@@ -35,6 +35,7 @@ export function ForgotPasswordForm() {
         <Input name="email" type="email" required autoComplete="email" dir="ltr" />
       </Field>
       <button type="submit" className="btn-primary w-full" disabled={pending}>
+        {pending && <Spinner className="size-4" />}
         {t('sendResetLink')}
       </button>
     </form>
@@ -78,13 +79,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (status === 'checking') return <p className="text-sm text-muted">{tc('loading')}</p>;
 
   if (done) {
-    return <p className="rounded-lg border border-info/40 bg-info/10 p-3 text-sm text-info">{t('resetDone')}</p>;
+    return <p className="animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetDone')}</p>;
   }
 
   if (status === 'invalid') {
     return (
       <div>
-        <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-sm text-danger">
+        <p className="animate-fade-in rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm leading-6 text-danger">
           {t(REASONS[reason] ?? 'resetInvalid')}
         </p>
         <button type="button" className="btn-secondary mt-4 w-full" onClick={() => router.replace('/forgot-password')}>
@@ -133,6 +134,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <Input name="confirm" type="password" required minLength={8} autoComplete="new-password" dir="ltr" />
       </Field>
       <button type="submit" className="btn-primary w-full" disabled={pending}>
+        {pending && <Spinner className="size-4" />}
         {pending ? tc('loading') : t('setNewPassword')}
       </button>
     </form>

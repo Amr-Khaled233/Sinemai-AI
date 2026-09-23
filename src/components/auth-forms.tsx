@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { getSession, signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { Field, Input, Select } from '@/components/ui';
+import { Field, Input, Select, Spinner } from '@/components/ui';
 
 const HOME_BY_ROLE: Record<string, string> = {
   ADMIN: '/admin',
@@ -53,6 +53,7 @@ export function SignInForm() {
         <Input name="password" type="password" required autoComplete="current-password" dir="ltr" />
       </Field>
       <button type="submit" className="btn-primary w-full" disabled={pending}>
+        {pending && <Spinner className="size-4" />}
         {t('submitSignIn')}
       </button>
     </form>
@@ -138,7 +139,7 @@ export function SignUpForm({ locale }: { locale: string }) {
       </Field>
 
       {role === 'VENDOR' && (
-        <div className="mb-2 rounded-lg border border-line bg-surface-sunken p-4">
+        <div className="mb-2 animate-scale-in rounded-2xl border border-line bg-surface-sunken/70 p-4">
           <Field label={t('companyName')}>
             <Input name="companyName" required />
           </Field>
@@ -160,15 +161,24 @@ export function SignUpForm({ locale }: { locale: string }) {
       )}
 
       {role !== 'PRODUCER' && (
-        <p className="mb-4 rounded-lg border border-accent/40 bg-accent/5 p-3 text-xs text-accent">
+        <p className="mb-4 animate-fade-in rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-xs leading-6 text-accent">
           {t('pendingNotice')}
         </p>
       )}
 
-      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
-      {notice && <p className="mb-3 text-sm text-info">{notice}</p>}
+      {error && (
+        <p className="mb-3 animate-fade-in rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger" role="alert">
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p className="mb-3 animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm text-info">
+          {notice}
+        </p>
+      )}
 
       <button type="submit" className="btn-primary w-full" disabled={pending}>
+        {pending && <Spinner className="size-4" />}
         {t('submitSignUp')}
       </button>
     </form>

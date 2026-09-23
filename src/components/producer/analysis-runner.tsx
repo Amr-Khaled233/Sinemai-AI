@@ -3,6 +3,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
+import { CheckIcon, Spinner } from '@/components/ui';
+import { cn } from '@/lib/utils';
 import type { ProgressEvent, ProgressStage } from '@/agents/types';
 
 const STAGE_ORDER: ProgressStage[] = [
@@ -146,45 +148,87 @@ export function AnalysisRunner({
 
   return (
     <div>
-      <button type="button" className="btn-primary" onClick={run} disabled={disabled || state.running}>
-        {state.running ? t(`stage.${state.stage}`) : label}
+      <button
+        type="button"
+        className="btn-primary w-full sm:w-auto"
+        onClick={run}
+        disabled={disabled || state.running}
+      >
+        {state.running ? (
+          <>
+            <Spinner />
+            {t(`stage.${state.stage}`)}
+          </>
+        ) : (
+          <>
+            <svg
+              aria-hidden
+              viewBox="0 0 24 24"
+              className="size-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M5 3v18l15-9z" />
+            </svg>
+            {label}
+          </>
+        )}
       </button>
 
       {(state.running || state.stage === 'done' || state.error) && (
-        <div className="mt-5 rounded-xl border border-line bg-surface-sunken p-4">
+        <div className="mt-5 animate-scale-in rounded-2xl border border-line bg-surface-sunken/70 p-4">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h3 className="text-sm font-semibold text-strong">{t('title')}</h3>
-            <span className="text-xs tabular-nums text-muted">{state.pct}%</span>
+            <span className="text-xs font-medium tabular-nums text-accent">{state.pct}%</span>
           </div>
 
           <div className="progress-rail">
             <div className="progress-fill" style={{ width: `${Math.max(state.pct, 3)}%` }} />
           </div>
 
-          <ol className="mt-4 space-y-1.5">
+          <ol className="mt-4 space-y-2">
             {STAGE_ORDER.filter((s) => s !== 'done').map((stage, index) => {
               const done = currentIndex > index || state.stage === 'done';
               const active = state.stage === stage;
               return (
                 <li
                   key={stage}
-                  className={`flex items-center gap-2 text-xs ${
-                    active ? 'text-accent' : done ? 'text-info' : 'text-muted/60'
-                  }`}
+                  className={cn(
+                    'flex items-center gap-2.5 text-xs transition-colors duration-300 ease-smooth',
+                    active && 'text-accent',
+                    done && 'text-success',
+                    !active && !done && 'text-muted/[0.55]',
+                  )}
                 >
-                  <span
-                    className={`inline-block size-1.5 rounded-full ${
-                      active ? 'animate-pulse bg-accent' : done ? 'bg-info' : 'bg-line-strong'
-                    }`}
-                  />
-                  {t(`stage.${stage}`)}
-                  {active && state.detail ? ` · ${state.detail}` : ''}
+                  <span className="relative grid size-4 shrink-0 place-items-center">
+                    {done ? (
+                      <CheckIcon className="size-3.5" />
+                    ) : active ? (
+                      <>
+                        <span className="absolute inline-flex size-3 animate-pulse-ring rounded-full bg-accent/60" />
+                        <span className="relative size-1.5 rounded-full bg-accent" />
+                      </>
+                    ) : (
+                      <span className="size-1.5 rounded-full bg-line-strong" />
+                    )}
+                  </span>
+                  <span className={cn(active && 'font-medium')}>{t(`stage.${stage}`)}</span>
+                  {active && state.detail && (
+                    <span className="animate-fade-in text-muted">· {state.detail}</span>
+                  )}
                 </li>
               );
             })}
           </ol>
 
-          {state.logs.length > 0 && <p className="mt-3 text-[11px] text-muted/70">{state.logs.join(' · ')}</p>}
+          {state.logs.length > 0 && (
+            <p className="mt-3 animate-fade-in border-t border-line/60 pt-3 text-[11px] text-muted/70">
+              {state.logs.join(' · ')}
+            </p>
+          )}
 
           <p className="mt-3 text-[11px] text-muted/60">{t('agents')}</p>
 

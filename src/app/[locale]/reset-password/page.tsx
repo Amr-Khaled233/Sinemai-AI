@@ -18,7 +18,7 @@ export default async function ResetPasswordPage({
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-md">
+    <div className="mx-auto max-w-md animate-fade-up pt-4 sm:pt-10">
       <Card title={t('resetTitle')} subtitle={t('resetSubtitle')}>
         {token ? (
           <ResetPasswordForm token={token} />

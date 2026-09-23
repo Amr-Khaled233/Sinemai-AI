@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Field, Input, Textarea } from '@/components/ui';
+import { Field, Input, Spinner, Textarea } from '@/components/ui';
 
 export function InquiryButton({
   projectId,
@@ -25,6 +25,29 @@ export function InquiryButton({
   const [sent, setSent] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const dialogRef = useRef<HTMLDivElement | null>(null);
+  const openerRef = useRef<HTMLButtonElement | null>(null);
+
+  const close = useCallback(() => {
+    setOpen(false);
+    openerRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') close();
+    };
+    document.addEventListener('keydown', onKey);
+    // Keep the page behind the dialog from scrolling under it.
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    dialogRef.current?.querySelector<HTMLInputElement>('input, textarea')?.focus();
+    return () => {
+      document.removeEventListener('keydown', onKey);
+      document.body.style.overflow = previous;
+    };
+  }, [open, close]);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -55,22 +78,39 @@ export function InquiryButton({
   }
 
   if (sent) {
-    return <span className={`text-xs text-info ${className ?? ''}`}>{t('sent')}</span>;
+    return (
+      <span className={`inline-flex animate-fade-in items-center gap-1.5 text-xs text-success ${className ?? ''}`}>
+        <svg aria-hidden viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 6 9 17l-5-5" />
+        </svg>
+        {t('sent')}
+      </span>
+    );
   }
 
   return (
     <>
-      <button type="button" className={`btn-secondary text-xs ${className ?? ''}`} onClick={() => setOpen(true)}>
+      <button
+        ref={openerRef}
+        type="button"
+        className={`btn-secondary text-xs ${className ?? ''}`}
+        onClick={() => setOpen(true)}
+      >
         {t('send')}
       </button>
 
       {open && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-page/80 p-4"
+          className="fixed inset-0 z-50 grid animate-fade-in place-items-center bg-page/70 p-4 backdrop-blur-sm"
           role="dialog"
           aria-modal="true"
+          aria-label={t('title')}
+          onMouseDown={(event) => {
+            // Backdrop click closes; a drag that starts inside does not.
+            if (event.target === event.currentTarget) close();
+          }}
         >
-          <div className="card w-full max-w-lg p-5">
+          <div ref={dialogRef} className="card w-full max-w-lg animate-scale-in p-5 shadow-lift">
             <header className="mb-4">
               <h2 className="text-base font-semibold text-strong">{t('title')}</h2>
               <p className="mt-1 text-xs text-muted">
@@ -101,10 +141,11 @@ export function InquiryButton({
               {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
               <div className="flex justify-end gap-2">
-                <button type="button" className="btn-ghost text-xs" onClick={() => setOpen(false)}>
+                <button type="button" className="btn-ghost text-xs" onClick={close}>
                   {tc('cancel')}
                 </button>
                 <button type="submit" className="btn-primary text-xs" disabled={pending}>
+                  {pending && <Spinner className="size-3.5" />}
                   {pending ? tc('loading') : t('send')}
                 </button>
               </div>

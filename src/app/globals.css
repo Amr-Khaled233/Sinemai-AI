@@ -17,69 +17,73 @@
   --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', 'Helvetica Neue', Tahoma, system-ui, sans-serif;
 
   /* light */
-  --page: 247 245 241;
+  --page: 250 249 246;
   --surface: 255 255 255;
   --surface-raised: 252 250 246;
-  --surface-sunken: 242 239 233;
-  --line: 226 221 211;
-  --line-strong: 203 196 182;
-  --text-strong: 18 21 27;
-  --text-body: 43 47 56;
-  --muted: 108 114 128;
-  --accent: 154 120 38;
+  --surface-sunken: 244 241 235;
+  --line: 228 223 213;
+  --line-strong: 201 194 180;
+  --text-strong: 17 20 26;
+  --text-body: 48 53 63;
+  --muted: 110 117 132;
+  --accent: 150 116 34;
   --accent-soft: 212 169 79;
   --danger: 185 28 28;
   --warning: 180 83 9;
   --success: 4 120 87;
   --info: 13 148 136;
+  --shadow: 24 22 18;
   --glow-a: 212 169 79;
   --glow-b: 79 209 197;
-  --glow-strength: 0.1;
+  --glow-strength: 0.5;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --page: 13 15 20;
+    --page: 10 12 16;
     --surface: 20 23 31;
-    --surface-raised: 29 34 44;
-    --surface-sunken: 8 9 13;
+    --surface-raised: 28 33 43;
+    --surface-sunken: 14 16 22;
     --line: 42 48 64;
-    --line-strong: 60 68 88;
+    --line-strong: 63 71 92;
     --text-strong: 255 255 255;
-    --text-body: 233 234 238;
-    --muted: 150 156 172;
+    --text-body: 226 229 236;
+    --muted: 148 155 172;
     --accent: 232 195 122;
     --accent-soft: 212 169 79;
     --danger: 248 113 113;
     --warning: 251 191 36;
     --success: 52 211 153;
     --info: 79 209 197;
-    --glow-strength: 0.08;
+    --shadow: 0 0 0;
+    --glow-strength: 0.42;
   }
 }
 
 :root[data-theme='dark'] {
-  --page: 13 15 20;
+  --page: 10 12 16;
   --surface: 20 23 31;
-  --surface-raised: 29 34 44;
-  --surface-sunken: 8 9 13;
+  --surface-raised: 28 33 43;
+  --surface-sunken: 14 16 22;
   --line: 42 48 64;
-  --line-strong: 60 68 88;
+  --line-strong: 63 71 92;
   --text-strong: 255 255 255;
-  --text-body: 233 234 238;
-  --muted: 150 156 172;
+  --text-body: 226 229 236;
+  --muted: 148 155 172;
   --accent: 232 195 122;
   --accent-soft: 212 169 79;
   --danger: 248 113 113;
   --warning: 251 191 36;
   --success: 52 211 153;
   --info: 79 209 197;
-  --glow-strength: 0.08;
+  --shadow: 0 0 0;
+  --glow-strength: 0.42;
 }
 
 @layer base {
   html {
     color-scheme: light;
+    scroll-behavior: smooth;
   }
 
   :root[data-theme='dark'] {
@@ -93,12 +97,8 @@
   }
 
   body {
-    @apply bg-page text-body antialiased;
+    @apply overflow-x-clip bg-page text-body antialiased;
     font-family: var(--font-sans);
-    background-image:
-      radial-gradient(60rem 30rem at 85% -10%, rgb(var(--glow-a) / var(--glow-strength)), transparent),
-      radial-gradient(50rem 25rem at 0% 0%, rgb(var(--glow-b) / calc(var(--glow-strength) * 0.75)), transparent);
-    background-attachment: fixed;
   }
 
   /* Budget columns line up in both locales. */
@@ -111,58 +111,150 @@
   h2,
   h3 {
     @apply text-balance;
+    letter-spacing: -0.015em;
   }
 
   ::selection {
     background: rgb(var(--accent-soft) / 0.28);
   }
+
+  /* A scrollbar that belongs to the theme rather than to the OS. */
+  * {
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+    scrollbar-width: thin;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--line-strong));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--muted) / 0.6);
+    background-clip: content-box;
+  }
+
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
 }
 
 @layer components {
+  /* ---------------------------------------------------------------- surfaces */
+
   .card {
-    @apply rounded-xl border border-line bg-surface/80 backdrop-blur-sm;
+    @apply relative rounded-2xl border border-line bg-surface/[0.85] shadow-card backdrop-blur-sm
+      transition-[transform,box-shadow,border-color] duration-300 ease-smooth;
   }
+
+  /* Cards that are links or otherwise actionable lift on hover. */
+  .card-interactive {
+    @apply hover:-translate-y-1 hover:border-accent/40 hover:shadow-lift;
+  }
+
+  /* A one-pixel highlight along the top edge gives the card a lit surface. */
+  .card::after {
+    content: '';
+    position: absolute;
+    inset-inline: 1rem;
+    top: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.35), transparent);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    pointer-events: none;
+  }
+
+  .card-interactive:hover::after {
+    opacity: 1;
+  }
+
+  .glass {
+    @apply border-line/80 bg-page/70 backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  /* ---------------------------------------------------------------- form */
 
   .label {
     @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted;
   }
 
   .input {
-    @apply w-full rounded-lg border border-line bg-surface-sunken px-3 py-2.5 text-sm text-body
-      placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40;
+    @apply w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5 text-sm text-body
+      transition-[border-color,box-shadow,background-color] duration-200 ease-smooth
+      placeholder:text-muted/60 hover:border-line-strong
+      focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/[0.12];
   }
 
+  /* ---------------------------------------------------------------- buttons */
+
   .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
-      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply relative inline-flex select-none items-center justify-center gap-2 overflow-hidden
+      rounded-xl px-4 py-2.5 text-sm font-medium
+      transition-[transform,background-color,border-color,color,box-shadow] duration-200 ease-smooth
+      active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-primary {
-    @apply btn bg-brass-500 text-ink-950 hover:bg-brass-400;
+    @apply btn bg-gradient-to-b from-brass-400 to-brass-500 text-ink-950 shadow-card
+      hover:shadow-glow hover:brightness-105;
+  }
+
+  /* A sheen sweeps across the primary action on hover. */
+  .btn-primary::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(110deg, transparent 25%, rgb(255 255 255 / 0.45), transparent 75%);
+    transform: translateX(-120%);
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .btn-primary:hover::before {
+    transform: translateX(120%);
   }
 
   .btn-secondary {
-    @apply btn border border-line bg-surface-raised text-body hover:border-accent/60 hover:text-accent;
+    @apply btn border border-line bg-surface-raised text-body
+      hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent hover:shadow-card;
   }
 
   .btn-ghost {
-    @apply btn text-muted hover:text-accent;
+    @apply btn text-muted hover:bg-accent/[0.08] hover:text-accent;
   }
 
   .btn-danger {
     @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
   }
 
+  /* ---------------------------------------------------------------- chips */
+
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-muted;
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-muted
+      transition-[background-color,border-color,color,transform] duration-200 ease-smooth;
   }
 
   .chip-on {
     @apply border-accent/60 bg-accent/10 text-accent;
   }
 
+  button.chip:hover {
+    @apply -translate-y-0.5 border-accent/50 text-accent;
+  }
+
+  /* ---------------------------------------------------------------- tables */
+
   .table-wrap {
-    @apply overflow-x-auto rounded-xl border border-line;
+    @apply overflow-x-auto rounded-2xl border border-line bg-surface/50;
   }
 
   .table {
@@ -170,20 +262,28 @@
   }
 
   .table thead th {
-    @apply border-b border-line bg-surface-raised px-3 py-2.5 text-start text-xs font-semibold
-      uppercase tracking-wider text-muted;
+    @apply sticky top-0 z-10 border-b border-line bg-surface-raised/95 px-3.5 py-3 text-start text-xs
+      font-semibold uppercase tracking-wider text-muted backdrop-blur;
   }
 
   .table tbody td {
-    @apply border-b border-line/70 px-3 py-2.5 align-top;
+    @apply border-b border-line/60 px-3.5 py-3 align-top transition-colors duration-150;
+  }
+
+  .table tbody tr {
+    @apply transition-colors duration-150 hover:bg-accent/[0.04];
   }
 
   .table tbody tr:last-child td {
     @apply border-b-0;
   }
 
+  /* ---------------------------------------------------------------- stats */
+
   .stat {
-    @apply rounded-xl border border-line bg-surface/60 p-4;
+    @apply relative overflow-hidden rounded-2xl border border-line bg-surface/60 p-4
+      transition-[transform,border-color,box-shadow] duration-300 ease-smooth
+      hover:-translate-y-0.5 hover:border-accent/[0.35] hover:shadow-card;
   }
 
   .stat-value {
@@ -197,17 +297,124 @@
   .prose-sheet {
     @apply text-sm leading-7 text-muted;
   }
+
+  /* ---------------------------------------------------------------- headings */
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] text-accent;
+  }
+
+  .headline-gradient {
+    background: linear-gradient(
+      135deg,
+      rgb(var(--text-strong)) 15%,
+      rgb(var(--accent)) 55%,
+      rgb(var(--text-strong)) 90%
+    );
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  /* ---------------------------------------------------------------- feedback */
+
+  .skeleton {
+    @apply rounded-lg bg-line/60;
+    background-image: linear-gradient(
+      90deg,
+      transparent,
+      rgb(var(--muted) / 0.12),
+      transparent
+    );
+    background-size: 200% 100%;
+    @apply animate-shimmer;
+  }
+
+  .alert {
+    @apply flex items-start gap-2.5 rounded-xl border p-3.5 text-xs leading-6;
+  }
+}
+
+@layer utilities {
+  /* Scroll-triggered reveal, driven by the Reveal component. */
+  .reveal {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+    transition:
+      opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: var(--reveal-delay, 0ms);
+  }
+
+  .reveal-in {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+
+  .bg-grid {
+    background-image:
+      linear-gradient(rgb(var(--line) / 0.6) 1px, transparent 1px),
+      linear-gradient(90deg, rgb(var(--line) / 0.6) 1px, transparent 1px);
+    background-size: 56px 56px;
+    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
 }
 
 /* The progress rail mirrors itself in RTL without extra markup. */
 .progress-rail {
-  @apply h-1.5 w-full overflow-hidden rounded-full bg-line;
+  @apply relative h-2 w-full overflow-hidden rounded-full bg-line/70;
 }
 
 .progress-fill {
-  @apply h-full rounded-full bg-gradient-to-r from-brass-600 to-brass-400 transition-[width] duration-500;
+  @apply relative h-full rounded-full bg-gradient-to-r from-brass-600 to-brass-400;
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
 
 [dir='rtl'] .progress-fill {
   @apply bg-gradient-to-l;
+}
+
+/* A travelling highlight makes a slow step feel alive rather than stalled. */
+.progress-fill::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  background-size: 200% 100%;
+  animation: shimmer 1.8s linear infinite;
+}
+
+/* Animated glow behind the hero.
+   A radial gradient fades to transparent on its own, so the edges never read
+   as a coloured rectangle the way a blurred solid fill did. */
+.aurora-blob {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(40px);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/**
+ * One switch turns the whole motion system off for people who ask for it.
+ * Everything above is decoration on top of a layout that already works.
+ */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .reveal {
+    opacity: 1;
+    transform: none;
+  }
 }

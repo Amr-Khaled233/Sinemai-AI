@@ -41,7 +41,16 @@
     "forVendors": "For rental houses",
     "forVendorsBody": "List your inventory, set your day and week rates, mark rented-out dates. Producers reach you with the package already specified.",
     "forDops": "For cinematographers",
-    "forDopsBody": "Publish your reel and style tags. We match you to projects whose look is genuinely yours."
+    "forDopsBody": "Publish your reel and style tags. We match you to projects whose look is genuinely yours.",
+    "statEquipment": "Catalog items",
+    "statDops": "Cinematographers",
+    "statVendors": "Rental vendors",
+    "statSheets": "Sheets generated",
+    "trustPoint1": "Equipment comes from a curated catalog query, never model memory.",
+    "trustPoint2": "Rental prices come from the vendor who owns the gear.",
+    "trustPoint3": "Crew costs come from an admin-maintained rate table.",
+    "trustPoint4": "A reviewer agent blocks a sheet that would mislead a spending decision.",
+    "closingBody": "Upload a screenplay or an ad brief and see the breakdown, the package, the people and the number in a few minutes."
   },
   "auth": {
     "signInTitle": "Sign in",
