@@ -97,8 +97,8 @@ export function DopProfileForm({
         <StyleTagPicker tags={tags} locale={locale} selected={selected} onChange={setSelected} name="styleTags" />
       </Field>
 
-      {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
-      {message && <p className="mb-3 text-xs text-teal-400">{message}</p>}
+      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
+      {message && <p className="mb-3 text-xs text-info">{message}</p>}
 
       <button type="submit" className="btn-primary" disabled={pending || selected.length === 0}>
         {pending ? tc('loading') : t('save')}

@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { AgentName, AgentRunStatus } from '@prisma/client';
 import { allToolResults, finishRun, model, MODELS, startRun, type RunContext } from './runtime';
 import { makeEquipmentTools, queryEquipmentCatalog } from './tools/equipment-tools';
+import { withLanguage } from './language';
 import type { CatalogItem, EquipmentResult, PackageItem, ProjectBrief, SceneSummary } from './types';
 
 export const EQUIPMENT_SYSTEM = `You are a camera and lighting department head building a rental package for a production in Saudi Arabia.
@@ -51,8 +52,8 @@ export async function runEquipmentAgent(
     agent: AgentName.EQUIPMENT,
     attempt: options.attempt ?? 1,
     model: MODELS.reasoning,
-    systemPrompt: EQUIPMENT_SYSTEM,
-    input: { summary, budgetTier: brief.budgetTier, criticFlag: options.criticFlag ?? null },
+    systemPrompt: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
+    input: { summary, budgetTier: brief.budgetTier, locale: brief.locale, criticFlag: options.criticFlag ?? null },
   });
 
   try {
@@ -63,7 +64,7 @@ export async function runEquipmentAgent(
     // ---- phase 1: retrieval. The model picks the filters; the DB picks the gear.
     await generateText({
       model: model('reasoning'),
-      system: EQUIPMENT_SYSTEM,
+      system: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
       tools,
       stopWhen: stepCountIs(4),
       temperature: 0.3,
@@ -92,7 +93,7 @@ export async function runEquipmentAgent(
     const { object } = await generateObject({
       model: model('reasoning'),
       schema: packageSchema,
-      system: SELECTION_SYSTEM,
+      system: withLanguage(SELECTION_SYSTEM, brief.locale),
       temperature: 0.3,
       prompt: buildSelectionPrompt(brief, summary, shortlist, options.criticFlag),
     });

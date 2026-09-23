@@ -63,7 +63,7 @@ export function ScriptUpload({
             type="file"
             name="file"
             accept=".fountain,.fdx,.pdf,.txt,.md,application/pdf,text/plain,text/xml,application/xml"
-            className="file:me-3 file:rounded-md file:border-0 file:bg-brass-500/20 file:px-3 file:py-1.5 file:text-xs file:text-brass-300"
+            className="file:me-3 file:rounded-md file:border-0 file:bg-accent/20 file:px-3 file:py-1.5 file:text-xs file:text-accent"
           />
         </Field>
       ) : (
@@ -72,7 +72,7 @@ export function ScriptUpload({
         </Field>
       )}
 
-      {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+      {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
       <button type="submit" className="btn-secondary" disabled={pending}>
         {pending ? tc('loading') : hasScript ? t('replaceScript') : t('saveScript')}

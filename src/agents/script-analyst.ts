@@ -11,7 +11,8 @@ import {
 import { prisma } from '@/lib/prisma';
 import { getSettings } from '@/lib/settings';
 import { finishRun, lastToolResult, model, MODELS, startRun, type RunContext } from './runtime';
-import { makeScriptTools, type ParseResult, type SceneStub } from './tools/script-tools';
+import { makeScriptTools, segmentScenesBatch, type ParseResult, type SceneStub } from './tools/script-tools';
+import { withLanguage } from './language';
 import type { ProjectBrief, SceneRequirement, SceneSummary } from './types';
 
 export const SCRIPT_ANALYST_SYSTEM = `You are a professional film production breakdown assistant. You understand cinematography and production terminology (ISO, focal length, anamorphic vs spherical, key light, fill light, practicals, dynamic range, frame rate, handheld vs steadicam vs gimbal, day-for-night, VFX plates).
@@ -23,7 +24,8 @@ For each scene provided, output ONLY valid JSON with these fields:
 - environment: "interior" | "exterior"
 - special_requirements: array of strings (e.g. ["underwater", "VFX greenscreen", "vehicle mount"])
 - estimated_shoot_hours: number
-Never include prose outside the JSON. Never invent a scene that wasn't in the input.`;
+Never include prose outside the JSON. Never invent a scene that wasn't in the input.
+The enum values above are fixed keys and are always written exactly as listed, in English; only lighting_notes and special_requirements are free text.`;
 
 const PREP_SYSTEM = `You prepare screenplays for breakdown. Call parseScriptFile once to segment the script, then report the scene count. Do not analyse the scenes yourself. Keep your reply to one sentence.`;
 
@@ -42,7 +44,7 @@ const sceneAnalysisSchema = z.object({
   ),
 });
 
-const BATCH_SIZE = 12;
+export const BATCH_SIZE = 12;
 
 const COMPLEXITY_DB: Record<SceneRequirement['lighting_complexity'], Complexity> = {
   low: Complexity.LOW,
@@ -66,112 +68,74 @@ const ENV_DB: Record<SceneRequirement['environment'], IntExt> = {
   exterior: IntExt.EXTERIOR,
 };
 
-export type ScriptAnalystOutput = {
-  scenes: SceneRequirement[];
-  summary: SceneSummary;
-};
+// Reverse maps, for rebuilding requirements from persisted scenes on resume.
+const COMPLEXITY_OUT = { LOW: 'low', MEDIUM: 'medium', HIGH: 'high' } as const;
+const MOVEMENT_OUT = {
+  STATIC: 'static',
+  HANDHELD: 'handheld',
+  STEADICAM_GIMBAL: 'steadicam/gimbal',
+  CRANE_DOLLY: 'crane/dolly',
+  DRONE: 'drone',
+} as const;
+const TIME_OUT = { DAY: 'day', NIGHT: 'night', DAWN_DUSK: 'dawn/dusk' } as const;
+const ENV_OUT = { INTERIOR: 'interior', EXTERIOR: 'exterior' } as const;
+
+export type ParsePhaseResult = { sceneTotal: number; reused: boolean };
+export type BatchPhaseResult = { analysed: number; sceneTotal: number; nextCursor: number | null };
 
 /**
- * Agent 2 — Script Analyst.
+ * Agent 2 — Script Analyst, in two resumable phases.
  *
- * Step 1 (tool phase): a cheap agent calls parseScriptFile, so segmentation is
- * deterministic and recorded.
- * Step 2 (reasoning phase): scenes are analysed in batches of 12 with a strict
- * JSON schema, on gpt-4o. Batching keeps a feature-length script inside sane
- * token budgets and lets one bad batch fail without losing the rest.
+ * `parse`: a cheap agent calls parseScriptFile so segmentation is deterministic
+ * and recorded.
+ * `batch`: one batch of scenes is analysed per call against a strict JSON
+ * schema on gpt-4o, and written straight to the Scene rows. Because results are
+ * persisted per batch, a timed-out request resumes at the next cursor instead
+ * of re-analysing (and re-paying for) the whole script.
  */
-export async function runScriptAnalyst(
+export async function runScriptAnalystStep(
   ctx: RunContext,
   brief: ProjectBrief,
-  options: { attempt?: number; criticFlag?: string } = {},
-): Promise<ScriptAnalystOutput> {
+  options: { phase: 'parse' } | { phase: 'batch'; cursor: number },
+): Promise<ParsePhaseResult & BatchPhaseResult> {
+  return options.phase === 'parse'
+    ? { ...(await parsePhase(ctx, brief)), analysed: 0, nextCursor: 0 }
+    : { ...(await batchPhase(ctx, brief, options.cursor)), reused: false };
+}
+
+async function parsePhase(ctx: RunContext, brief: ProjectBrief): Promise<ParsePhaseResult> {
   const startedAt = Date.now();
   const handle = await startRun({
     ctx,
     agent: AgentName.SCRIPT_ANALYST,
-    attempt: options.attempt ?? 1,
-    model: MODELS.reasoning,
-    systemPrompt: SCRIPT_ANALYST_SYSTEM,
-    input: { projectId: brief.projectId, criticFlag: options.criticFlag ?? null },
+    model: MODELS.cheap,
+    systemPrompt: PREP_SYSTEM,
+    input: { projectId: brief.projectId, phase: 'parse' },
   });
 
   try {
     const tools = makeScriptTools(handle, { projectId: brief.projectId });
 
-    ctx.report({ type: 'stage', stage: 'parsing', pct: 8, detail: brief.name });
     await generateText({
       model: model('cheap'),
       system: PREP_SYSTEM,
       tools: { parseScriptFile: tools.parseScriptFile },
       stopWhen: stepCountIs(3),
-      prompt: `Project "${brief.name}" (${brief.type}). Segment the uploaded script into scenes.${
-        options.criticFlag ? ` A reviewer flagged the previous pass: ${options.criticFlag}` : ''
-      }`,
+      prompt: `Project "${brief.name}" (${brief.type}). Segment the uploaded script into scenes.`,
     });
 
     const parsed = lastToolResult<ParseResult>(handle, 'parseScriptFile');
     if (!parsed || typeof parsed.sceneCount !== 'number' || parsed.sceneCount === 0) {
       throw new Error('SCRIPT_SEGMENTATION_FAILED');
     }
-    ctx.report({ type: 'scenes', count: parsed.sceneCount });
-    ctx.report({
-      type: 'stage',
-      stage: 'analyzing_scenes',
-      pct: 14,
-      detail: `${parsed.sceneCount}`,
-    });
-
-    // ---- batched breakdown
-    const requirements: SceneRequirement[] = [];
-    const stubs = await collectStubs(brief.projectId, tools);
-    const batches = chunk(stubs, BATCH_SIZE);
-
-    for (const [index, batch] of batches.entries()) {
-      const { object } = await generateObject({
-        model: model('reasoning'),
-        schema: sceneAnalysisSchema,
-        system: SCRIPT_ANALYST_SYSTEM,
-        temperature: 0.2,
-        prompt: buildBatchPrompt(brief, batch, options.criticFlag),
-      });
-
-      const bySceneId = new Map(batch.map((s) => [s.sceneId, s]));
-      for (const analysed of object.scenes) {
-        const stub = bySceneId.get(analysed.sceneId);
-        if (!stub) continue; // guards against an invented scene id
-        const { sceneId: _ignored, ...fields } = analysed;
-        requirements.push({
-          sceneId: stub.sceneId,
-          order: stub.order,
-          heading: stub.heading,
-          ...fields,
-          special_requirements: analysed.special_requirements
-            .map((s) => s.trim().toLowerCase())
-            .filter(Boolean)
-            .slice(0, 6),
-        });
-      }
-
-      ctx.report({
-        type: 'stage',
-        stage: 'analyzing_scenes',
-        pct: 14 + Math.round(((index + 1) / batches.length) * 26),
-        detail: `${requirements.length}/${stubs.length}`,
-      });
-    }
-
-    if (requirements.length === 0) throw new Error('NO_SCENES_ANALYSED');
-
-    await persistSceneRequirements(requirements);
-    const summary = await summariseScenes(brief.projectId, requirements);
 
     await finishRun(handle, {
       status: AgentRunStatus.OK,
-      output: { summary, sceneCount: requirements.length },
+      output: { sceneCount: parsed.sceneCount, reused: parsed.reused },
       startedAt,
     });
 
-    return { scenes: requirements.sort((a, b) => a.order - b.order), summary };
+    return { sceneTotal: parsed.sceneCount, reused: parsed.reused };
   } catch (error) {
     await finishRun(handle, {
       status: AgentRunStatus.FAILED,
@@ -182,31 +146,80 @@ export async function runScriptAnalyst(
   }
 }
 
-async function collectStubs(
-  projectId: string,
-  tools: ReturnType<typeof makeScriptTools>,
-): Promise<SceneStub[]> {
-  const stubs: SceneStub[] = [];
-  let offset = 0;
+async function batchPhase(ctx: RunContext, brief: ProjectBrief, cursor: number): Promise<BatchPhaseResult> {
+  const startedAt = Date.now();
+  const system = withLanguage(SCRIPT_ANALYST_SYSTEM, brief.locale);
+  const handle = await startRun({
+    ctx,
+    agent: AgentName.SCRIPT_ANALYST,
+    attempt: 1,
+    model: MODELS.reasoning,
+    systemPrompt: system,
+    input: { phase: 'batch', cursor, locale: brief.locale },
+  });
 
-  // The segmentScenes tool is the agent's paging interface; calling it directly
-  // here keeps the batching loop deterministic while still logging every call.
-  for (;;) {
-    const result = (await tools.segmentScenes.execute?.(
-      { offset, limit: BATCH_SIZE },
-      { toolCallId: `segment-${offset}`, messages: [] },
-    )) as { scenes: SceneStub[]; nextOffset: number | null } | undefined;
-    if (!result || !Array.isArray(result.scenes) || result.scenes.length === 0) break;
-    stubs.push(...result.scenes);
-    if (result.nextOffset === null) break;
-    offset = result.nextOffset;
-    if (stubs.length >= 400) break; // hard ceiling for runaway documents
+  try {
+    const batch = await segmentScenesBatch(brief.projectId, { offset: cursor, limit: BATCH_SIZE });
+    if (batch.scenes.length === 0) {
+      await finishRun(handle, { status: AgentRunStatus.OK, output: { empty: true }, startedAt });
+      return { analysed: batch.total, sceneTotal: batch.total, nextCursor: null };
+    }
+
+    const { object } = await generateObject({
+      model: model('reasoning'),
+      schema: sceneAnalysisSchema,
+      system,
+      temperature: 0.2,
+      prompt: buildBatchPrompt(brief, batch.scenes),
+    });
+
+    const bySceneId = new Map(batch.scenes.map((scene) => [scene.sceneId, scene]));
+    const requirements: SceneRequirement[] = [];
+
+    for (const analysed of object.scenes) {
+      const stub = bySceneId.get(analysed.sceneId);
+      if (!stub) continue; // guards against an invented scene id
+      const { sceneId: _ignored, ...fields } = analysed;
+      requirements.push({
+        sceneId: stub.sceneId,
+        order: stub.order,
+        heading: stub.heading,
+        ...fields,
+        special_requirements: analysed.special_requirements
+          .map((value) => value.trim())
+          .filter(Boolean)
+          .slice(0, 6),
+      });
+    }
+
+    await persistSceneRequirements(requirements);
+
+    const analysedTotal = await prisma.scene.count({
+      where: { script: { projectId: brief.projectId }, analyzedAt: { not: null } },
+    });
+
+    await finishRun(handle, {
+      status: AgentRunStatus.OK,
+      output: { batchSize: requirements.length, cursor, analysedTotal },
+      startedAt,
+    });
+
+    return {
+      analysed: analysedTotal,
+      sceneTotal: batch.total,
+      nextCursor: batch.nextOffset,
+    };
+  } catch (error) {
+    await finishRun(handle, {
+      status: AgentRunStatus.FAILED,
+      errorText: error instanceof Error ? error.message : String(error),
+      startedAt,
+    });
+    throw error;
   }
-
-  return stubs;
 }
 
-function buildBatchPrompt(brief: ProjectBrief, batch: SceneStub[], criticFlag?: string) {
+function buildBatchPrompt(brief: ProjectBrief, batch: SceneStub[]) {
   const scenes = batch
     .map(
       (scene) =>
@@ -221,7 +234,6 @@ function buildBatchPrompt(brief: ProjectBrief, batch: SceneStub[], criticFlag?: 
   return [
     `Production: "${brief.name}" — ${brief.type}, budget tier ${brief.budgetTier}.`,
     brief.visualStyleTags.length ? `Director's visual style: ${brief.visualStyleTags.join(', ')}.` : '',
-    criticFlag ? `A reviewer flagged the previous breakdown: ${criticFlag}. Correct it.` : '',
     `Return one JSON object per scene, echoing its sceneId exactly. Respect the parsed intExt/timeOfDay hints unless the action clearly contradicts them.`,
     '',
     scenes,
@@ -231,6 +243,7 @@ function buildBatchPrompt(brief: ProjectBrief, batch: SceneStub[], criticFlag?: 
 }
 
 async function persistSceneRequirements(requirements: SceneRequirement[]) {
+  if (requirements.length === 0) return;
   await prisma.$transaction(
     requirements.map((r) =>
       prisma.scene.update({
@@ -248,6 +261,42 @@ async function persistSceneRequirements(requirements: SceneRequirement[]) {
       }),
     ),
   );
+}
+
+/**
+ * Rebuilds the requirement set from the persisted scenes. This is what makes
+ * the breakdown resumable: the database, not memory, is the source of truth.
+ */
+export async function loadSceneRequirements(projectId: string): Promise<SceneRequirement[]> {
+  const scenes = await prisma.scene.findMany({
+    where: { script: { projectId }, analyzedAt: { not: null } },
+    orderBy: { order: 'asc' },
+    select: {
+      id: true,
+      order: true,
+      heading: true,
+      lightingComplexity: true,
+      lightingNotes: true,
+      cameraMovement: true,
+      timeOfDay: true,
+      intExt: true,
+      specialRequirements: true,
+      estimatedHours: true,
+    },
+  });
+
+  return scenes.map((scene) => ({
+    sceneId: scene.id,
+    order: scene.order,
+    heading: scene.heading,
+    lighting_complexity: COMPLEXITY_OUT[scene.lightingComplexity ?? 'MEDIUM'],
+    lighting_notes: scene.lightingNotes ?? '',
+    camera_movement: MOVEMENT_OUT[scene.cameraMovement ?? 'STATIC'],
+    time_of_day: TIME_OUT[scene.timeOfDay ?? 'DAY'],
+    environment: ENV_OUT[scene.intExt ?? 'INTERIOR'],
+    special_requirements: scene.specialRequirements,
+    estimated_shoot_hours: scene.estimatedHours ?? 1,
+  }));
 }
 
 /** Aggregation is pure arithmetic — no model is asked to count anything. */
@@ -311,10 +360,4 @@ export async function summariseScenes(
       .slice(0, 8)
       .map((n) => n.note),
   };
-}
-
-function chunk<T>(items: T[], size: number): T[][] {
-  const out: T[][] = [];
-  for (let i = 0; i < items.length; i += size) out.push(items.slice(i, i + size));
-  return out;
 }

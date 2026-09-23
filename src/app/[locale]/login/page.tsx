@@ -19,9 +19,14 @@ export default async function LoginPage({ params }: { params: Promise<{ locale: 
     <div className="mx-auto max-w-md">
       <Card title={t('signInTitle')} subtitle={t('signInSubtitle')}>
         <SignInForm />
-        <p className="mt-5 text-xs text-[rgb(var(--muted))]">
+        <p className="mt-4 text-xs">
+          <Link href="/forgot-password" className="text-accent hover:underline">
+            {t('forgotPassword')}
+          </Link>
+        </p>
+        <p className="mt-2 text-xs text-muted">
           {t('noAccount')}{' '}
-          <Link href="/register" className="text-brass-400 hover:underline">
+          <Link href="/register" className="text-accent hover:underline">
             {t('signUpTitle')}
           </Link>
         </p>

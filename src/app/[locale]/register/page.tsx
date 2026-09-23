@@ -19,9 +19,9 @@ export default async function RegisterPage({ params }: { params: Promise<{ local
     <div className="mx-auto max-w-lg">
       <Card title={t('signUpTitle')} subtitle={t('signUpSubtitle')}>
         <SignUpForm locale={locale} />
-        <p className="mt-5 text-xs text-[rgb(var(--muted))]">
+        <p className="mt-5 text-xs text-muted">
           {t('haveAccount')}{' '}
-          <Link href="/login" className="text-brass-400 hover:underline">
+          <Link href="/login" className="text-accent hover:underline">
             {t('signInTitle')}
           </Link>
         </p>

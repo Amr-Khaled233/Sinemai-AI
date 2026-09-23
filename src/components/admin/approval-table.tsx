@@ -42,19 +42,19 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
-        <li key={row.id} className="rounded-xl border border-ink-600/70 bg-ink-900/40 p-4">
+        <li key={row.id} className="rounded-xl border border-line bg-surface-sunken p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+              <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">
                 {row.title}
                 <Badge tone={row.status === 'APPROVED' ? 'green' : row.status === 'REJECTED' ? 'red' : 'amber'}>
                   {tEnum(`approval.${row.status}`)}
                 </Badge>
                 {row.verified && <Badge tone="teal">{t('verified')}</Badge>}
               </h3>
-              <p className="mt-1 text-xs text-[rgb(var(--muted))]">{row.subtitle}</p>
+              <p className="mt-1 text-xs text-muted">{row.subtitle}</p>
               {row.detail && (
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[rgb(var(--muted))]">{row.detail}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{row.detail}</p>
               )}
 
               {row.tags && row.tags.length > 0 && (
@@ -75,7 +75,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-teal-400 hover:underline"
+                      className="text-info hover:underline"
                       dir="ltr"
                     >
                       {link.replace(/^https?:\/\//, '').slice(0, 48)} ↗
@@ -84,7 +84,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
                 </div>
               )}
 
-              {row.meta && <p className="mt-2 text-[11px] text-[rgb(var(--muted))]/70">{row.meta}</p>}
+              {row.meta && <p className="mt-2 text-[11px] text-muted/70">{row.meta}</p>}
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
@@ -127,7 +127,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
           </div>
 
           {reasonFor === row.id && (
-            <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-ink-700 pt-3">
+            <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
               <input
                 className="input max-w-md"
                 placeholder="Reviewer note sent to the applicant"

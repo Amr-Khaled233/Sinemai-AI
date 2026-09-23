@@ -39,13 +39,13 @@ export default async function DopHome({ params }: { params: Promise<{ locale: st
   return (
     <div className="mx-auto max-w-3xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-white">{t('title')}</h1>
+        <h1 className="text-xl font-semibold text-strong">{t('title')}</h1>
         <div className="flex items-center gap-2">
           <Badge tone={dop.status === 'APPROVED' ? 'green' : dop.status === 'REJECTED' ? 'red' : 'amber'}>
             {tEnum(`approval.${dop.status}`)}
           </Badge>
           {dop.embeddedAt && (
-            <span className="text-[11px] text-[rgb(var(--muted))]">
+            <span className="text-[11px] text-muted">
               {t('embeddedAt', { date: formatDate(dop.embeddedAt, locale) })}
             </span>
           )}
@@ -55,8 +55,8 @@ export default async function DopHome({ params }: { params: Promise<{ locale: st
       <p
         className={`rounded-lg border p-3 text-xs ${
           dop.status === 'APPROVED'
-            ? 'border-teal-700/40 bg-teal-900/10 text-teal-300'
-            : 'border-amber-700/40 bg-amber-900/10 text-amber-300'
+            ? 'border-info/40 bg-info/10 text-info'
+            : 'border-warning/40 bg-warning/10 text-warning'
         }`}
       >
         {dop.status === 'APPROVED' ? t('approved') : t('pending')}

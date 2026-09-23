@@ -66,7 +66,24 @@
     "invalid": "Wrong email or password.",
     "emailTaken": "An account with this email already exists.",
     "created": "Account created. Signing you in…",
-    "pendingNotice": "Your listing will be visible to producers once an admin approves it."
+    "pendingNotice": "Your listing will be visible to producers once an admin approves it.",
+    "forgotPassword": "Forgot password?",
+    "forgotTitle": "Reset your password",
+    "forgotSubtitle": "We will email you a link to choose a new one.",
+    "forgotHint": "The address you signed up with.",
+    "sendResetLink": "Send reset link",
+    "resetSent": "If that address has an account, a reset link is on its way. The link expires in one hour.",
+    "resetTitle": "Choose a new password",
+    "resetSubtitle": "Pick something at least 8 characters long.",
+    "newPassword": "New password",
+    "confirmPassword": "Confirm password",
+    "setNewPassword": "Save new password",
+    "passwordMismatch": "The two passwords do not match.",
+    "resetInvalid": "This reset link is not valid. Request a new one.",
+    "resetExpired": "This reset link has expired. Request a new one.",
+    "resetUsed": "This reset link has already been used. Request a new one.",
+    "resetDone": "Password updated. Taking you to sign in…",
+    "backToSignIn": "Back to sign in"
   },
   "project": {
     "newTitle": "New project",
@@ -375,5 +392,10 @@
     "copy": "Copy",
     "open": "Open",
     "search": "Search"
+  },
+  "theme": {
+    "system": "Theme: system",
+    "dark": "Theme: dark",
+    "light": "Theme: light"
   }
 }

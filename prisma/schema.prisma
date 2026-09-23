@@ -139,9 +139,10 @@ model User {
   projects      Project[]
   dop           Dop?
   vendor        Vendor?
-  sentInquiries Inquiry[] @relation("InquiryFrom")
+  sentInquiries Inquiry[]            @relation("InquiryFrom")
   accounts      Account[]
   sessions      Session[]
+  resetTokens   PasswordResetToken[]
 
   @@index([role])
 }
@@ -363,6 +364,7 @@ model Project {
   inquiries      Inquiry[]
   agentRuns      AgentRun[]
   shareLinks     ShareLink[]
+  analysisState  AnalysisState?
 
   @@index([ownerId])
   @@index([status])
@@ -431,6 +433,8 @@ model ProjectRecommendation {
   budgetBreakdown     Json   @default("{}")
 
   rationaleText String   @default("")
+  /// Language the narrative fields were generated in (ar | en).
+  locale        String   @default("ar")
   criticNotes   String[] @default([])
   criticPassed  Boolean  @default(true)
   /// Aggregated scene statistics the whole sheet is derived from.
@@ -565,4 +569,61 @@ model Setting {
   key       String   @id
   value     Json
   updatedAt DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------- resumable analysis
+
+enum AnalysisStage {
+  PARSE
+  SCENES
+  EQUIPMENT
+  DOPS
+  VENDOR_BUDGET
+  CRITIC
+  RETRY
+  ASSEMBLE
+  DONE
+  FAILED
+}
+
+/// Checkpoint for one project's analysis so the agent graph can be executed
+/// across several short function invocations instead of one long one. Each step
+/// advances `stage` (and `sceneCursor` inside the batched breakdown) and stores
+/// the finished agent output, so a timed-out request simply resumes here.
+model AnalysisState {
+  id            String        @id @default(cuid())
+  projectId     String        @unique
+  stage         AnalysisStage @default(PARSE)
+  /// UI language the run was started in — every agent answers in it.
+  locale        String        @default("ar")
+  sceneCursor   Int           @default(0)
+  sceneTotal    Int           @default(0)
+  summary       Json?
+  equipment     Json?
+  dops          Json?
+  vendorBudget  Json?
+  critic        Json?
+  /// Agents already retried once, so the one-retry-per-agent cap survives resumes.
+  retriedAgents String[]      @default([])
+  criticRound   Int           @default(0)
+  errorText     String?
+  startedAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+/// Single-use password reset tokens. Only the SHA-256 hash is stored, so a
+/// database leak cannot be replayed against the reset endpoint.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }

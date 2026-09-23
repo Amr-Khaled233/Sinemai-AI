@@ -87,7 +87,7 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-white">{t('overview')}</h1>
+      <h1 className="text-xl font-semibold text-strong">{t('overview')}</h1>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
         <Stat label={t('projects')} value={projectCount} />
@@ -122,8 +122,8 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
             <ul className="space-y-2">
               {topEquipmentIds.map(([id, count]) => (
                 <li key={id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-white">{equipmentNames.get(id) ?? id}</span>
-                  <span className="tabular-nums text-brass-400">{count}</span>
+                  <span className="text-strong">{equipmentNames.get(id) ?? id}</span>
+                  <span className="tabular-nums text-accent">{count}</span>
                 </li>
               ))}
             </ul>
@@ -137,8 +137,8 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
             <ul className="space-y-2">
               {topDopIds.map(([id, count]) => (
                 <li key={id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-white">{dopNames.get(id) ?? id}</span>
-                  <span className="tabular-nums text-brass-400">{count}</span>
+                  <span className="text-strong">{dopNames.get(id) ?? id}</span>
+                  <span className="tabular-nums text-accent">{count}</span>
                 </li>
               ))}
             </ul>
@@ -163,15 +163,15 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
             <tbody>
               {recentRuns.map((run) => (
                 <tr key={run.id}>
-                  <td className="text-white">{tEnum(`agent.${run.agent}`)}</td>
-                  <td className="text-[rgb(var(--muted))]">{run.project.name}</td>
+                  <td className="text-strong">{tEnum(`agent.${run.agent}`)}</td>
+                  <td className="text-muted">{run.project.name}</td>
                   <td>
                     <Badge tone={RUN_TONE[run.status]}>{run.status}</Badge>
                   </td>
                   <td className="text-end tabular-nums">{run.attempt}</td>
                   <td className="text-end tabular-nums">{run.latencyMs ? `${run.latencyMs} ms` : '—'}</td>
-                  <td className="text-xs text-[rgb(var(--muted))]">{run.model ?? '—'}</td>
-                  <td className="text-xs text-[rgb(var(--muted))]/70">{formatDate(run.startedAt, locale)}</td>
+                  <td className="text-xs text-muted">{run.model ?? '—'}</td>
+                  <td className="text-xs text-muted/70">{formatDate(run.startedAt, locale)}</td>
                 </tr>
               ))}
             </tbody>

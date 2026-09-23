@@ -4,6 +4,7 @@ import { AgentName, AgentRunStatus } from '@prisma/client';
 import { getBudgetTierConfig } from '@/lib/settings';
 import { finishRun, model, MODELS, startRun, type RunContext } from './runtime';
 import { describeSummary } from './equipment-agent';
+import { withLanguage } from './language';
 import type {
   CriticIssue,
   CriticResult,
@@ -59,7 +60,7 @@ export async function runCriticAgent(
     agent: AgentName.CRITIC,
     attempt: options.attempt ?? 1,
     model: MODELS.reasoning,
-    systemPrompt: CRITIC_SYSTEM,
+    systemPrompt: withLanguage(CRITIC_SYSTEM, brief.locale),
     input: { budgetTier: brief.budgetTier, tierWindow: [tierConfig.minTotal, tierConfig.maxTotal] },
   });
 
@@ -69,7 +70,7 @@ export async function runCriticAgent(
     const { object } = await generateObject({
       model: model('reasoning'),
       schema: criticSchema,
-      system: CRITIC_SYSTEM,
+      system: withLanguage(CRITIC_SYSTEM, brief.locale),
       temperature: 0.1,
       prompt: [
         `PROJECT: "${brief.name}" — ${brief.type}, declared budget tier ${brief.budgetTier} (${tierConfig.minTotal}–${tierConfig.maxTotal} ${tierConfig.currency}), ${brief.city}.`,

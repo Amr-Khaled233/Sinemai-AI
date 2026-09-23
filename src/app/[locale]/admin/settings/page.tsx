@@ -31,7 +31,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-white">{t('settingsTitle')}</h1>
+      <h1 className="text-xl font-semibold text-strong">{t('settingsTitle')}</h1>
 
       <Card title={t('settingsTitle')} subtitle="These values feed the budget agent and the matching thresholds.">
         <form action={savePlatformSettingsForm}>
@@ -74,11 +74,11 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
             </Field>
           </div>
 
-          <h3 className="mb-3 mt-2 text-sm font-semibold text-white">{t('budgetTiers')}</h3>
+          <h3 className="mb-3 mt-2 text-sm font-semibold text-strong">{t('budgetTiers')}</h3>
           <div className="space-y-3">
             {tiers.map((tier) => (
-              <div key={tier.tier} className="rounded-lg border border-ink-600/70 bg-ink-900/40 p-3">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-brass-500">
+              <div key={tier.tier} className="rounded-lg border border-line bg-surface-sunken p-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-accent">
                   {tEnum(`tier.${tier.tier}`)}
                 </p>
                 <div className="grid gap-x-4 sm:grid-cols-4">
@@ -121,9 +121,9 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
             <tbody>
               {[...ratesByRole.entries()].map(([roleSlug, rates]) => (
                 <tr key={roleSlug}>
-                  <td className="text-white">
+                  <td className="text-strong">
                     {locale === 'ar' ? rates[0].labelAr : rates[0].labelEn}
-                    <span className="ms-2 text-[11px] text-[rgb(var(--muted))]">{roleSlug}</span>
+                    <span className="ms-2 text-[11px] text-muted">{roleSlug}</span>
                   </td>
                   {Object.values(BudgetTier).map((tier) => {
                     const rate = rates.find((r) => r.budgetTier === tier);

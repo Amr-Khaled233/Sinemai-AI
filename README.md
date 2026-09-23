@@ -20,8 +20,10 @@ Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay head
 | Auth | NextAuth (credentials, JWT sessions) with `PRODUCER · VENDOR · DOP · ADMIN` roles |
 | Files | Vercel Blob (scripts, equipment photos) |
 | Email | Resend (falls back to console logging in dev) |
-| PDF | `@react-pdf/renderer` — no headless browser, so it fits in a serverless function |
-| i18n | `next-intl`, `dir="rtl"` + logical CSS properties |
+| PDF | `@react-pdf/renderer` with an embedded IBM Plex Sans Arabic — Arabic and English, no headless browser |
+| Auth extras | Self-service password reset: hashed single-use tokens, 60-minute expiry, no account enumeration |
+| i18n | `next-intl`, `dir="rtl"` + logical CSS properties; agents answer in the reader's language |
+| Theming | Semantic CSS-variable tokens, light/dark/system with a no-flash init script |
 | Jobs | Vercel Cron (`vercel.json`) hitting guarded `/api/cron/*` routes |
 
 ---
@@ -46,14 +48,24 @@ npm run db:seed         # catalog, crew rates, style tags, launch partners, demo
 
 ### Seeded accounts
 
-All use the password `Sinemai!2026`:
+Demo accounts are built from one real Gmail address with plus-addressing, so every
+approval mail, inquiry and password reset lands in a single inbox and each account can
+actually be signed into:
+
+```bash
+SEED_GMAIL=you@gmail.com SEED_PASSWORD='choose-one' npm run db:seed
+```
 
 | Email | Role |
 | --- | --- |
-| `admin@sinemai.ai` | ADMIN |
-| `producer@sinemai.ai` | PRODUCER |
-| `vendor.riyadh@sinemai.ai` · `vendor.jeddah@sinemai.ai` | VENDOR (approved, with inventory) |
-| `dop.faisal@sinemai.ai` … `dop.tariq@sinemai.ai` | DOP (approved, 5 profiles) |
+| `you+admin@gmail.com` | ADMIN |
+| `you+producer@gmail.com` | PRODUCER |
+| `you+vendor-riyadh@gmail.com` · `you+vendor-jeddah@gmail.com` | VENDOR (approved, with inventory) |
+| `you+dop-faisal@gmail.com` … `you+dop-tariq@gmail.com` | DOP (approved, 5 profiles) |
+
+**No password is committed to this repository.** With `SEED_PASSWORD` unset the seed
+generates a strong one and prints it once — save it from that output. Forgot the password
+later? Use the reset flow on the sign-in page.
 
 The seed ships ~30 catalog entries compiled from public manufacturer spec sheets
 (ARRI, RED, Sony, Canon, Blackmagic, Aputure, Astera, Nanlux, Kino Flo, DJI, Matthews,
@@ -122,11 +134,28 @@ The hallucination surface is closed structurally, not by asking the model nicely
   output, latency, token counts) and `AgentToolCall` (args + results) — visible in the admin
   dashboard and the basis for tuning the matching rules later.
 
-### Streaming
+### Answering in the reader's language
 
-`POST /api/projects/:id/analyze` streams newline-delimited JSON progress events
-(`parsing → analyzing_scenes → matching_equipment → matching_dops → pricing → reviewing → saving`)
-which the client renders as a live stage list.
+The run carries the locale the producer is actually reading, not the one stored on their
+account, and every agent that writes prose for a human gets a language directive appended to
+its system prompt ([`src/agents/language.ts`](src/agents/language.ts)). Equipment rationale,
+cinematographer match reasons, sourcing caveats, reviewer findings and the executive summary
+come back in Arabic on `/ar` and English on `/en`. Ids, enum values, numbers and equipment
+model names stay exactly as the database has them — the UI translates those itself.
+
+### Resumable execution and streaming
+
+The orchestrator is a **state machine, not one long call**. Each step does one unit of work
+(parse, *one batch of 12 scenes*, equipment+DOP, pricing, review, one retry, assemble) and
+checkpoints to `AnalysisState`. `POST /api/projects/:id/analyze` runs as many steps as fit in
+a 40s budget, streams newline-delimited JSON progress events, and closes with a `checkpoint`
+event telling the client whether to call again.
+
+That means **no single function invocation needs a long duration**: a feature-length breakdown
+runs on a 60s plan across several short requests. Because analysed scenes are persisted per
+batch, a timed-out or retried request resumes at the next cursor instead of re-analysing — and
+re-paying for — the whole script. `GET` on the same route returns the current checkpoint, so a
+reloaded page can rejoin a run already in flight.
 
 ### Testing the pipeline
 
@@ -172,19 +201,18 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
    - `/api/cron/reembed-dops` daily at 03:00 — re-embeds profiles edited since their last vector.
    - `/api/cron/availability-cleanup` at 03:30 — prunes old availability blocks and fails
      analyses left hanging by a timed-out function.
-5. The analyze route declares `maxDuration = 300`. Feature-length scripts need
-   **Fluid Compute / a plan that allows long function durations**. If a run ever outgrows it, the
-   orchestrator's stages are already separable — split the agents into chained functions or put
-   them behind a queue (Upstash QStash) without touching agent logic.
+5. No plan upgrade is needed: the analyze route declares `maxDuration = 60` and the run is
+   split across as many short requests as it takes. On a plan with longer durations it simply
+   finishes in fewer round trips.
+
+Arabic PDF export embeds two font files from `src/pdf/fonts/`. They are pulled into the
+serverless bundle by `outputFileTracingIncludes` in `next.config.mjs` — keep that entry if you
+move the PDF route.
 
 ---
 
 ## Known limits, deliberately
 
-- **The PDF is English/Latin.** `@react-pdf/renderer` does not shape Arabic script without an
-  embedded Arabic font with ligature support. Register one via `Font.register` in
-  [`src/pdf/sheet-document.tsx`](src/pdf/sheet-document.tsx) to enable an Arabic export; a
-  silently mis-rendered Arabic sheet would be worse than an English one.
 - **Indicative day rates are placeholders.** They exist so a sheet can still be costed when a
   needed item has no vendor. Real prices come from vendor onboarding.
 - **Proximity is a soft signal.** Same-city DOPs and vendors get a small ranking nudge, never a
@@ -193,3 +221,30 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
   paginated layout engine, so they approximate rather than replace a scheduling package.
 - **Aerial work needs permits.** The catalog notes GACA permits for drone platforms; lead time is
   not modelled in the budget.
+
+---
+
+## Theming
+
+Light, dark and "follow the OS" are one token set with two value tables in
+[`src/app/globals.css`](src/app/globals.css) — `--page`, `--surface`, `--line`, `--text-strong`,
+`--muted`, `--accent`, `--danger`… Tailwind maps each to a semantic utility
+(`bg-surface`, `border-line`, `text-muted`), so components never name a literal colour and a
+third theme would be a third value table, not a component rewrite.
+
+Resolution order: an explicit choice on `<html data-theme>` wins; with no choice the
+`prefers-color-scheme` media query applies. The choice is stored in `localStorage` and replayed
+by a tiny inline script in `<head>`, so a dark-mode visitor never sees a white flash. Every
+storage read and write is wrapped in try/catch, because private windows throw.
+
+## Arabic PDF
+
+`@react-pdf/renderer` shapes text through fontkit, which applies the font's OpenType Arabic
+features and emits glyphs in visual right-to-left order — what it cannot do is invent Arabic
+glyphs for Helvetica. So the sheet embeds IBM Plex Sans Arabic (SIL OFL 1.1), which carries
+Latin too, keeping "ARRI ALEXA 35" in one typeface inside an Arabic sentence.
+
+Verified rather than assumed: `لا` shapes to a single `uniFEFB` ligature glyph and `كاميرا`
+to five contextual forms, table columns mirror in RTL, and hyphenation is disabled so Arabic
+words are never broken mid-script. The export language follows `?locale=`, falling back to the
+language the sheet's narrative was generated in.

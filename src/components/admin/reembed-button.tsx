@@ -12,7 +12,7 @@ export function ReembedButton() {
 
   return (
     <div className="flex items-center gap-3">
-      {result && <span className="text-xs text-teal-400">{result}</span>}
+      {result && <span className="text-xs text-info">{result}</span>}
       <button
         type="button"
         className="btn-secondary text-xs"

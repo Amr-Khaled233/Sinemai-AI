@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settings';
 import { allToolResults, finishRun, model, MODELS, startRun, type RunContext } from './runtime';
 import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/vendor-tools';
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
+import { withLanguage } from './language';
 import type {
   BudgetBreakdown,
   CrewLine,
@@ -49,7 +50,7 @@ export async function runVendorBudgetAgent(
     agent: AgentName.VENDOR_BUDGET,
     attempt: options.attempt ?? 1,
     model: MODELS.reasoning,
-    systemPrompt: VENDOR_BUDGET_SYSTEM,
+    systemPrompt: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
     input: {
       package: equipment.package,
       shootDays: summary.shootDays,
@@ -65,7 +66,7 @@ export async function runVendorBudgetAgent(
 
     await generateText({
       model: model('reasoning'),
-      system: VENDOR_BUDGET_SYSTEM,
+      system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
       tools,
       stopWhen: stepCountIs(4),
       temperature: 0.2,
@@ -109,7 +110,7 @@ export async function runVendorBudgetAgent(
     const { object } = await generateObject({
       model: model('cheap'),
       schema: notesSchema,
-      system: VENDOR_BUDGET_SYSTEM,
+      system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
       temperature: 0.3,
       prompt: [
         `Production: ${brief.type}, ${summary.shootDays} shoot day(s) in ${brief.city}, budget tier ${brief.budgetTier}.`,

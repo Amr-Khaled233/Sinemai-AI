@@ -19,8 +19,8 @@ export function Card({
       {(title || action) && (
         <header className="mb-4 flex flex-wrap items-start justify-between gap-3">
           <div>
-            {title && <h2 className="text-base font-semibold text-white">{title}</h2>}
-            {subtitle && <p className="mt-1 text-xs text-[rgb(var(--muted))]">{subtitle}</p>}
+            {title && <h2 className="text-base font-semibold text-strong">{title}</h2>}
+            {subtitle && <p className="mt-1 text-xs text-muted">{subtitle}</p>}
           </div>
           {action}
         </header>
@@ -47,8 +47,8 @@ export function Field({
     <div className={cn('mb-4', className)}>
       <label className="label">{label}</label>
       {children}
-      {hint && <p className="mt-1.5 text-xs text-[rgb(var(--muted))]/80">{hint}</p>}
-      {error && <p className="mt-1.5 text-xs text-red-400">{error}</p>}
+      {hint && <p className="mt-1.5 text-xs text-muted/80">{hint}</p>}
+      {error && <p className="mt-1.5 text-xs text-danger">{error}</p>}
     </div>
   );
 }
@@ -74,18 +74,18 @@ export function Stat({ label, value, hint }: { label: ReactNode; value: ReactNod
     <div className="stat">
       <div className="stat-label">{label}</div>
       <div className="stat-value">{value}</div>
-      {hint && <div className="mt-1 text-xs text-[rgb(var(--muted))]">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );
 }
 
 const BADGE_TONES = {
-  neutral: 'border-ink-600 text-[rgb(var(--muted))]',
-  gold: 'border-brass-500/60 bg-brass-500/10 text-brass-400',
-  teal: 'border-teal-500/50 bg-teal-500/10 text-teal-400',
-  green: 'border-emerald-600/50 bg-emerald-600/10 text-emerald-400',
-  red: 'border-red-700/60 bg-red-900/20 text-red-300',
-  amber: 'border-amber-600/50 bg-amber-600/10 text-amber-300',
+  neutral: 'border-line text-muted',
+  gold: 'border-accent/60 bg-accent/10 text-accent',
+  teal: 'border-info/40 bg-info/10 text-info',
+  green: 'border-success/40 bg-success/10 text-success',
+  red: 'border-danger/40 bg-danger/10 text-danger',
+  amber: 'border-warning/40 bg-warning/10 text-warning',
 } as const;
 
 export function Badge({
@@ -112,8 +112,8 @@ export function Badge({
 
 export function EmptyState({ title, action }: { title: ReactNode; action?: ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-ink-600 px-6 py-10 text-center">
-      <p className="text-sm text-[rgb(var(--muted))]">{title}</p>
+    <div className="rounded-xl border border-dashed border-line px-6 py-10 text-center">
+      <p className="text-sm text-muted">{title}</p>
       {action && <div className="mt-4 flex justify-center">{action}</div>}
     </div>
   );
@@ -122,8 +122,8 @@ export function EmptyState({ title, action }: { title: ReactNode; action?: React
 export function SectionTitle({ children, hint }: { children: ReactNode; hint?: ReactNode }) {
   return (
     <div className="mb-4">
-      <h2 className="text-lg font-semibold text-white">{children}</h2>
-      {hint && <p className="mt-1 text-sm text-[rgb(var(--muted))]">{hint}</p>}
+      <h2 className="text-lg font-semibold text-strong">{children}</h2>
+      {hint && <p className="mt-1 text-sm text-muted">{hint}</p>}
     </div>
   );
 }
@@ -137,7 +137,7 @@ export function MeterBar({
   const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
   return (
     <div>
-      <div className="flex h-2 w-full overflow-hidden rounded-full bg-ink-700">
+      <div className="flex h-2 w-full overflow-hidden rounded-full bg-line">
         {segments.map((segment) => (
           <div
             key={segment.label}
@@ -147,7 +147,7 @@ export function MeterBar({
           />
         ))}
       </div>
-      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[rgb(var(--muted))]">
+      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted">
         {segments
           .filter((s) => s.value > 0)
           .map((segment) => (

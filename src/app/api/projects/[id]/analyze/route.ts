@@ -1,28 +1,35 @@
-import { Role } from '@prisma/client';
+import { AnalysisStage, Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
-import { runProductionAnalysis } from '@/agents/orchestrator';
+import { advanceAnalysis, beginAnalysis } from '@/agents/orchestrator';
+import { normaliseLocale } from '@/agents/language';
 import type { ProgressEvent } from '@/agents/types';
 
 /**
- * The orchestrator runs inside this single serverless function and streams
- * newline-delimited JSON progress events to the UI, so the multi-agent run feels
- * live instead of a long black-box wait.
+ * One slice of the agent graph per request.
  *
- * `maxDuration` needs Fluid Compute (or a Pro plan) for feature-length scripts.
- * If a run ever outgrows it, the orchestrator's stages are already separable
- * into chained functions or a queue without touching the agents themselves.
+ * The orchestrator is a resumable state machine: this route runs as many steps
+ * as fit inside `STEP_BUDGET_MS` and then returns a resume point, so a run
+ * never needs a function duration longer than `maxDuration` below. The client
+ * keeps calling until `done`, which means a feature-length breakdown works on
+ * a 60s plan without changing any agent.
+ *
+ * `start: true` begins a fresh run; without it the request continues the
+ * existing checkpoint.
  */
 export const runtime = 'nodejs';
-export const maxDuration = 300;
+export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
 
-export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
+// Leaves headroom for the final step to finish and the response to flush.
+const STEP_BUDGET_MS = 40_000;
+
+export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const session = await auth();
 
   if (!session?.user) {
-    return new Response(JSON.stringify({ error: 'UNAUTHORIZED' }), { status: 401 });
+    return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
   }
 
   const project = await prisma.project.findUnique({
@@ -30,12 +37,24 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     select: { id: true, ownerId: true, script: { select: { sceneCount: true } } },
   });
 
-  if (!project) return new Response(JSON.stringify({ error: 'NOT_FOUND' }), { status: 404 });
+  if (!project) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
   if (project.ownerId !== session.user.id && session.user.role !== Role.ADMIN) {
-    return new Response(JSON.stringify({ error: 'FORBIDDEN' }), { status: 403 });
+    return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
-  if (!project.script) {
-    return new Response(JSON.stringify({ error: 'NO_SCRIPT' }), { status: 400 });
+  if (!project.script) return Response.json({ error: 'NO_SCRIPT' }, { status: 400 });
+
+  const body = (await request.json().catch(() => ({}))) as { start?: boolean; locale?: string };
+  const locale = normaliseLocale(body.locale);
+
+  if (body.start) {
+    await beginAnalysis(id, locale);
+  } else {
+    const state = await prisma.analysisState.findUnique({
+      where: { projectId: id },
+      select: { stage: true },
+    });
+    // Nothing to resume (a cold client, or state wiped by a new script upload).
+    if (!state || state.stage === AnalysisStage.FAILED) await beginAnalysis(id, locale);
   }
 
   const encoder = new TextEncoder();
@@ -52,7 +71,15 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       };
 
       try {
-        await runProductionAnalysis(id, send);
+        const outcome = await advanceAnalysis(id, send, { budgetMs: STEP_BUDGET_MS });
+        // The final line always tells the client whether to call again.
+        send({
+          type: 'checkpoint',
+          done: outcome.done,
+          failed: Boolean(outcome.failed),
+          stage: outcome.stage,
+          pct: outcome.pct,
+        });
       } catch (error) {
         send({
           type: 'error',
@@ -71,5 +98,30 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
       'cache-control': 'no-store, no-transform',
       connection: 'keep-alive',
     },
+  });
+}
+
+/** Current checkpoint, so a reloaded page can rejoin a run already in flight. */
+export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
+  const { id } = await context.params;
+  const session = await auth();
+  if (!session?.user) return Response.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+
+  const project = await prisma.project.findUnique({
+    where: { id },
+    select: { ownerId: true, analysisState: true },
+  });
+  if (!project) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
+  if (project.ownerId !== session.user.id && session.user.role !== Role.ADMIN) {
+    return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
+  }
+
+  const state = project.analysisState;
+  return Response.json({
+    stage: state?.stage ?? null,
+    sceneCursor: state?.sceneCursor ?? 0,
+    sceneTotal: state?.sceneTotal ?? 0,
+    errorText: state?.errorText ?? null,
+    updatedAt: state?.updatedAt ?? null,
   });
 }

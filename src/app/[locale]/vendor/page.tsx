@@ -32,7 +32,7 @@ export default async function VendorHome({ params }: { params: Promise<{ locale:
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-white">{t('title')}</h1>
+        <h1 className="text-xl font-semibold text-strong">{t('title')}</h1>
         <div className="flex items-center gap-2">
           <Badge tone={vendor.status === 'APPROVED' ? 'green' : vendor.status === 'REJECTED' ? 'red' : 'amber'}>
             {tEnum(`approval.${vendor.status}`)}
@@ -42,12 +42,12 @@ export default async function VendorHome({ params }: { params: Promise<{ locale:
       </div>
 
       {vendor.status === 'PENDING' && (
-        <p className="rounded-lg border border-amber-700/40 bg-amber-900/10 p-3 text-xs text-amber-300">
+        <p className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
           {t('pending')}
         </p>
       )}
       {vendor.status === 'REJECTED' && (
-        <p className="rounded-lg border border-red-800/50 bg-red-950/30 p-3 text-xs text-red-300">
+        <p className="rounded-lg border border-danger/40 bg-danger/10 p-3 text-xs text-danger">
           {t('rejected')}
         </p>
       )}

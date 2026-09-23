@@ -214,6 +214,13 @@ export type ProgressStage =
   | 'error';
 
 export type ProgressEvent =
+  | {
+      type: 'checkpoint';
+      done: boolean;
+      failed: boolean;
+      stage: string;
+      pct: number;
+    }
   | { type: 'stage'; stage: ProgressStage; detail?: string; pct: number }
   | { type: 'log'; message: string }
   | { type: 'scenes'; count: number }

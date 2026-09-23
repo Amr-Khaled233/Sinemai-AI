@@ -81,7 +81,7 @@ export function EquipmentManager({
       }
     >
       {showForm && (
-        <form action={submit} className="mb-6 rounded-xl border border-brass-600/40 bg-ink-900/60 p-4">
+        <form action={submit} className="mb-6 rounded-xl border border-accent/40 bg-surface-sunken p-4">
           {editing && <input type="hidden" name="id" value={editing.id} />}
 
           <div className="grid gap-x-4 sm:grid-cols-3">
@@ -171,7 +171,7 @@ export function EquipmentManager({
             />
           </Field>
 
-          <div className="mb-4 flex flex-wrap gap-4 text-xs text-[rgb(var(--muted))]">
+          <div className="mb-4 flex flex-wrap gap-4 text-xs text-muted">
             <label className="flex items-center gap-2">
               <input type="checkbox" name="isCore" defaultChecked={editing?.isCore ?? false} />
               {t('isCore')}
@@ -182,7 +182,7 @@ export function EquipmentManager({
             </label>
           </div>
 
-          {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+          {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
           <div className="flex gap-2">
             <button type="submit" className="btn-primary text-xs" disabled={pending}>
@@ -224,8 +224,8 @@ export function EquipmentManager({
           <tbody>
             {filtered.map((row) => (
               <tr key={row.id} className={row.active ? '' : 'opacity-50'}>
-                <td className="text-xs uppercase tracking-wider text-brass-500">{row.categorySlug}</td>
-                <td className="text-white">{row.brand}</td>
+                <td className="text-xs uppercase tracking-wider text-accent">{row.categorySlug}</td>
+                <td className="text-strong">{row.brand}</td>
                 <td>
                   {row.model}
                   {row.isCore && <Badge className="ms-2">core</Badge>}
@@ -241,7 +241,7 @@ export function EquipmentManager({
                     </button>
                     <button
                       type="button"
-                      className="btn-ghost text-[11px] text-red-400"
+                      className="btn-ghost text-[11px] text-danger"
                       onClick={async () => {
                         await deleteEquipment(row.id);
                         router.refresh();

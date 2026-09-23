@@ -2,31 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Theme tokens.
+ *
+ * Every colour in the UI is a semantic token, so light and dark are two value
+ * sets rather than two sets of components. Values are raw RGB triplets so
+ * Tailwind's `/opacity` modifiers keep working (`bg-surface/60`).
+ *
+ * Resolution order: no stored preference → follow the OS; an explicit choice
+ * (data-theme on <html>) always wins.
+ */
+
 :root {
   --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', 'Helvetica Neue', Tahoma, system-ui, sans-serif;
-  --surface: 13 15 20;
-  --surface-raised: 20 23 31;
-  --border: 42 48 64;
-  --text: 233 234 238;
+
+  /* light */
+  --page: 247 245 241;
+  --surface: 255 255 255;
+  --surface-raised: 252 250 246;
+  --surface-sunken: 242 239 233;
+  --line: 226 221 211;
+  --line-strong: 203 196 182;
+  --text-strong: 18 21 27;
+  --text-body: 43 47 56;
+  --muted: 108 114 128;
+  --accent: 154 120 38;
+  --accent-soft: 212 169 79;
+  --danger: 185 28 28;
+  --warning: 180 83 9;
+  --success: 4 120 87;
+  --info: 13 148 136;
+  --glow-a: 212 169 79;
+  --glow-b: 79 209 197;
+  --glow-strength: 0.1;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --page: 13 15 20;
+    --surface: 20 23 31;
+    --surface-raised: 29 34 44;
+    --surface-sunken: 8 9 13;
+    --line: 42 48 64;
+    --line-strong: 60 68 88;
+    --text-strong: 255 255 255;
+    --text-body: 233 234 238;
+    --muted: 150 156 172;
+    --accent: 232 195 122;
+    --accent-soft: 212 169 79;
+    --danger: 248 113 113;
+    --warning: 251 191 36;
+    --success: 52 211 153;
+    --info: 79 209 197;
+    --glow-strength: 0.08;
+  }
+}
+
+:root[data-theme='dark'] {
+  --page: 13 15 20;
+  --surface: 20 23 31;
+  --surface-raised: 29 34 44;
+  --surface-sunken: 8 9 13;
+  --line: 42 48 64;
+  --line-strong: 60 68 88;
+  --text-strong: 255 255 255;
+  --text-body: 233 234 238;
   --muted: 150 156 172;
-  --accent: 212 169 79;
+  --accent: 232 195 122;
+  --accent-soft: 212 169 79;
+  --danger: 248 113 113;
+  --warning: 251 191 36;
+  --success: 52 211 153;
+  --info: 79 209 197;
+  --glow-strength: 0.08;
 }
 
 @layer base {
   html {
+    color-scheme: light;
+  }
+
+  :root[data-theme='dark'] {
     color-scheme: dark;
   }
 
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+    }
+  }
+
   body {
-    @apply bg-ink-900 text-[rgb(var(--text))] antialiased;
+    @apply bg-page text-body antialiased;
     font-family: var(--font-sans);
     background-image:
-      radial-gradient(60rem 30rem at 85% -10%, rgba(212, 169, 79, 0.08), transparent),
-      radial-gradient(50rem 25rem at 0% 0%, rgba(79, 209, 197, 0.06), transparent);
+      radial-gradient(60rem 30rem at 85% -10%, rgb(var(--glow-a) / var(--glow-strength)), transparent),
+      radial-gradient(50rem 25rem at 0% 0%, rgb(var(--glow-b) / calc(var(--glow-strength) * 0.75)), transparent);
     background-attachment: fixed;
   }
 
-  /* Arabic numerals stay Latin in tables so budgets line up in both locales. */
+  /* Budget columns line up in both locales. */
   [dir='rtl'] table,
   [dir='rtl'] .tabular {
     font-variant-numeric: tabular-nums;
@@ -39,22 +114,22 @@
   }
 
   ::selection {
-    background: rgba(212, 169, 79, 0.28);
+    background: rgb(var(--accent-soft) / 0.28);
   }
 }
 
 @layer components {
   .card {
-    @apply rounded-xl border border-ink-600/70 bg-ink-800/60 backdrop-blur-sm;
+    @apply rounded-xl border border-line bg-surface/80 backdrop-blur-sm;
   }
 
   .label {
-    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-[rgb(var(--muted))];
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted;
   }
 
   .input {
-    @apply w-full rounded-lg border border-ink-600 bg-ink-900/80 px-3 py-2.5 text-sm text-[rgb(var(--text))]
-      placeholder:text-[rgb(var(--muted))]/60 focus:border-brass-500 focus:outline-none focus:ring-1 focus:ring-brass-500/40;
+    @apply w-full rounded-lg border border-line bg-surface-sunken px-3 py-2.5 text-sm text-body
+      placeholder:text-muted/60 focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent/40;
   }
 
   .btn {
@@ -67,27 +142,27 @@
   }
 
   .btn-secondary {
-    @apply btn border border-ink-600 bg-ink-800 text-[rgb(var(--text))] hover:border-brass-600 hover:text-brass-400;
+    @apply btn border border-line bg-surface-raised text-body hover:border-accent/60 hover:text-accent;
   }
 
   .btn-ghost {
-    @apply btn text-[rgb(var(--muted))] hover:text-brass-400;
+    @apply btn text-muted hover:text-accent;
   }
 
   .btn-danger {
-    @apply btn border border-red-900/60 bg-red-950/40 text-red-300 hover:bg-red-900/40;
+    @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
   }
 
   .chip {
-    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-600 px-3 py-1 text-xs text-[rgb(var(--muted))];
+    @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-muted;
   }
 
   .chip-on {
-    @apply border-brass-500/70 bg-brass-500/10 text-brass-400;
+    @apply border-accent/60 bg-accent/10 text-accent;
   }
 
   .table-wrap {
-    @apply overflow-x-auto rounded-xl border border-ink-600/70;
+    @apply overflow-x-auto rounded-xl border border-line;
   }
 
   .table {
@@ -95,12 +170,12 @@
   }
 
   .table thead th {
-    @apply border-b border-ink-600 bg-ink-800/80 px-3 py-2.5 text-start text-xs font-semibold
-      uppercase tracking-wider text-[rgb(var(--muted))];
+    @apply border-b border-line bg-surface-raised px-3 py-2.5 text-start text-xs font-semibold
+      uppercase tracking-wider text-muted;
   }
 
   .table tbody td {
-    @apply border-b border-ink-700/60 px-3 py-2.5 align-top;
+    @apply border-b border-line/70 px-3 py-2.5 align-top;
   }
 
   .table tbody tr:last-child td {
@@ -108,25 +183,25 @@
   }
 
   .stat {
-    @apply rounded-xl border border-ink-600/70 bg-ink-800/50 p-4;
+    @apply rounded-xl border border-line bg-surface/60 p-4;
   }
 
   .stat-value {
-    @apply mt-1 text-2xl font-semibold text-[rgb(var(--text))] tabular-nums;
+    @apply mt-1 text-2xl font-semibold tabular-nums text-strong;
   }
 
   .stat-label {
-    @apply text-xs uppercase tracking-wider text-[rgb(var(--muted))];
+    @apply text-xs uppercase tracking-wider text-muted;
   }
 
   .prose-sheet {
-    @apply text-sm leading-7 text-[rgb(var(--muted))];
+    @apply text-sm leading-7 text-muted;
   }
 }
 
 /* The progress rail mirrors itself in RTL without extra markup. */
 .progress-rail {
-  @apply h-1.5 w-full overflow-hidden rounded-full bg-ink-700;
+  @apply h-1.5 w-full overflow-hidden rounded-full bg-line;
 }
 
 .progress-fill {

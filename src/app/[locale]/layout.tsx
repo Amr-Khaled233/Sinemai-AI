@@ -6,6 +6,7 @@ import { getMessages, setRequestLocale } from 'next-intl/server';
 import { locales, dirFor, type AppLocale } from '@/i18n/routing';
 import { Providers } from '@/components/providers';
 import { TopBar } from '@/components/top-bar';
+import { THEME_INIT_SCRIPT } from '@/components/theme-toggle';
 import '../globals.css';
 
 export const metadata: Metadata = {
@@ -33,12 +34,16 @@ export default async function LocaleLayout({
 
   return (
     <html lang={locale} dir={dirFor(locale)} suppressHydrationWarning>
+      <head>
+        {/* Applies the stored theme before first paint, so there is no flash. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
+      </head>
       <body className="min-h-dvh">
         <NextIntlClientProvider messages={messages}>
           <Providers>
             <TopBar locale={locale} />
             <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">{children}</main>
-            <footer className="mx-auto max-w-7xl px-4 pb-10 pt-6 text-xs text-[rgb(var(--muted))]/70 sm:px-6">
+            <footer className="mx-auto max-w-7xl px-4 pb-10 pt-6 text-xs text-muted/70 sm:px-6">
               Sinemai AI · سينمائي — production intelligence for film &amp; advertising.
             </footer>
           </Providers>

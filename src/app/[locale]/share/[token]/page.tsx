@@ -61,7 +61,7 @@ export default async function SharedSheetPage({
         // The token authorises the export too, so a recipient can download the
         // sheet without an account.
         <a
-          href={`/api/projects/${link.project.id}/pdf?token=${token}`}
+          href={`/api/projects/${link.project.id}/pdf?token=${token}&locale=${locale}`}
           className="btn-secondary text-xs"
           target="_blank"
           rel="noreferrer"

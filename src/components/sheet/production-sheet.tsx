@@ -100,9 +100,9 @@ export async function ProductionSheet({
       <header className="card p-5">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-brass-500">{t('title')}</p>
-            <h1 className="mt-2 text-2xl font-semibold text-white">{project.name}</h1>
-            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[rgb(var(--muted))]">
+            <p className="text-xs uppercase tracking-[0.18em] text-accent">{t('title')}</p>
+            <h1 className="mt-2 text-2xl font-semibold text-strong">{project.name}</h1>
+            <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
               <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
               <span>{project.city}</span>
@@ -110,7 +110,7 @@ export async function ProductionSheet({
               <span>{t('generated', { date: formatDate(recommendation.generatedAt, locale) })}</span>
               {readOnly && <Badge tone="teal">{t('readOnly')}</Badge>}
             </p>
-            <p className="mt-2 text-xs text-[rgb(var(--muted))]/80">
+            <p className="mt-2 text-xs text-muted/80">
               {t('tierWindow', { min: money(tierWindow.minTotal), max: money(tierWindow.maxTotal) })}
             </p>
           </div>
@@ -118,11 +118,11 @@ export async function ProductionSheet({
         </div>
 
         {recommendation.rationaleText && (
-          <div className="mt-5 border-t border-ink-700/70 pt-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-[rgb(var(--muted))]">
+          <div className="mt-5 border-t border-line/70 pt-4">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
               {t('summary')}
             </h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-[rgb(var(--text))]/90">
+            <p className="mt-2 max-w-4xl text-sm leading-7 text-body/90">
               {recommendation.rationaleText}
             </p>
           </div>
@@ -148,7 +148,7 @@ export async function ProductionSheet({
               const severity = /^\[(\w+)\]/.exec(note)?.[1] ?? 'info';
               const tone = severity === 'blocker' ? 'red' : severity === 'warning' ? 'amber' : 'neutral';
               return (
-                <li key={index} className="flex gap-2 text-sm leading-6 text-[rgb(var(--muted))]">
+                <li key={index} className="flex gap-2 text-sm leading-6 text-muted">
                   <Badge tone={tone as 'red' | 'amber' | 'neutral'}>{tEnum(`severity.${severity}`)}</Badge>
                   <span>{note.replace(/^\[\w+\]\s*/, '')}</span>
                 </li>
@@ -175,9 +175,9 @@ export async function ProductionSheet({
               <p className="label">{t('lighting')}</p>
               <MeterBar
                 segments={[
-                  { label: tEnum('complexity.LOW'), value: summary.lightingMix.LOW, className: 'bg-teal-500/70' },
-                  { label: tEnum('complexity.MEDIUM'), value: summary.lightingMix.MEDIUM, className: 'bg-brass-500/80' },
-                  { label: tEnum('complexity.HIGH'), value: summary.lightingMix.HIGH, className: 'bg-red-500/70' },
+                  { label: tEnum('complexity.LOW'), value: summary.lightingMix.LOW, className: 'bg-info' },
+                  { label: tEnum('complexity.MEDIUM'), value: summary.lightingMix.MEDIUM, className: 'bg-brass-500' },
+                  { label: tEnum('complexity.HIGH'), value: summary.lightingMix.HIGH, className: 'bg-danger' },
                 ]}
               />
             </div>
@@ -185,19 +185,19 @@ export async function ProductionSheet({
               <p className="label">{t('movement')}</p>
               <MeterBar
                 segments={[
-                  { label: tEnum('movement.STATIC'), value: summary.movementMix.STATIC, className: 'bg-ink-600' },
-                  { label: tEnum('movement.HANDHELD'), value: summary.movementMix.HANDHELD, className: 'bg-teal-500/70' },
+                  { label: tEnum('movement.STATIC'), value: summary.movementMix.STATIC, className: 'bg-line-strong' },
+                  { label: tEnum('movement.HANDHELD'), value: summary.movementMix.HANDHELD, className: 'bg-info' },
                   {
                     label: tEnum('movement.STEADICAM_GIMBAL'),
                     value: summary.movementMix.STEADICAM_GIMBAL,
-                    className: 'bg-brass-500/80',
+                    className: 'bg-brass-500',
                   },
                   {
                     label: tEnum('movement.CRANE_DOLLY'),
                     value: summary.movementMix.CRANE_DOLLY,
-                    className: 'bg-amber-500/70',
+                    className: 'bg-warning',
                   },
-                  { label: tEnum('movement.DRONE'), value: summary.movementMix.DRONE, className: 'bg-red-500/70' },
+                  { label: tEnum('movement.DRONE'), value: summary.movementMix.DRONE, className: 'bg-danger' },
                 ]}
               />
             </div>
@@ -220,11 +220,11 @@ export async function ProductionSheet({
               <tbody>
                 {scenes.map((scene) => (
                   <tr key={scene.order}>
-                    <td className="tabular-nums text-[rgb(var(--muted))]">{scene.order}</td>
-                    <td className="max-w-[18rem] text-white">
+                    <td className="tabular-nums text-muted">{scene.order}</td>
+                    <td className="max-w-[18rem] text-strong">
                       <div className="truncate font-medium">{truncate(scene.heading, 70)}</div>
                       {scene.lightingNotes && (
-                        <div className="mt-0.5 text-xs text-[rgb(var(--muted))]">{scene.lightingNotes}</div>
+                        <div className="mt-0.5 text-xs text-muted">{scene.lightingNotes}</div>
                       )}
                     </td>
                     <td>{scene.intExt ? tEnum(`intExt.${scene.intExt}`) : '—'}</td>
@@ -248,7 +248,7 @@ export async function ProductionSheet({
                     </td>
                     <td>{scene.cameraMovement ? tEnum(`movement.${scene.cameraMovement}`) : '—'}</td>
                     <td className="text-end tabular-nums">{scene.estimatedHours ?? '—'}</td>
-                    <td className="text-xs text-[rgb(var(--muted))]">
+                    <td className="text-xs text-muted">
                       {scene.specialRequirements.length ? scene.specialRequirements.join(', ') : '—'}
                     </td>
                   </tr>
@@ -275,15 +275,15 @@ export async function ProductionSheet({
             <tbody>
               {pkg.map((item) => (
                 <tr key={item.equipmentId}>
-                  <td className="text-xs uppercase tracking-wider text-brass-500">
+                  <td className="text-xs uppercase tracking-wider text-accent">
                     {categoryLabel(item.categorySlug)}
                   </td>
-                  <td className="font-medium text-white">
+                  <td className="font-medium text-strong">
                     {item.brand} {item.model}
                   </td>
                   <td className="text-end tabular-nums">{item.quantity}</td>
                   <td className="text-end tabular-nums">{item.rentalDays}</td>
-                  <td className="text-[rgb(var(--muted))]">{item.reason}</td>
+                  <td className="text-muted">{item.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -291,7 +291,7 @@ export async function ProductionSheet({
         </div>
 
         {recommendation.equipmentRationale && (
-          <div className="mt-4 rounded-lg border border-ink-600/60 bg-ink-900/40 p-4">
+          <div className="mt-4 rounded-lg border border-line/60 bg-surface-sunken p-4">
             <p className="label">{t('equipmentRationale')}</p>
             <p className="prose-sheet">{recommendation.equipmentRationale}</p>
           </div>
@@ -305,32 +305,32 @@ export async function ProductionSheet({
         ) : (
           <ul className="grid gap-3 md:grid-cols-2">
             {dops.map((dop) => (
-              <li key={dop.dopId} className="rounded-xl border border-ink-600/70 bg-ink-900/40 p-4">
+              <li key={dop.dopId} className="rounded-xl border border-line bg-surface-sunken p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <h3 className="text-sm font-semibold text-white">{dop.name}</h3>
-                    <p className="mt-0.5 text-xs text-[rgb(var(--muted))]">
+                    <h3 className="text-sm font-semibold text-strong">{dop.name}</h3>
+                    <p className="mt-0.5 text-xs text-muted">
                       {[dop.city, dop.yearsExperience ? t('years', { count: dop.yearsExperience }) : null]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
                   </div>
                   <div className="text-end">
-                    <div className="text-xs text-[rgb(var(--muted))]">{t('matchScore')}</div>
-                    <div className="text-lg font-semibold tabular-nums text-brass-400">
+                    <div className="text-xs text-muted">{t('matchScore')}</div>
+                    <div className="text-lg font-semibold tabular-nums text-accent">
                       {Math.round(dop.score * 100)}%
                     </div>
                   </div>
                 </div>
 
-                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-ink-700">
+                <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-line">
                   <div
                     className="h-full rounded-full bg-brass-500"
                     style={{ width: `${Math.min(100, Math.max(4, dop.score * 100))}%` }}
                   />
                 </div>
 
-                <p className="mt-3 text-sm leading-6 text-[rgb(var(--muted))]">{dop.reason}</p>
+                <p className="mt-3 text-sm leading-6 text-muted">{dop.reason}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {dop.styleTags.slice(0, 5).map((tag) => (
@@ -347,13 +347,13 @@ export async function ProductionSheet({
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-teal-400 hover:underline"
+                      className="text-info hover:underline"
                     >
                       {t('portfolio')} ↗
                     </a>
                   ))}
                   {dop.dayRate ? (
-                    <span className="text-[rgb(var(--muted))]">
+                    <span className="text-muted">
                       {t('dayRate')}: {money(dop.dayRate)}
                     </span>
                   ) : null}
@@ -381,21 +381,21 @@ export async function ProductionSheet({
         ) : (
           <div className="space-y-4">
             {vendors.map((vendor) => (
-              <div key={vendor.vendorId} className="rounded-xl border border-ink-600/70 bg-ink-900/40 p-4">
+              <div key={vendor.vendorId} className="rounded-xl border border-line bg-surface-sunken p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                    <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">
                       {vendor.companyName}
                       {vendor.verified && <Badge tone="teal">✓</Badge>}
                     </h3>
-                    <p className="mt-0.5 text-xs text-[rgb(var(--muted))]">
+                    <p className="mt-0.5 text-xs text-muted">
                       {vendor.city} · {t('coverage')} {vendor.coveragePct}%
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
                     <div className="text-end">
-                      <div className="text-xs text-[rgb(var(--muted))]">{t('subtotal')}</div>
-                      <div className="font-semibold tabular-nums text-white">{money(vendor.subtotal)}</div>
+                      <div className="text-xs text-muted">{t('subtotal')}</div>
+                      <div className="font-semibold tabular-nums text-strong">{money(vendor.subtotal)}</div>
                     </div>
                     {!readOnly && (
                       <InquiryButton
@@ -423,16 +423,16 @@ export async function ProductionSheet({
                     <tbody>
                       {vendor.items.map((line) => (
                         <tr key={line.equipmentId}>
-                          <td className="text-white">
+                          <td className="text-strong">
                             {line.brand} {line.model}
                             {!line.available && (
-                              <span className="ms-2 text-[11px] text-amber-400">{t('unavailableOnDates')}</span>
+                              <span className="ms-2 text-[11px] text-warning">{t('unavailableOnDates')}</span>
                             )}
                           </td>
                           <td className="text-end tabular-nums">{line.quantity}</td>
                           <td className="text-end tabular-nums">{line.rentalDays}</td>
                           <td className="text-end tabular-nums">{money(line.dailyRate)}</td>
-                          <td className="text-end tabular-nums text-white">{money(line.lineTotal)}</td>
+                          <td className="text-end tabular-nums text-strong">{money(line.lineTotal)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -444,7 +444,7 @@ export async function ProductionSheet({
         )}
 
         {budget?.uncoveredEquipment && budget.uncoveredEquipment.length > 0 && (
-          <p className="mt-4 rounded-lg border border-amber-700/40 bg-amber-900/10 p-3 text-xs text-amber-300">
+          <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
             {t('uncovered')}:{' '}
             {budget.uncoveredEquipment.map((item) => `${item.brand} ${item.model}`).join(' · ')}
           </p>
@@ -477,11 +477,11 @@ export async function ProductionSheet({
                   <tbody>
                     {budget.crewBreakdown.map((line) => (
                       <tr key={line.roleSlug}>
-                        <td className="text-white">{locale === 'ar' ? line.labelAr : line.labelEn}</td>
+                        <td className="text-strong">{locale === 'ar' ? line.labelAr : line.labelEn}</td>
                         <td className="text-end tabular-nums">{line.headcount}</td>
                         <td className="text-end tabular-nums">{money(line.dayRate)}</td>
                         <td className="text-end tabular-nums">{line.days}</td>
-                        <td className="text-end tabular-nums text-white">{money(line.total)}</td>
+                        <td className="text-end tabular-nums text-strong">{money(line.total)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -491,14 +491,14 @@ export async function ProductionSheet({
 
             <div>
               <p className="label">{t('total')}</p>
-              <dl className="space-y-2 rounded-xl border border-ink-600/70 bg-ink-900/40 p-4 text-sm">
+              <dl className="space-y-2 rounded-xl border border-line bg-surface-sunken p-4 text-sm">
                 <Row label={t('equipmentRental')} value={money(budget.equipmentRental)} />
                 <Row label={t('crew')} value={money(budget.crewTotal)} />
                 <Row
                   label={t('contingency', { pct: budget.contingencyPct })}
                   value={money(Math.max(0, budget.contingency))}
                 />
-                <div className="border-t border-ink-700 pt-2">
+                <div className="border-t border-line pt-2">
                   <Row label={t('budgetMid')} value={money(recommendation.estimatedBudgetMid)} strong />
                 </div>
                 <Row label={t('shootDays')} value={String(budget.shootDays)} />
@@ -507,10 +507,10 @@ export async function ProductionSheet({
               {budget.notes && budget.notes.length > 0 && (
                 <div className="mt-4">
                   <p className="label">{t('notes')}</p>
-                  <ul className="space-y-1.5 text-sm text-[rgb(var(--muted))]">
+                  <ul className="space-y-1.5 text-sm text-muted">
                     {budget.notes.map((note, index) => (
                       <li key={index} className="flex gap-2">
-                        <span className="text-brass-500">·</span>
+                        <span className="text-accent">·</span>
                         {note}
                       </li>
                     ))}
@@ -522,7 +522,7 @@ export async function ProductionSheet({
         </Card>
       )}
 
-      <p className="px-1 text-[11px] leading-6 text-[rgb(var(--muted))]/60">
+      <p className="px-1 text-[11px] leading-6 text-muted/60">
         {t('provenance', { models: models.length ? [...new Set(models)].join(', ') : 'gpt-4o' })}
       </p>
     </div>
@@ -532,8 +532,8 @@ export async function ProductionSheet({
 function Row({ label, value, strong }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-baseline justify-between gap-3">
-      <dt className="text-[rgb(var(--muted))]">{label}</dt>
-      <dd className={strong ? 'text-base font-semibold tabular-nums text-brass-400' : 'tabular-nums text-white'}>
+      <dt className="text-muted">{label}</dt>
+      <dd className={strong ? 'text-base font-semibold tabular-nums text-accent' : 'tabular-nums text-strong'}>
         {value}
       </dd>
     </div>

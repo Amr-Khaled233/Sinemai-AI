@@ -30,11 +30,11 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   return (
     <div className="space-y-14">
       <section className="animate-fade-up">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brass-500">{t('heroKicker')}</p>
-        <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight text-white sm:text-5xl">
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-accent">{t('heroKicker')}</p>
+        <h1 className="mt-4 max-w-3xl text-3xl font-semibold leading-tight text-strong sm:text-5xl">
           {t('heroTitle')}
         </h1>
-        <p className="mt-5 max-w-2xl text-base leading-8 text-[rgb(var(--muted))]">{t('heroBody')}</p>
+        <p className="mt-5 max-w-2xl text-base leading-8 text-muted">{t('heroBody')}</p>
         <div className="mt-8 flex flex-wrap gap-3">
           <Link href={session?.user ? homeForRole(session.user.role) : '/register'} className="btn-primary">
             {t('ctaPrimary')}
@@ -53,13 +53,13 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
       </section>
 
       <section>
-        <h2 className="mb-5 text-xl font-semibold text-white">{t('howTitle')}</h2>
+        <h2 className="mb-5 text-xl font-semibold text-strong">{t('howTitle')}</h2>
         <ol className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {steps.map((step, index) => (
             <li key={step.title} className="card p-5">
-              <span className="text-xs font-semibold text-brass-500">0{index + 1}</span>
-              <h3 className="mt-2 text-sm font-semibold text-white">{step.title}</h3>
-              <p className="mt-2 text-sm leading-6 text-[rgb(var(--muted))]">{step.body}</p>
+              <span className="text-xs font-semibold text-accent">0{index + 1}</span>
+              <h3 className="mt-2 text-sm font-semibold text-strong">{step.title}</h3>
+              <p className="mt-2 text-sm leading-6 text-muted">{step.body}</p>
             </li>
           ))}
         </ol>

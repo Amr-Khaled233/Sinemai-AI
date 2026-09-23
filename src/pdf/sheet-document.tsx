@@ -1,44 +1,62 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { fontsFor, registerPdfFonts } from './fonts';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 /**
  * PDF export built with @react-pdf/renderer — no headless browser, so it fits
  * inside a Vercel function without blowing up bundle size or cold starts.
  *
- * The PDF is intentionally English/Latin: @react-pdf does not shape Arabic
- * script without an embedded Arabic font with ligature support, and a silently
- * mis-rendered Arabic sheet is worse than an English one. Register an Arabic
- * font here (Font.register) if you add one to the repo.
+ * The sheet is produced in the language it was generated in. Arabic is laid out
+ * right to left with an embedded Arabic font (see ./fonts.ts); Latin brand and
+ * model names stay in Latin script inside Arabic sentences, which is how crews
+ * write them anyway.
  */
 
-const styles = StyleSheet.create({
-  page: { padding: 36, fontSize: 9, color: '#1a1d24', fontFamily: 'Helvetica' },
-  kicker: { fontSize: 7, letterSpacing: 1.6, color: '#9a7a2e', textTransform: 'uppercase' },
-  h1: { fontSize: 18, marginTop: 6, fontFamily: 'Helvetica-Bold' },
-  meta: { fontSize: 8, color: '#6b7280', marginTop: 4 },
-  section: { marginTop: 18 },
-  h2: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
-    borderBottomWidth: 1,
-    borderBottomColor: '#d8c79a',
-    paddingBottom: 3,
-    marginBottom: 6,
-  },
-  body: { lineHeight: 1.5, color: '#374151' },
-  row: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: '#e5e7eb', paddingVertical: 3 },
-  th: { flexDirection: 'row', backgroundColor: '#f3f4f6', paddingVertical: 4, fontFamily: 'Helvetica-Bold' },
-  cell: { paddingHorizontal: 3 },
-  statRow: { flexDirection: 'row', gap: 8, marginTop: 4 },
-  stat: { flexGrow: 1, borderWidth: 0.5, borderColor: '#e5e7eb', padding: 6 },
-  statLabel: { fontSize: 6.5, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.6 },
-  statValue: { fontSize: 12, fontFamily: 'Helvetica-Bold', marginTop: 2 },
-  note: { fontSize: 7.5, color: '#6b7280', marginTop: 10, lineHeight: 1.4 },
-  badge: { fontSize: 7, color: '#92400e' },
-  footer: { position: 'absolute', bottom: 22, left: 36, right: 36, fontSize: 7, color: '#9ca3af' },
-});
+export type PdfLabels = {
+  title: string;
+  summary: string;
+  sceneBreakdown: string;
+  scenes: string;
+  shootDays: string;
+  nightScenes: string;
+  exteriors: string;
+  highComplexity: string;
+  heading: string;
+  environment: string;
+  time: string;
+  lighting: string;
+  movement: string;
+  equipmentTitle: string;
+  category: string;
+  item: string;
+  quantity: string;
+  days: string;
+  reason: string;
+  dopsTitle: string;
+  dopsEmpty: string;
+  matchScore: string;
+  vendorsTitle: string;
+  vendorsEmpty: string;
+  coverage: string;
+  budgetTitle: string;
+  budgetLow: string;
+  budgetMid: string;
+  budgetHigh: string;
+  role: string;
+  headcount: string;
+  rate: string;
+  total: string;
+  equipmentRental: string;
+  crew: string;
+  contingency: string;
+  reviewer: string;
+  provenance: string;
+  dayRate: string;
+};
 
 export type SheetPdfData = {
+  locale: string;
+  labels: PdfLabels;
   projectName: string;
   projectType: string;
   budgetTier: string;
@@ -71,44 +89,107 @@ export type SheetPdfData = {
 const money = (value: number, currency: string) =>
   `${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(Math.round(value))} ${currency}`;
 
+function makeStyles(locale: string) {
+  const f = fontsFor(locale);
+  return {
+    f,
+    styles: StyleSheet.create({
+      page: {
+        padding: 36,
+        fontSize: 9,
+        color: '#1a1d24',
+        fontFamily: f.body,
+        direction: f.direction,
+        textAlign: f.align,
+      },
+      kicker: { fontSize: 7, letterSpacing: f.isArabic ? 0 : 1.6, color: '#9a7a2e' },
+      h1: { fontSize: 18, marginTop: 6, fontFamily: f.bold, fontWeight: f.boldWeight },
+      meta: { fontSize: 8, color: '#6b7280', marginTop: 4 },
+      section: { marginTop: 18 },
+      h2: {
+        fontSize: 10,
+        fontFamily: f.bold,
+        fontWeight: f.boldWeight,
+        borderBottomWidth: 1,
+        borderBottomColor: '#d8c79a',
+        paddingBottom: 3,
+        marginBottom: 6,
+      },
+      bold: { fontFamily: f.bold, fontWeight: f.boldWeight },
+      body: { lineHeight: 1.6, color: '#374151' },
+      row: {
+        flexDirection: f.isArabic ? 'row-reverse' : 'row',
+        borderBottomWidth: 0.5,
+        borderBottomColor: '#e5e7eb',
+        paddingVertical: 3,
+      },
+      th: {
+        flexDirection: f.isArabic ? 'row-reverse' : 'row',
+        backgroundColor: '#f3f4f6',
+        paddingVertical: 4,
+        fontFamily: f.bold,
+        fontWeight: f.boldWeight,
+      },
+      cell: { paddingHorizontal: 3, textAlign: f.align },
+      statRow: { flexDirection: f.isArabic ? 'row-reverse' : 'row', gap: 8, marginTop: 4 },
+      stat: { flexGrow: 1, borderWidth: 0.5, borderColor: '#e5e7eb', padding: 6 },
+      statLabel: { fontSize: 6.5, color: '#6b7280', textAlign: f.align },
+      statValue: { fontSize: 12, fontFamily: f.bold, fontWeight: f.boldWeight, marginTop: 2, textAlign: f.align },
+      note: { fontSize: 7.5, color: '#6b7280', marginTop: 10, lineHeight: 1.5 },
+      badge: { fontSize: 7, color: '#92400e' },
+      footer: { position: 'absolute', bottom: 22, left: 36, right: 36, fontSize: 7, color: '#9ca3af' },
+    }),
+  };
+}
+
 export function SheetDocument({ data }: { data: SheetPdfData }) {
+  registerPdfFonts();
+  const { styles, f } = makeStyles(data.locale);
+  const L = data.labels;
+  const cur = data.currency;
+
+  const Stat = ({ label, value }: { label: string; value: string }) => (
+    <View style={styles.stat}>
+      <Text style={styles.statLabel}>{label}</Text>
+      <Text style={styles.statValue}>{value}</Text>
+    </View>
+  );
+
   return (
-    <Document title={`${data.projectName} — Production & Equipment Sheet`} author="Sinemai AI">
+    <Document title={`${data.projectName} — ${L.title}`} author="Sinemai AI">
       <Page size="A4" style={styles.page}>
-        <Text style={styles.kicker}>Sinemai AI — Production &amp; Equipment Sheet</Text>
+        <Text style={styles.kicker}>Sinemai AI · {L.title}</Text>
         <Text style={styles.h1}>{data.projectName}</Text>
         <Text style={styles.meta}>
-          {[data.projectType, `${data.budgetTier} budget tier`, data.city, data.generatedAt]
-            .filter(Boolean)
-            .join('  ·  ')}
+          {[data.projectType, data.budgetTier, data.city, data.generatedAt].filter(Boolean).join('  ·  ')}
         </Text>
-        {data.styleTags.length > 0 && <Text style={styles.meta}>Visual style: {data.styleTags.join(', ')}</Text>}
+        {data.styleTags.length > 0 && <Text style={styles.meta}>{data.styleTags.join('  ·  ')}</Text>}
 
         {data.summaryText ? (
           <View style={styles.section}>
-            <Text style={styles.h2}>Executive summary</Text>
+            <Text style={styles.h2}>{L.summary}</Text>
             <Text style={styles.body}>{data.summaryText}</Text>
           </View>
         ) : null}
 
         {data.sceneSummary && (
           <View style={styles.section}>
-            <Text style={styles.h2}>Scene breakdown</Text>
+            <Text style={styles.h2}>{L.sceneBreakdown}</Text>
             <View style={styles.statRow}>
-              <Stat label="Scenes" value={String(data.sceneSummary.sceneCount)} />
-              <Stat label="Shoot days" value={String(data.sceneSummary.shootDays)} />
-              <Stat label="Night / dawn" value={`${data.sceneSummary.nightScenePct}%`} />
-              <Stat label="Exteriors" value={`${data.sceneSummary.exteriorScenePct}%`} />
-              <Stat label="High complexity" value={`${data.sceneSummary.highComplexityPct}%`} />
+              <Stat label={L.scenes} value={String(data.sceneSummary.sceneCount)} />
+              <Stat label={L.shootDays} value={String(data.sceneSummary.shootDays)} />
+              <Stat label={L.nightScenes} value={`${data.sceneSummary.nightScenePct}%`} />
+              <Stat label={L.exteriors} value={`${data.sceneSummary.exteriorScenePct}%`} />
+              <Stat label={L.highComplexity} value={`${data.sceneSummary.highComplexityPct}%`} />
             </View>
 
             <View style={[styles.th, { marginTop: 10 }]}>
               <Text style={[styles.cell, { width: '6%' }]}>#</Text>
-              <Text style={[styles.cell, { width: '42%' }]}>Heading</Text>
-              <Text style={[styles.cell, { width: '13%' }]}>Env</Text>
-              <Text style={[styles.cell, { width: '13%' }]}>Time</Text>
-              <Text style={[styles.cell, { width: '13%' }]}>Light</Text>
-              <Text style={[styles.cell, { width: '13%' }]}>Move</Text>
+              <Text style={[styles.cell, { width: '42%' }]}>{L.heading}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{L.environment}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{L.time}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{L.lighting}</Text>
+              <Text style={[styles.cell, { width: '13%' }]}>{L.movement}</Text>
             </View>
             {data.scenes.map((scene) => (
               <View key={scene.order} style={styles.row} wrap={false}>
@@ -124,13 +205,13 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
         )}
 
         <View style={styles.section} break>
-          <Text style={styles.h2}>Recommended package</Text>
+          <Text style={styles.h2}>{L.equipmentTitle}</Text>
           <View style={styles.th}>
-            <Text style={[styles.cell, { width: '14%' }]}>Category</Text>
-            <Text style={[styles.cell, { width: '36%' }]}>Item</Text>
-            <Text style={[styles.cell, { width: '7%' }]}>Qty</Text>
-            <Text style={[styles.cell, { width: '8%' }]}>Days</Text>
-            <Text style={[styles.cell, { width: '35%' }]}>Reason</Text>
+            <Text style={[styles.cell, { width: '14%' }]}>{L.category}</Text>
+            <Text style={[styles.cell, { width: '36%' }]}>{L.item}</Text>
+            <Text style={[styles.cell, { width: '7%' }]}>{L.quantity}</Text>
+            <Text style={[styles.cell, { width: '8%' }]}>{L.days}</Text>
+            <Text style={[styles.cell, { width: '35%' }]}>{L.reason}</Text>
           </View>
           {data.equipment.map((item) => (
             <View key={item.equipmentId} style={styles.row} wrap={false}>
@@ -149,16 +230,16 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.h2}>Matched cinematographers</Text>
+          <Text style={styles.h2}>{L.dopsTitle}</Text>
           {data.dops.length === 0 ? (
-            <Text style={styles.body}>No cinematographer profiles matched this project.</Text>
+            <Text style={styles.body}>{L.dopsEmpty}</Text>
           ) : (
             data.dops.map((dop) => (
               <View key={dop.dopId} style={{ marginBottom: 7 }} wrap={false}>
-                <Text style={{ fontFamily: 'Helvetica-Bold' }}>
-                  {dop.name} — {Math.round(dop.score * 100)}% style match
+                <Text style={styles.bold}>
+                  {dop.name} — {L.matchScore} {Math.round(dop.score * 100)}%
                   {dop.city ? ` · ${dop.city}` : ''}
-                  {dop.dayRate ? ` · ${money(dop.dayRate, data.currency)}/day` : ''}
+                  {dop.dayRate ? ` · ${L.dayRate} ${money(dop.dayRate, cur)}` : ''}
                 </Text>
                 <Text style={styles.body}>{dop.reason}</Text>
                 {dop.portfolioLinks.length > 0 && (
@@ -170,24 +251,26 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.h2}>Rental vendors</Text>
+          <Text style={styles.h2}>{L.vendorsTitle}</Text>
           {data.vendors.length === 0 ? (
-            <Text style={styles.body}>No approved vendor stocks this package yet.</Text>
+            <Text style={styles.body}>{L.vendorsEmpty}</Text>
           ) : (
             data.vendors.map((vendor) => (
               <View key={vendor.vendorId} style={{ marginBottom: 8 }} wrap={false}>
-                <Text style={{ fontFamily: 'Helvetica-Bold' }}>
-                  {vendor.companyName} — {vendor.city} · {vendor.coveragePct}% coverage ·{' '}
-                  {money(vendor.subtotal, data.currency)}
+                <Text style={styles.bold}>
+                  {vendor.companyName} — {vendor.city} · {L.coverage} {vendor.coveragePct}% ·{' '}
+                  {money(vendor.subtotal, cur)}
                 </Text>
                 {vendor.items.map((line) => (
                   <View key={line.equipmentId} style={styles.row} wrap={false}>
                     <Text style={[styles.cell, { width: '50%' }]}>
                       {line.brand} {line.model}
                     </Text>
-                    <Text style={[styles.cell, { width: '12%' }]}>x{line.quantity}</Text>
-                    <Text style={[styles.cell, { width: '13%' }]}>{line.rentalDays}d</Text>
-                    <Text style={[styles.cell, { width: '25%' }]}>{money(line.lineTotal, data.currency)}</Text>
+                    <Text style={[styles.cell, { width: '12%' }]}>×{line.quantity}</Text>
+                    <Text style={[styles.cell, { width: '13%' }]}>
+                      {line.rentalDays} {L.days}
+                    </Text>
+                    <Text style={[styles.cell, { width: '25%' }]}>{money(line.lineTotal, cur)}</Text>
                   </View>
                 ))}
               </View>
@@ -197,41 +280,43 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
 
         {data.budget && (
           <View style={styles.section} wrap={false}>
-            <Text style={styles.h2}>Estimated budget</Text>
+            <Text style={styles.h2}>{L.budgetTitle}</Text>
             <View style={styles.statRow}>
-              <Stat label="Low" value={money(data.low, data.currency)} />
-              <Stat label="Mid" value={money(data.mid, data.currency)} />
-              <Stat label="High" value={money(data.high, data.currency)} />
+              <Stat label={L.budgetLow} value={money(data.low, cur)} />
+              <Stat label={L.budgetMid} value={money(data.mid, cur)} />
+              <Stat label={L.budgetHigh} value={money(data.high, cur)} />
             </View>
 
             <View style={[styles.th, { marginTop: 10 }]}>
-              <Text style={[styles.cell, { width: '46%' }]}>Crew role</Text>
-              <Text style={[styles.cell, { width: '12%' }]}>Count</Text>
-              <Text style={[styles.cell, { width: '18%' }]}>Day rate</Text>
-              <Text style={[styles.cell, { width: '10%' }]}>Days</Text>
-              <Text style={[styles.cell, { width: '14%' }]}>Total</Text>
+              <Text style={[styles.cell, { width: '46%' }]}>{L.role}</Text>
+              <Text style={[styles.cell, { width: '12%' }]}>{L.headcount}</Text>
+              <Text style={[styles.cell, { width: '18%' }]}>{L.rate}</Text>
+              <Text style={[styles.cell, { width: '10%' }]}>{L.days}</Text>
+              <Text style={[styles.cell, { width: '14%' }]}>{L.total}</Text>
             </View>
             {data.budget.crewBreakdown.map((line) => (
               <View key={line.roleSlug} style={styles.row} wrap={false}>
-                <Text style={[styles.cell, { width: '46%' }]}>{line.labelEn}</Text>
+                <Text style={[styles.cell, { width: '46%' }]}>
+                  {f.isArabic ? line.labelAr : line.labelEn}
+                </Text>
                 <Text style={[styles.cell, { width: '12%' }]}>{line.headcount}</Text>
-                <Text style={[styles.cell, { width: '18%' }]}>{money(line.dayRate, data.currency)}</Text>
+                <Text style={[styles.cell, { width: '18%' }]}>{money(line.dayRate, cur)}</Text>
                 <Text style={[styles.cell, { width: '10%' }]}>{line.days}</Text>
-                <Text style={[styles.cell, { width: '14%' }]}>{money(line.total, data.currency)}</Text>
+                <Text style={[styles.cell, { width: '14%' }]}>{money(line.total, cur)}</Text>
               </View>
             ))}
 
             <Text style={[styles.body, { marginTop: 8 }]}>
-              Equipment rental {money(data.budget.equipmentRental, data.currency)} · Crew{' '}
-              {money(data.budget.crewTotal, data.currency)} · Contingency {data.budget.contingencyPct}% ·{' '}
-              {data.budget.shootDays} shoot day(s)
+              {L.equipmentRental} {money(data.budget.equipmentRental, cur)} · {L.crew}{' '}
+              {money(data.budget.crewTotal, cur)} · {L.contingency} {data.budget.contingencyPct}% ·{' '}
+              {data.budget.shootDays} {L.shootDays}
             </Text>
           </View>
         )}
 
         {data.criticNotes.length > 0 && (
           <View style={styles.section} wrap={false}>
-            <Text style={styles.h2}>Reviewer notes</Text>
+            <Text style={styles.h2}>{L.reviewer}</Text>
             {data.criticNotes.map((note, index) => (
               <Text key={index} style={styles.badge}>
                 • {note}
@@ -240,23 +325,14 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
           </View>
         )}
 
-        <Text style={styles.note}>
-          Every equipment item, rental price, cinematographer and crew rate in this sheet was retrieved from the
-          Sinemai AI database by a tool call, not generated by a language model. Estimates are indicative and subject
-          to vendor confirmation of availability on your dates.
-        </Text>
+        <Text style={styles.note}>{L.provenance}</Text>
 
-        <Text style={styles.footer} render={({ pageNumber, totalPages }) => `Sinemai AI · ${pageNumber}/${totalPages}`} fixed />
+        <Text
+          style={styles.footer}
+          render={({ pageNumber, totalPages }) => `Sinemai AI · ${pageNumber}/${totalPages}`}
+          fixed
+        />
       </Page>
     </Document>
-  );
-}
-
-function Stat({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statLabel}>{label}</Text>
-      <Text style={styles.statValue}>{value}</Text>
-    </View>
   );
 }

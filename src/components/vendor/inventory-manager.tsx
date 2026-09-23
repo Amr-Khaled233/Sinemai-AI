@@ -85,7 +85,7 @@ export function InventoryManager({
         }
       >
         {showForm && (
-          <form action={submit} className="mb-6 rounded-xl border border-brass-600/40 bg-ink-900/60 p-4">
+          <form action={submit} className="mb-6 rounded-xl border border-accent/40 bg-surface-sunken p-4">
             {editing && <input type="hidden" name="id" value={editing.id} />}
 
             <Field label={t('equipment')}>
@@ -156,11 +156,11 @@ export function InventoryManager({
                 type="file"
                 name="photo"
                 accept="image/*"
-                className="file:me-3 file:rounded-md file:border-0 file:bg-brass-500/20 file:px-3 file:py-1.5 file:text-xs file:text-brass-300"
+                className="file:me-3 file:rounded-md file:border-0 file:bg-accent/20 file:px-3 file:py-1.5 file:text-xs file:text-accent"
               />
             </Field>
 
-            {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+            {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
             <div className="flex gap-2">
               <button type="submit" className="btn-primary text-xs" disabled={pending}>
@@ -199,12 +199,12 @@ export function InventoryManager({
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className={item.active ? '' : 'opacity-50'}>
-                    <td className="font-medium text-white">
+                    <td className="font-medium text-strong">
                       {item.label}
                       {item.blocks.length > 0 && (
                         <button
                           type="button"
-                          className="ms-2 text-[11px] text-amber-400 hover:underline"
+                          className="ms-2 text-[11px] text-warning hover:underline"
                           onClick={() => setExpanded(expanded === item.id ? null : item.id)}
                         >
                           {item.blocks.length} {t('blocks')}
@@ -213,7 +213,7 @@ export function InventoryManager({
                       {expanded === item.id && (
                         <ul className="mt-2 space-y-1">
                           {item.blocks.map((block) => (
-                            <li key={block.id} className="flex items-center gap-2 text-[11px] text-[rgb(var(--muted))]">
+                            <li key={block.id} className="flex items-center gap-2 text-[11px] text-muted">
                               <span dir="ltr">
                                 {block.startDate} → {block.endDate}
                               </span>
@@ -221,7 +221,7 @@ export function InventoryManager({
                               {block.reason && <span>· {block.reason}</span>}
                               <button
                                 type="button"
-                                className="text-red-400 hover:underline"
+                                className="text-danger hover:underline"
                                 onClick={async () => {
                                   await removeAvailabilityBlock(block.id);
                                   router.refresh();
@@ -257,7 +257,7 @@ export function InventoryManager({
                         </button>
                         <button
                           type="button"
-                          className="btn-ghost text-[11px] text-red-400"
+                          className="btn-ghost text-[11px] text-danger"
                           onClick={async () => {
                             await deleteInventoryItem(item.id);
                             router.refresh();

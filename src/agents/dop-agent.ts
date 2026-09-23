@@ -5,6 +5,7 @@ import { getSettings } from '@/lib/settings';
 import type { DopSearchHit } from '@/lib/embeddings';
 import { allToolResults, finishRun, model, MODELS, startRun, type RunContext } from './runtime';
 import { makeDopTools } from './tools/dop-tools';
+import { withLanguage } from './language';
 import type { DopMatch, DopResult, ProjectBrief, SceneSummary } from './types';
 
 export const DOP_SYSTEM = `You match cinematographers to productions by visual style.
@@ -41,7 +42,7 @@ export async function runDopAgent(
     agent: AgentName.DOP_MATCH,
     attempt: options.attempt ?? 1,
     model: MODELS.reasoning,
-    systemPrompt: DOP_SYSTEM,
+    systemPrompt: withLanguage(DOP_SYSTEM, brief.locale),
     input: {
       visualStyleTags: brief.visualStyleTags,
       lightingNotes: summary.dominantLightingNotes,
@@ -56,7 +57,7 @@ export async function runDopAgent(
 
     await generateText({
       model: model('reasoning'),
-      system: DOP_SYSTEM,
+      system: withLanguage(DOP_SYSTEM, brief.locale),
       tools,
       stopWhen: stepCountIs(4),
       temperature: 0.4,
@@ -103,7 +104,7 @@ export async function runDopAgent(
     const { object } = await generateObject({
       model: model('cheap'),
       schema: explainSchema,
-      system: DOP_SYSTEM,
+      system: withLanguage(DOP_SYSTEM, brief.locale),
       temperature: 0.4,
       prompt: [
         brief.visualStyleTags.length ? `Requested look: ${brief.visualStyleTags.join(', ')}.` : '',

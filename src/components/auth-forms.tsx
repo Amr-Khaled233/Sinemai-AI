@@ -138,7 +138,7 @@ export function SignUpForm({ locale }: { locale: string }) {
       </Field>
 
       {role === 'VENDOR' && (
-        <div className="mb-2 rounded-lg border border-ink-600/70 bg-ink-900/50 p-4">
+        <div className="mb-2 rounded-lg border border-line bg-surface-sunken p-4">
           <Field label={t('companyName')}>
             <Input name="companyName" required />
           </Field>
@@ -160,13 +160,13 @@ export function SignUpForm({ locale }: { locale: string }) {
       )}
 
       {role !== 'PRODUCER' && (
-        <p className="mb-4 rounded-lg border border-brass-600/40 bg-brass-500/5 p-3 text-xs text-brass-300">
+        <p className="mb-4 rounded-lg border border-accent/40 bg-accent/5 p-3 text-xs text-accent">
           {t('pendingNotice')}
         </p>
       )}
 
-      {error && <p className="mb-3 text-sm text-red-400">{error}</p>}
-      {notice && <p className="mb-3 text-sm text-teal-400">{notice}</p>}
+      {error && <p className="mb-3 text-sm text-danger">{error}</p>}
+      {notice && <p className="mb-3 text-sm text-info">{notice}</p>}
 
       <button type="submit" className="btn-primary w-full" disabled={pending}>
         {t('submitSignUp')}

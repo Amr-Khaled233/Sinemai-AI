@@ -22,7 +22,7 @@ export function ShareControls({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <a href={`/api/projects/${projectId}/pdf`} className="btn-secondary text-xs" target="_blank" rel="noreferrer">
+      <a href={`/api/projects/${projectId}/pdf?locale=${locale}`} className="btn-secondary text-xs" target="_blank" rel="noreferrer">
         {t('exportPdf')}
       </a>
 

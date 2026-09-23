@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { isAuthorizedJob } from '@/lib/cron';
+import { purgeExpiredResetTokens } from '@/lib/password-reset';
 
 export const runtime = 'nodejs';
 
@@ -20,7 +21,13 @@ export async function GET(request: Request) {
     data: { status: 'FAILED' },
   });
 
-  return NextResponse.json({ blocksRemoved: count, staleAnalysesFailed: stuck.count });
+  const resetTokensRemoved = await purgeExpiredResetTokens();
+
+  return NextResponse.json({
+    blocksRemoved: count,
+    staleAnalysesFailed: stuck.count,
+    resetTokensRemoved,
+  });
 }
 
 export const POST = GET;

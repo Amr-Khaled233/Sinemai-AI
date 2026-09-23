@@ -69,3 +69,19 @@ export function approvalEmail(args: { name: string; approved: boolean; reason?: 
          <p><a style="color:#4fd1c5" href="${args.loginUrl}">Update your profile and resubmit</a></p>`,
       );
 }
+
+export function resetEmail(args: { name: string; locale: string; url: string; ttlMinutes: number }) {
+  return args.locale === 'ar'
+    ? shell(
+        'إعادة تعيين كلمة المرور',
+        `<p>مرحباً ${args.name}، وصلنا طلب لإعادة تعيين كلمة مرور حسابك في سينمائي AI.</p>
+         <p><a style="color:#4fd1c5" href="${args.url}">اضغط هنا لتعيين كلمة مرور جديدة</a></p>
+         <p>الرابط صالح لمدة ${args.ttlMinutes} دقيقة ويُستخدم مرة واحدة. إن لم تطلب ذلك، تجاهل هذه الرسالة ولن يتغيّر شيء.</p>`,
+      )
+    : shell(
+        'Reset your password',
+        `<p>Hi ${args.name}, we received a request to reset your Sinemai AI password.</p>
+         <p><a style="color:#4fd1c5" href="${args.url}">Choose a new password</a></p>
+         <p>The link is valid for ${args.ttlMinutes} minutes and can be used once. If you did not request this, ignore this email — nothing changes.</p>`,
+      );
+}

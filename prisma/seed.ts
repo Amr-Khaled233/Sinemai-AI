@@ -9,6 +9,7 @@
  * - Crew day rates and budget-tier windows are starting points for the admin to
  *   tune; the budget agent reads them from the database, never from code.
  */
+import { randomBytes } from 'node:crypto';
 import { hash } from 'bcryptjs';
 import {
   BudgetTier,
@@ -22,6 +23,33 @@ import { buildDopEmbeddingText, writeDopEmbedding, embedText } from '../src/lib/
 import { DEFAULT_BUDGET_TIERS, DEFAULT_SETTINGS } from '../src/lib/settings';
 
 const prisma = new PrismaClient();
+
+/**
+ * Seeded accounts are real Gmail addresses built with plus-addressing, so every
+ * demo inbox (approval mails, inquiries, password resets) lands in the owner's
+ * mailbox and can actually be signed into.
+ *
+ *   SEED_GMAIL=you@gmail.com  →  you+admin@gmail.com, you+producer@gmail.com, …
+ *
+ * The password comes from SEED_PASSWORD. When it is missing a strong one is
+ * generated and printed once, so a public deployment never ships with a
+ * password that is committed to the repository.
+ */
+const SEED_GMAIL = process.env.SEED_GMAIL ?? 'amr.khufra250@gmail.com';
+
+function seedEmail(tag: string) {
+  const [local, domain] = SEED_GMAIL.split('@');
+  if (!domain) throw new Error('SEED_GMAIL must be a full email address');
+  // Strip any existing +tag so re-runs stay idempotent.
+  return `${local.split('+')[0]}+${tag}@${domain}`;
+}
+
+function seedPassword() {
+  const configured = process.env.SEED_PASSWORD;
+  if (configured && configured.length >= 8) return { value: configured, generated: false };
+  const generated = `Sin-${randomBytes(9).toString('base64url')}`;
+  return { value: generated, generated: true };
+}
 
 const { LOW, MEDIUM, HIGH } = BudgetTier;
 const ALL_TIERS = [LOW, MEDIUM, HIGH];
@@ -829,12 +857,13 @@ async function main() {
 
   // ---------------------------------------------------------------- accounts
   console.log('→ accounts');
-  const password = await hash('Sinemai!2026', 12);
+  const credentials = seedPassword();
+  const password = await hash(credentials.value, 12);
 
   const admin = await prisma.user.upsert({
-    where: { email: 'admin@sinemai.ai' },
+    where: { email: seedEmail('admin') },
     create: {
-      email: 'admin@sinemai.ai',
+      email: seedEmail('admin'),
       name: 'Platform Admin',
       passwordHash: password,
       role: Role.ADMIN,
@@ -844,9 +873,9 @@ async function main() {
   });
 
   await prisma.user.upsert({
-    where: { email: 'producer@sinemai.ai' },
+    where: { email: seedEmail('producer') },
     create: {
-      email: 'producer@sinemai.ai',
+      email: seedEmail('producer'),
       name: 'Demo Producer',
       passwordHash: password,
       role: Role.PRODUCER,
@@ -858,7 +887,7 @@ async function main() {
   // ---- launch-partner vendors
   const vendorSeeds = [
     {
-      email: 'vendor.riyadh@sinemai.ai',
+      email: seedEmail('vendor-riyadh'),
       contact: 'Riyadh Rentals Manager',
       company: {
         name: 'استوديوهات نجد للتأجير',
@@ -887,7 +916,7 @@ async function main() {
       } as Record<string, [number, number]>,
     },
     {
-      email: 'vendor.jeddah@sinemai.ai',
+      email: seedEmail('vendor-jeddah'),
       contact: 'Jeddah Rentals Manager',
       company: {
         name: 'البحر الأحمر للإنتاج',
@@ -983,7 +1012,7 @@ async function main() {
   // ---- launch-partner cinematographers
   const dopSeeds = [
     {
-      email: 'dop.faisal@sinemai.ai',
+      email: seedEmail('dop-faisal'),
       name: 'Faisal Al-Harbi',
       nameAr: 'فيصل الحربي',
       city: 'Riyadh',
@@ -994,7 +1023,7 @@ async function main() {
       links: ['https://vimeo.com/example/faisal-reel', 'https://www.imdb.com/name/nm0000001/'],
     },
     {
-      email: 'dop.noura@sinemai.ai',
+      email: seedEmail('dop-noura'),
       name: 'Noura Al-Qahtani',
       nameAr: 'نورة القحطاني',
       city: 'Riyadh',
@@ -1005,7 +1034,7 @@ async function main() {
       links: ['https://vimeo.com/example/noura-reel', 'https://www.youtube.com/@example-noura'],
     },
     {
-      email: 'dop.omar@sinemai.ai',
+      email: seedEmail('dop-omar'),
       name: 'Omar Haddad',
       nameAr: 'عمر حداد',
       city: 'Jeddah',
@@ -1016,7 +1045,7 @@ async function main() {
       links: ['https://vimeo.com/example/omar-reel'],
     },
     {
-      email: 'dop.layla@sinemai.ai',
+      email: seedEmail('dop-layla'),
       name: 'Layla Mansour',
       nameAr: 'ليلى منصور',
       city: 'AlUla',
@@ -1027,7 +1056,7 @@ async function main() {
       links: ['https://vimeo.com/example/layla-reel', 'https://www.imdb.com/name/nm0000004/'],
     },
     {
-      email: 'dop.tariq@sinemai.ai',
+      email: seedEmail('dop-tariq'),
       name: 'Tariq Bin Saleh',
       nameAr: 'طارق بن صالح',
       city: 'Riyadh',
@@ -1096,11 +1125,19 @@ async function main() {
     );
   }
 
-  console.log(`\nSeed complete. Sign in with:
-  admin@sinemai.ai        / Sinemai!2026   (ADMIN)
-  producer@sinemai.ai     / Sinemai!2026   (PRODUCER)
-  vendor.riyadh@sinemai.ai / Sinemai!2026  (VENDOR, approved)
-  dop.faisal@sinemai.ai   / Sinemai!2026   (DOP, approved)
+  console.log(`
+Seed complete. Accounts (every address delivers to ${SEED_GMAIL}):
+  ${seedEmail('admin').padEnd(40)} ADMIN
+  ${seedEmail('producer').padEnd(40)} PRODUCER
+  ${seedEmail('vendor-riyadh').padEnd(40)} VENDOR (approved)
+  ${seedEmail('vendor-jeddah').padEnd(40)} VENDOR (approved)
+  ${seedEmail('dop-faisal').padEnd(40)} DOP (approved, 5 profiles seeded)
+
+Password: ${credentials.value}${
+    credentials.generated
+      ? '  <- generated for this run. Save it now, or set SEED_PASSWORD to choose your own.'
+      : '  (from SEED_PASSWORD)'
+  }
 Admin id: ${admin.id}`);
 }
 

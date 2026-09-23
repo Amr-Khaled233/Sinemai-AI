@@ -37,7 +37,7 @@ export function StyleTagPicker({
               key={tag.slug}
               type="button"
               onClick={() => toggle(tag.slug)}
-              className={`chip transition-colors ${on ? 'chip-on' : 'hover:border-brass-600/60'}`}
+              className={`chip transition-colors ${on ? 'chip-on' : 'hover:border-accent/60'}`}
               aria-pressed={on}
             >
               {locale === 'ar' ? tag.labelAr : tag.labelEn}

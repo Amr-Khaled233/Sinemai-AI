@@ -1,19 +1,23 @@
 import { generateText } from 'ai';
-import { AgentName, AgentRunStatus, ProjectStatus, Prisma } from '@prisma/client';
+import { AgentName, AgentRunStatus, AnalysisStage, ProjectStatus, Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { createRunContext, finishRun, model, MODELS, startRun } from './runtime';
-import { runScriptAnalyst } from './script-analyst';
+import { loadSceneRequirements, runScriptAnalystStep, summariseScenes } from './script-analyst';
 import { runEquipmentAgent } from './equipment-agent';
 import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
+import { languageDirective, languageName } from './language';
 import type {
   CriticIssue,
+  CriticResult,
   DopResult,
   EquipmentResult,
   ProductionSheet,
   ProgressReporter,
+  ProgressStage,
   ProjectBrief,
+  SceneSummary,
   VendorBudgetResult,
 } from './types';
 
@@ -24,165 +28,449 @@ Write 3–5 sentences for the director/producer who will act on this sheet. Lead
 /**
  * Agent 1 — Orchestrator.
  *
- * Owns execution order and the final assembly. Equipment and DOP matching run
- * concurrently once scene data exists; vendor pricing waits for the package.
- * The Critic reviews the assembled sheet, and any agent it blocks gets exactly
- * one retry with the specific complaint fed back in.
+ * Owns execution order and final assembly, but runs as a **resumable state
+ * machine** rather than one long call: each step does one unit of work and
+ * checkpoints to `AnalysisState`. A request executes as many steps as it can
+ * inside its time budget and then returns; the client calls again to continue.
+ *
+ * That keeps every invocation comfortably inside a 60s serverless limit while
+ * the graph itself is unchanged — equipment and DOP matching still run
+ * concurrently, vendor pricing still waits for the package, and the critic
+ * still gets one targeted retry per agent.
  */
-export async function runProductionAnalysis(
+
+const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage }> = {
+  PARSE: { pct: 8, stage: 'parsing' },
+  SCENES: { pct: 20, stage: 'analyzing_scenes' },
+  EQUIPMENT: { pct: 50, stage: 'matching_equipment' },
+  DOPS: { pct: 60, stage: 'matching_dops' },
+  VENDOR_BUDGET: { pct: 70, stage: 'pricing' },
+  CRITIC: { pct: 80, stage: 'reviewing' },
+  RETRY: { pct: 86, stage: 'retrying' },
+  ASSEMBLE: { pct: 94, stage: 'saving' },
+  DONE: { pct: 100, stage: 'done' },
+  FAILED: { pct: 100, stage: 'error' },
+};
+
+export type StepOutcome = {
+  done: boolean;
+  stage: AnalysisStage;
+  pct: number;
+  failed?: boolean;
+};
+
+/** Starts a fresh run, discarding any half-finished state for this project. */
+export async function beginAnalysis(projectId: string, locale: string) {
+  const state = {
+    stage: AnalysisStage.PARSE,
+    locale,
+    sceneCursor: 0,
+    sceneTotal: 0,
+    summary: Prisma.DbNull,
+    equipment: Prisma.DbNull,
+    dops: Prisma.DbNull,
+    vendorBudget: Prisma.DbNull,
+    critic: Prisma.DbNull,
+    retriedAgents: [],
+    criticRound: 0,
+    errorText: null,
+    startedAt: new Date(),
+  };
+
+  await prisma.$transaction([
+    prisma.analysisState.upsert({
+      where: { projectId },
+      create: { projectId, ...state },
+      update: state,
+    }),
+    prisma.project.update({ where: { id: projectId }, data: { status: ProjectStatus.ANALYZING } }),
+  ]);
+}
+
+/**
+ * Runs analysis steps until the time budget is spent or the run finishes.
+ * `budgetMs` is deliberately below the function's `maxDuration` so the response
+ * always makes it back to the client with a resume point.
+ */
+export async function advanceAnalysis(
   projectId: string,
   report: ProgressReporter,
-): Promise<ProductionSheet> {
-  const ctx = createRunContext(projectId, report);
+  options: { budgetMs?: number } = {},
+): Promise<StepOutcome> {
+  const budgetMs = options.budgetMs ?? 45_000;
   const startedAt = Date.now();
-  const brief = await loadBrief(projectId);
+  let outcome: StepOutcome = { done: false, stage: AnalysisStage.PARSE, pct: 0 };
 
-  const handle = await startRun({
-    ctx,
-    agent: AgentName.ORCHESTRATOR,
-    model: MODELS.reasoning,
-    systemPrompt: ORCHESTRATOR_SYSTEM,
-    input: { brief: { ...brief, shootStartDate: null, shootEndDate: null } },
-  });
+  do {
+    outcome = await runSingleStep(projectId, report);
+    if (outcome.done || outcome.failed) break;
+    // Leave room for one more step of the size we have been seeing.
+  } while (Date.now() - startedAt < budgetMs);
 
-  await prisma.project.update({ where: { id: projectId }, data: { status: ProjectStatus.ANALYZING } });
-  report({ type: 'stage', stage: 'queued', pct: 4, detail: brief.name });
+  return outcome;
+}
+
+/** One unit of work. Everything it produces is checkpointed before it returns. */
+async function runSingleStep(projectId: string, report: ProgressReporter): Promise<StepOutcome> {
+  const state = await prisma.analysisState.findUnique({ where: { projectId } });
+  if (!state) throw new Error('ANALYSIS_NOT_STARTED');
+  if (state.stage === AnalysisStage.DONE) return { done: true, stage: state.stage, pct: 100 };
+  if (state.stage === AnalysisStage.FAILED) {
+    return { done: true, stage: state.stage, pct: 100, failed: true };
+  }
+
+  const brief = await loadBrief(projectId, state.locale);
+  const ctx = createRunContext(projectId, report);
+  const progress = STAGE_PROGRESS[state.stage];
 
   try {
-    // ---- 1. scene data (everything downstream depends on it)
-    const analyst = await runScriptAnalyst(ctx, brief);
+    switch (state.stage) {
+      // ---- 1. deterministic segmentation
+      case AnalysisStage.PARSE: {
+        report({ type: 'stage', stage: 'parsing', pct: progress.pct, detail: brief.name });
+        const parsed = await runScriptAnalystStep(ctx, brief, { phase: 'parse' });
+        report({ type: 'scenes', count: parsed.sceneTotal });
+        await save(projectId, { stage: AnalysisStage.SCENES, sceneTotal: parsed.sceneTotal, sceneCursor: 0 });
+        return { done: false, stage: AnalysisStage.SCENES, pct: STAGE_PROGRESS.SCENES.pct };
+      }
 
-    // ---- 2. equipment + DOP matching, concurrently
-    report({ type: 'log', message: 'Matching equipment and cinematographers' });
-    const [equipmentSettled, dopsSettled] = await Promise.allSettled([
-      runEquipmentAgent(ctx, brief, analyst.summary),
-      runDopAgent(ctx, brief, analyst.summary),
-    ]);
+      // ---- 2. one batch of scenes per step, so a feature script resumes cleanly
+      case AnalysisStage.SCENES: {
+        const batch = await runScriptAnalystStep(ctx, brief, {
+          phase: 'batch',
+          cursor: state.sceneCursor,
+        });
 
-    if (equipmentSettled.status === 'rejected') throw equipmentSettled.reason;
-    let equipment: EquipmentResult = equipmentSettled.value;
+        const done = batch.nextCursor === null;
+        const pct = 20 + Math.round((batch.analysed / Math.max(batch.sceneTotal, 1)) * 28);
+        report({
+          type: 'stage',
+          stage: 'analyzing_scenes',
+          pct,
+          detail: `${batch.analysed}/${batch.sceneTotal}`,
+        });
 
-    // A DOP failure degrades the sheet; it does not sink it.
-    let dops: DopResult =
-      dopsSettled.status === 'fulfilled'
-        ? dopsSettled.value
-        : {
-            matches: [],
-            queryText: '',
-            searchedCount: 0,
-            note: 'Cinematographer matching failed for this run; the rest of the sheet is unaffected.',
-          };
+        if (!done) {
+          await save(projectId, { sceneCursor: batch.nextCursor ?? 0, sceneTotal: batch.sceneTotal });
+          return { done: false, stage: AnalysisStage.SCENES, pct };
+        }
 
-    // ---- 3. vendors + budget (needs the package)
-    let vendorBudget: VendorBudgetResult = await runVendorBudgetAgent(ctx, brief, analyst.summary, equipment);
+        const requirements = await loadSceneRequirements(projectId);
+        if (requirements.length === 0) throw new Error('NO_SCENES_ANALYSED');
+        const summary = await summariseScenes(projectId, requirements);
+        await save(projectId, {
+          stage: AnalysisStage.EQUIPMENT,
+          sceneCursor: batch.sceneTotal,
+          summary: summary as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.EQUIPMENT, pct: STAGE_PROGRESS.EQUIPMENT.pct };
+      }
 
-    // ---- 4. review, then at most one targeted retry per agent
-    let critic = await runCriticAgent(ctx, brief, {
-      summary: analyst.summary,
-      equipment,
-      dops,
-      vendorBudget,
-    });
+      // ---- 3. equipment and DOP matching, concurrently
+      case AnalysisStage.EQUIPMENT: {
+        const summary = readJson<SceneSummary>(state.summary);
+        if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
+        report({ type: 'log', message: 'Matching equipment and cinematographers' });
 
-    const blockers = critic.issues.filter((i) => i.severity === 'blocker');
-    if (blockers.length) {
-      report({ type: 'stage', stage: 'retrying', pct: 84, detail: `${blockers.length}` });
+        const [equipmentSettled, dopsSettled] = await Promise.allSettled([
+          runEquipmentAgent(ctx, brief, summary),
+          runDopAgent(ctx, brief, summary),
+        ]);
 
-      const retried = new Set<string>();
-      let packageChanged = false;
+        if (equipmentSettled.status === 'rejected') throw equipmentSettled.reason;
 
-      for (const blocker of blockers) {
-        if (retried.has(blocker.agent)) continue; // cap: one retry per agent
-        retried.add(blocker.agent);
+        // A DOP failure degrades the sheet; it does not sink it.
+        const dops: DopResult =
+          dopsSettled.status === 'fulfilled'
+            ? dopsSettled.value
+            : {
+                matches: [],
+                queryText: '',
+                searchedCount: 0,
+                note: 'Cinematographer matching failed for this run; the rest of the sheet is unaffected.',
+              };
+
+        await save(projectId, {
+          stage: AnalysisStage.VENDOR_BUDGET,
+          equipment: equipmentSettled.value as unknown as Prisma.InputJsonValue,
+          dops: dops as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
+      }
+
+      // DOPS is only reached when a retry re-runs matching on its own.
+      case AnalysisStage.DOPS: {
+        const summary = readJson<SceneSummary>(state.summary);
+        if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
+        const dops = await runDopAgent(ctx, brief, summary);
+        await save(projectId, {
+          stage: AnalysisStage.VENDOR_BUDGET,
+          dops: dops as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
+      }
+
+      // ---- 4. vendors + budget (needs the package)
+      case AnalysisStage.VENDOR_BUDGET: {
+        const summary = readJson<SceneSummary>(state.summary);
+        const equipment = readJson<EquipmentResult>(state.equipment);
+        if (!summary || !equipment) throw new Error('MISSING_EQUIPMENT_STATE');
+
+        const vendorBudget = await runVendorBudgetAgent(ctx, brief, summary, equipment);
+        await save(projectId, {
+          stage: AnalysisStage.CRITIC,
+          vendorBudget: vendorBudget as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.CRITIC, pct: STAGE_PROGRESS.CRITIC.pct };
+      }
+
+      // ---- 5. review
+      case AnalysisStage.CRITIC: {
+        const parts = readParts(state);
+        const critic = await runCriticAgent(ctx, brief, parts, { attempt: state.criticRound + 1 });
+
+        const blockers = critic.issues.filter((issue) => issue.severity === 'blocker');
+        const retryable = blockers.find(
+          (issue) => issue.agent !== 'SCRIPT_ANALYST' && !state.retriedAgents.includes(issue.agent),
+        );
+
+        // SCRIPT_ANALYST is never retried here: re-running the breakdown would
+        // invalidate the equipment and pricing built on top of it, so its
+        // blockers are surfaced to the producer instead.
+        const nextStage = retryable && state.criticRound < 2 ? AnalysisStage.RETRY : AnalysisStage.ASSEMBLE;
+
+        await save(projectId, {
+          stage: nextStage,
+          critic: critic as unknown as Prisma.InputJsonValue,
+          criticRound: state.criticRound + 1,
+        });
+        return { done: false, stage: nextStage, pct: STAGE_PROGRESS[nextStage].pct };
+      }
+
+      // ---- 6. one targeted retry per agent, then review again
+      case AnalysisStage.RETRY: {
+        const critic = readJson<CriticResult>(state.critic);
+        const summary = readJson<SceneSummary>(state.summary);
+        const equipment = readJson<EquipmentResult>(state.equipment);
+        if (!critic || !summary || !equipment) throw new Error('MISSING_CRITIC_STATE');
+
+        const blocker = critic.issues.find(
+          (issue) =>
+            issue.severity === 'blocker' &&
+            issue.agent !== 'SCRIPT_ANALYST' &&
+            !state.retriedAgents.includes(issue.agent),
+        );
+
+        if (!blocker) {
+          await save(projectId, { stage: AnalysisStage.ASSEMBLE });
+          return { done: false, stage: AnalysisStage.ASSEMBLE, pct: STAGE_PROGRESS.ASSEMBLE.pct };
+        }
+
+        report({ type: 'stage', stage: 'retrying', pct: progress.pct, detail: blocker.agent });
         const flag = `${blocker.problem} ${blocker.suggestion}`;
+        const retriedAgents = [...state.retriedAgents, blocker.agent];
 
         try {
           if (blocker.agent === 'EQUIPMENT') {
-            equipment = await runEquipmentAgent(ctx, brief, analyst.summary, { attempt: 2, criticFlag: flag });
-            packageChanged = true;
-          } else if (blocker.agent === 'DOP_MATCH') {
-            dops = await runDopAgent(ctx, brief, analyst.summary, { attempt: 2, criticFlag: flag });
-          } else if (blocker.agent === 'VENDOR_BUDGET') {
-            vendorBudget = await runVendorBudgetAgent(ctx, brief, analyst.summary, equipment, {
-              attempt: 2,
-              criticFlag: flag,
+            const retried = await runEquipmentAgent(ctx, brief, summary, { attempt: 2, criticFlag: flag });
+            // A new package invalidates the pricing built on the old one.
+            await save(projectId, {
+              stage: AnalysisStage.VENDOR_BUDGET,
+              equipment: retried as unknown as Prisma.InputJsonValue,
+              retriedAgents,
             });
+            return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
           }
-          // SCRIPT_ANALYST is not retried here: re-running the breakdown would
-          // invalidate the equipment and pricing built on top of it. Its blockers
-          // are surfaced to the producer instead.
+
+          if (blocker.agent === 'DOP_MATCH') {
+            const retried = await runDopAgent(ctx, brief, summary, { attempt: 2, criticFlag: flag });
+            await save(projectId, {
+              stage: AnalysisStage.CRITIC,
+              dops: retried as unknown as Prisma.InputJsonValue,
+              retriedAgents,
+            });
+            return { done: false, stage: AnalysisStage.CRITIC, pct: STAGE_PROGRESS.CRITIC.pct };
+          }
+
+          const retried = await runVendorBudgetAgent(ctx, brief, summary, equipment, {
+            attempt: 2,
+            criticFlag: flag,
+          });
+          await save(projectId, {
+            stage: AnalysisStage.CRITIC,
+            vendorBudget: retried as unknown as Prisma.InputJsonValue,
+            retriedAgents,
+          });
+          return { done: false, stage: AnalysisStage.CRITIC, pct: STAGE_PROGRESS.CRITIC.pct };
         } catch (error) {
+          // A failed retry must not sink a sheet that is otherwise complete.
           report({
             type: 'log',
             message: `Retry of ${blocker.agent} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
           });
+          await save(projectId, { stage: AnalysisStage.ASSEMBLE, retriedAgents });
+          return { done: false, stage: AnalysisStage.ASSEMBLE, pct: STAGE_PROGRESS.ASSEMBLE.pct };
         }
       }
 
-      if (packageChanged) {
-        vendorBudget = await runVendorBudgetAgent(ctx, brief, analyst.summary, equipment, { attempt: 2 });
+      // ---- 7. executive summary + persistence
+      case AnalysisStage.ASSEMBLE: {
+        report({ type: 'stage', stage: 'saving', pct: progress.pct });
+        const parts = readParts(state);
+        const critic = readJson<CriticResult>(state.critic) ?? {
+          passed: true,
+          issues: [],
+          summary: '',
+        };
+
+        const handle = await startRun({
+          ctx,
+          agent: AgentName.ORCHESTRATOR,
+          model: MODELS.reasoning,
+          systemPrompt: ORCHESTRATOR_SYSTEM,
+          input: { stage: 'assemble', locale: brief.locale },
+        });
+        const runStartedAt = Date.now();
+
+        const rationaleText = await writeExecutiveSummary(brief, {
+          summary: parts.summary,
+          equipment: parts.equipment,
+          dops: parts.dops,
+          vendorBudget: parts.vendorBudget,
+          criticIssues: critic.issues,
+        });
+
+        const sheet: ProductionSheet = {
+          sceneSummary: parts.summary,
+          scenes: await loadSceneRequirements(projectId),
+          equipment: parts.equipment,
+          dops: parts.dops,
+          vendorBudget: parts.vendorBudget,
+          critic,
+          rationaleText,
+          modelVersions: ctx.modelVersions,
+        };
+
+        await persistSheet(projectId, sheet, brief.locale);
+        await save(projectId, { stage: AnalysisStage.DONE });
+
+        await finishRun(handle, {
+          status: AgentRunStatus.OK,
+          output: {
+            sceneCount: sheet.sceneSummary.sceneCount,
+            packageSize: sheet.equipment.package.length,
+            dopMatches: sheet.dops.matches.length,
+            vendors: sheet.vendorBudget.vendors.length,
+            criticPassed: critic.passed,
+            mid: sheet.vendorBudget.mid,
+          },
+          startedAt: runStartedAt,
+        });
+
+        report({ type: 'stage', stage: 'done', pct: 100 });
+        report({ type: 'done', projectId });
+        return { done: true, stage: AnalysisStage.DONE, pct: 100 };
       }
 
-      critic = await runCriticAgent(
-        ctx,
-        brief,
-        { summary: analyst.summary, equipment, dops, vendorBudget },
-        { attempt: 2 },
-      );
+      default:
+        throw new Error(`UNHANDLED_STAGE_${state.stage}`);
     }
-
-    // ---- 5. executive summary + persistence
-    report({ type: 'stage', stage: 'saving', pct: 92 });
-    const rationaleText = await writeExecutiveSummary(brief, {
-      summary: analyst.summary,
-      equipment,
-      dops,
-      vendorBudget,
-      criticIssues: critic.issues,
-    });
-
-    const sheet: ProductionSheet = {
-      sceneSummary: analyst.summary,
-      scenes: analyst.scenes,
-      equipment,
-      dops,
-      vendorBudget,
-      critic,
-      rationaleText,
-      modelVersions: ctx.modelVersions,
-    };
-
-    await persistSheet(projectId, sheet);
-
-    await finishRun(handle, {
-      status: AgentRunStatus.OK,
-      output: {
-        sceneCount: analyst.summary.sceneCount,
-        packageSize: equipment.package.length,
-        dopMatches: dops.matches.length,
-        vendors: vendorBudget.vendors.length,
-        criticPassed: critic.passed,
-        mid: vendorBudget.mid,
-      },
-      startedAt,
-    });
-
-    report({ type: 'stage', stage: 'done', pct: 100 });
-    report({ type: 'done', projectId });
-    return sheet;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await prisma.project.update({ where: { id: projectId }, data: { status: ProjectStatus.FAILED } });
-    await finishRun(handle, { status: AgentRunStatus.FAILED, errorText: message, startedAt });
+    await prisma.$transaction([
+      prisma.analysisState.update({
+        where: { projectId },
+        data: { stage: AnalysisStage.FAILED, errorText: message.slice(0, 2000) },
+      }),
+      prisma.project.update({ where: { id: projectId }, data: { status: ProjectStatus.FAILED } }),
+    ]);
     report({ type: 'error', message });
-    throw error;
+    return { done: true, stage: AnalysisStage.FAILED, pct: 100, failed: true };
   }
+}
+
+/**
+ * Runs a whole analysis in one call. Used by the smoke script and by any
+ * deployment with a long enough function duration; the UI uses the stepwise
+ * path above.
+ */
+export async function runProductionAnalysis(
+  projectId: string,
+  report: ProgressReporter,
+  locale = 'ar',
+): Promise<ProductionSheet> {
+  await beginAnalysis(projectId, locale);
+
+  for (;;) {
+    const outcome = await advanceAnalysis(projectId, report, { budgetMs: 10 * 60_000 });
+    if (outcome.failed) {
+      const state = await prisma.analysisState.findUnique({ where: { projectId } });
+      throw new Error(state?.errorText ?? 'ANALYSIS_FAILED');
+    }
+    if (outcome.done) break;
+  }
+
+  const recommendation = await prisma.projectRecommendation.findUnique({ where: { projectId } });
+  if (!recommendation) throw new Error('SHEET_NOT_PERSISTED');
+
+  return {
+    sceneSummary: recommendation.sceneSummary as unknown as SceneSummary,
+    scenes: await loadSceneRequirements(projectId),
+    equipment: {
+      package: recommendation.equipmentPackage as unknown as EquipmentResult['package'],
+      rationale: recommendation.equipmentRationale,
+      droppedHallucinatedIds: [],
+    },
+    dops: {
+      matches: recommendation.matchedDops as unknown as DopResult['matches'],
+      queryText: '',
+      searchedCount: 0,
+      note: null,
+    },
+    vendorBudget: {
+      vendors: recommendation.matchedVendors as unknown as VendorBudgetResult['vendors'],
+      budget: recommendation.budgetBreakdown as unknown as VendorBudgetResult['budget'],
+      low: recommendation.estimatedBudgetLow,
+      mid: recommendation.estimatedBudgetMid,
+      high: recommendation.estimatedBudgetHigh,
+      notes: [],
+      uncoveredEquipment: [],
+    },
+    critic: {
+      passed: recommendation.criticPassed,
+      issues: [],
+      summary: recommendation.criticNotes.join(' | '),
+    },
+    rationaleText: recommendation.rationaleText,
+    modelVersions: recommendation.modelVersions as Record<string, string>,
+  };
+}
+
+// ------------------------------------------------------------------ helpers
+
+type StateRow = NonNullable<Awaited<ReturnType<typeof prisma.analysisState.findUnique>>>;
+
+function readJson<T>(value: Prisma.JsonValue | null): T | null {
+  return value === null || value === undefined ? null : (value as unknown as T);
+}
+
+function readParts(state: StateRow) {
+  const summary = readJson<SceneSummary>(state.summary);
+  const equipment = readJson<EquipmentResult>(state.equipment);
+  const dops = readJson<DopResult>(state.dops);
+  const vendorBudget = readJson<VendorBudgetResult>(state.vendorBudget);
+  if (!summary || !equipment || !dops || !vendorBudget) throw new Error('INCOMPLETE_ANALYSIS_STATE');
+  return { summary, equipment, dops, vendorBudget };
+}
+
+async function save(projectId: string, data: Prisma.AnalysisStateUpdateInput) {
+  await prisma.analysisState.update({ where: { projectId }, data });
 }
 
 async function writeExecutiveSummary(
   brief: ProjectBrief,
   parts: {
-    summary: ProductionSheet['sceneSummary'];
+    summary: SceneSummary;
     equipment: EquipmentResult;
     dops: DopResult;
     vendorBudget: VendorBudgetResult;
@@ -192,7 +480,7 @@ async function writeExecutiveSummary(
   try {
     const { text } = await generateText({
       model: model('reasoning'),
-      system: ORCHESTRATOR_SYSTEM,
+      system: `${ORCHESTRATOR_SYSTEM}\n\n${languageDirective(brief.locale)}`,
       temperature: 0.4,
       prompt: [
         `Project "${brief.name}" — ${brief.type}, ${brief.budgetTier} tier, ${brief.city}.`,
@@ -201,9 +489,7 @@ async function writeExecutiveSummary(
         `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}`).join(', ')}.`,
         `Department rationale: ${parts.equipment.rationale}`,
         parts.dops.matches.length
-          ? `Top cinematographer matches: ${parts.dops.matches
-              .map((d) => `${d.name} (${d.score})`)
-              .join(', ')}.`
+          ? `Top cinematographer matches: ${parts.dops.matches.map((d) => `${d.name} (${d.score})`).join(', ')}.`
           : 'No cinematographer matches were available.',
         `Vendors: ${parts.vendorBudget.vendors.map((v) => v.companyName).join(', ') || 'none found'}.`,
         `Estimate ${parts.vendorBudget.low}–${parts.vendorBudget.high} ${parts.vendorBudget.budget.currency} (mid ${parts.vendorBudget.mid}).`,
@@ -211,7 +497,7 @@ async function writeExecutiveSummary(
           ? `Reviewer notes: ${parts.criticIssues.map((i) => `${i.severity}: ${i.problem}`).join(' | ')}`
           : 'The reviewer found no issues.',
         '',
-        `Write the summary in ${brief.locale === 'ar' ? 'Arabic' : 'English'}.`,
+        `Write the summary in ${languageName(brief.locale)}.`,
       ]
         .filter(Boolean)
         .join('\n'),
@@ -223,7 +509,7 @@ async function writeExecutiveSummary(
   }
 }
 
-async function persistSheet(projectId: string, sheet: ProductionSheet) {
+async function persistSheet(projectId: string, sheet: ProductionSheet, locale: string) {
   const data = {
     recommendedEquipmentIds: sheet.equipment.package.map((i) => i.equipmentId),
     equipmentPackage: sheet.equipment.package as unknown as Prisma.InputJsonValue,
@@ -241,7 +527,10 @@ async function persistSheet(projectId: string, sheet: ProductionSheet) {
       dopQuery: sheet.dops.queryText,
     } as unknown as Prisma.InputJsonValue,
     rationaleText: sheet.rationaleText,
-    criticNotes: sheet.critic.issues.map((i) => `[${i.severity}] ${i.agent}: ${i.problem} → ${i.suggestion}`),
+    locale,
+    criticNotes: sheet.critic.issues.map(
+      (i) => `[${i.severity}] ${i.agent}: ${i.problem} → ${i.suggestion}`,
+    ),
     criticPassed: sheet.critic.passed,
     sceneSummary: sheet.sceneSummary as unknown as Prisma.InputJsonValue,
     modelVersions: sheet.modelVersions as unknown as Prisma.InputJsonValue,
@@ -258,7 +547,7 @@ async function persistSheet(projectId: string, sheet: ProductionSheet) {
   ]);
 }
 
-async function loadBrief(projectId: string): Promise<ProjectBrief> {
+async function loadBrief(projectId: string, locale: string): Promise<ProjectBrief> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { owner: { select: { locale: true } }, script: { select: { id: true } } },
@@ -276,6 +565,8 @@ async function loadBrief(projectId: string): Promise<ProjectBrief> {
     shootStartDate: project.shootStartDate,
     shootEndDate: project.shootEndDate,
     synopsis: project.synopsis,
-    locale: project.owner.locale,
+    // The language the run was started in wins over the account default, so the
+    // sheet comes back in whatever language the producer is using right now.
+    locale: locale || project.owner.locale,
   };
 }

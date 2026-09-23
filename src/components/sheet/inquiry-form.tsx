@@ -55,7 +55,7 @@ export function InquiryButton({
   }
 
   if (sent) {
-    return <span className={`text-xs text-teal-400 ${className ?? ''}`}>{t('sent')}</span>;
+    return <span className={`text-xs text-info ${className ?? ''}`}>{t('sent')}</span>;
   }
 
   return (
@@ -66,14 +66,14 @@ export function InquiryButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 grid place-items-center bg-ink-950/80 p-4"
+          className="fixed inset-0 z-50 grid place-items-center bg-page/80 p-4"
           role="dialog"
           aria-modal="true"
         >
           <div className="card w-full max-w-lg p-5">
             <header className="mb-4">
-              <h2 className="text-base font-semibold text-white">{t('title')}</h2>
-              <p className="mt-1 text-xs text-[rgb(var(--muted))]">
+              <h2 className="text-base font-semibold text-strong">{t('title')}</h2>
+              <p className="mt-1 text-xs text-muted">
                 {targetType === 'DOP' ? t('toDop', { name: targetName }) : t('toVendor', { name: targetName })}
               </p>
             </header>
@@ -98,7 +98,7 @@ export function InquiryButton({
                 </Field>
               </div>
 
-              {error && <p className="mb-3 text-xs text-red-400">{error}</p>}
+              {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
               <div className="flex justify-end gap-2">
                 <button type="button" className="btn-ghost text-xs" onClick={() => setOpen(false)}>

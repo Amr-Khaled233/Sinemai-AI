@@ -4,18 +4,24 @@ import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { SheetDocument, type SheetPdfData } from '@/pdf/sheet-document';
+import { pdfEnum, pdfLabels } from '@/pdf/labels';
+import { normaliseLocale } from '@/agents/language';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * PDF export. Accessible to the project owner, an admin, or anyone holding a
- * live share token (`?token=`), so a shared sheet can be downloaded too.
+ * PDF export, in Arabic or English.
+ *
+ * Language resolution: `?locale=` (the page the reader is on) → the language the
+ * sheet's narrative was generated in → Arabic. Accessible to the project owner,
+ * an admin, or anyone holding a live share token, so a shared sheet downloads too.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const token = new URL(request.url).searchParams.get('token');
+  const url = new URL(request.url);
+  const token = url.searchParams.get('token');
 
   const project = await prisma.project.findUnique({
     where: { id },
@@ -59,17 +65,31 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   }
 
   const recommendation = project.recommendation;
+  const locale = normaliseLocale(url.searchParams.get('locale') ?? recommendation.locale);
+
   const data: SheetPdfData = {
+    locale,
+    labels: pdfLabels(locale),
     projectName: project.name,
-    projectType: project.type.replace('_', ' ').toLowerCase(),
-    budgetTier: recommendation ? project.budgetTier.toLowerCase() : project.budgetTier,
+    projectType: pdfEnum(locale, 'type', project.type),
+    budgetTier: pdfEnum(locale, 'tier', project.budgetTier),
     city: project.city,
     generatedAt: recommendation.generatedAt.toISOString().slice(0, 10),
     currency: recommendation.currency,
     styleTags: project.visualStyleTags,
     summaryText: recommendation.rationaleText,
     sceneSummary: (recommendation.sceneSummary as unknown as SceneSummary) ?? null,
-    scenes: project.script?.scenes ?? [],
+    scenes: (project.script?.scenes ?? []).map((scene) => ({
+      order: scene.order,
+      heading: scene.heading,
+      intExt: scene.intExt ? pdfEnum(locale, 'intExt', scene.intExt) : null,
+      timeOfDay: scene.timeOfDay ? pdfEnum(locale, 'time', scene.timeOfDay) : null,
+      lightingComplexity: scene.lightingComplexity
+        ? pdfEnum(locale, 'complexity', scene.lightingComplexity)
+        : null,
+      cameraMovement: scene.cameraMovement ? pdfEnum(locale, 'movement', scene.cameraMovement) : null,
+      estimatedHours: scene.estimatedHours,
+    })),
     equipment: (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [],
     equipmentRationale: recommendation.equipmentRationale,
     dops: (recommendation.matchedDops as unknown as DopMatch[]) ?? [],
@@ -89,7 +109,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   return new Response(new Uint8Array(buffer), {
     headers: {
       'content-type': 'application/pdf',
-      'content-disposition': `inline; filename="${fileName}"`,
+      'content-disposition': `inline; filename="${encodeURIComponent(fileName)}"`,
       'cache-control': 'no-store',
     },
   });
