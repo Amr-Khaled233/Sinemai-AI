@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import { escapeHtml, escapeHtmlMultiline } from '@/lib/security';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.EMAIL_FROM ?? 'Sinemai AI <noreply@sinemai.ai>';
@@ -44,13 +45,15 @@ export function inquiryEmail(args: {
   contactEmail: string;
   contactPhone?: string | null;
 }) {
+  // Every field below is attacker-controlled and this is hand-built HTML, so
+  // each one is escaped — React's protection does not extend to mail bodies.
   return shell(
-    `New inquiry from ${args.producerName}`,
-    `<p><strong>${args.subject}</strong></p>
-     ${args.projectName ? `<p>Project: ${args.projectName}</p>` : ''}
-     <blockquote style="border-inline-start:3px solid #d4a94f;margin:16px 0;padding:4px 16px">${args.message.replace(/\n/g, '<br>')}</blockquote>
-     <p>Reply to: <a style="color:#4fd1c5" href="mailto:${args.contactEmail}">${args.contactEmail}</a>${
-       args.contactPhone ? ` · ${args.contactPhone}` : ''
+    `New inquiry from ${escapeHtml(args.producerName)}`,
+    `<p><strong>${escapeHtml(args.subject)}</strong></p>
+     ${args.projectName ? `<p>Project: ${escapeHtml(args.projectName)}</p>` : ''}
+     <blockquote style="border-inline-start:3px solid #d4a94f;margin:16px 0;padding:4px 16px">${escapeHtmlMultiline(args.message)}</blockquote>
+     <p>Reply to: <a style="color:#4fd1c5" href="mailto:${encodeURIComponent(args.contactEmail)}">${escapeHtml(args.contactEmail)}</a>${
+       args.contactPhone ? ` · ${escapeHtml(args.contactPhone)}` : ''
      }</p>`,
   );
 }
@@ -59,13 +62,13 @@ export function approvalEmail(args: { name: string; approved: boolean; reason?: 
   return args.approved
     ? shell(
         `Your account is approved`,
-        `<p>Hi ${args.name}, your Sinemai AI listing is live. Producers can now find and contact you.</p>
+        `<p>Hi ${escapeHtml(args.name)}, your Sinemai AI listing is live. Producers can now find and contact you.</p>
          <p><a style="color:#4fd1c5" href="${args.loginUrl}">Open your dashboard</a></p>`,
       )
     : shell(
         `Your application needs changes`,
-        `<p>Hi ${args.name}, we could not verify your listing yet.</p>
-         ${args.reason ? `<p>Reviewer note: ${args.reason}</p>` : ''}
+        `<p>Hi ${escapeHtml(args.name)}, we could not verify your listing yet.</p>
+         ${args.reason ? `<p>Reviewer note: ${escapeHtml(args.reason)}</p>` : ''}
          <p><a style="color:#4fd1c5" href="${args.loginUrl}">Update your profile and resubmit</a></p>`,
       );
 }
@@ -74,13 +77,13 @@ export function resetEmail(args: { name: string; locale: string; url: string; tt
   return args.locale === 'ar'
     ? shell(
         'إعادة تعيين كلمة المرور',
-        `<p>مرحباً ${args.name}، وصلنا طلب لإعادة تعيين كلمة مرور حسابك في سينمائي AI.</p>
+        `<p>مرحباً ${escapeHtml(args.name)}، وصلنا طلب لإعادة تعيين كلمة مرور حسابك في سينمائي AI.</p>
          <p><a style="color:#4fd1c5" href="${args.url}">اضغط هنا لتعيين كلمة مرور جديدة</a></p>
          <p>الرابط صالح لمدة ${args.ttlMinutes} دقيقة ويُستخدم مرة واحدة. إن لم تطلب ذلك، تجاهل هذه الرسالة ولن يتغيّر شيء.</p>`,
       )
     : shell(
         'Reset your password',
-        `<p>Hi ${args.name}, we received a request to reset your Sinemai AI password.</p>
+        `<p>Hi ${escapeHtml(args.name)}, we received a request to reset your Sinemai AI password.</p>
          <p><a style="color:#4fd1c5" href="${args.url}">Choose a new password</a></p>
          <p>The link is valid for ${args.ttlMinutes} minutes and can be used once. If you did not request this, ignore this email — nothing changes.</p>`,
       );

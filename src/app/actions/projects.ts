@@ -9,6 +9,7 @@ import { projectSchema } from '@/lib/validation';
 import { detectFormat, parseScriptSource } from '@/lib/script/parse';
 import { uploadFile, deleteFile } from '@/lib/blob';
 import { randomToken } from '@/lib/utils';
+import { publicError } from '@/lib/security';
 
 async function requireProducer() {
   const session = await auth();
@@ -89,7 +90,7 @@ export async function saveScript(projectId: string, formData: FormData): Promise
       format = detectFormat(file.name, file.type);
       buffer = await file.arrayBuffer();
       if (format !== ParsedFormat.PDF) rawText = new TextDecoder('utf-8').decode(buffer);
-      const stored = await uploadFile(file, `scripts/${projectId}`);
+      const stored = await uploadFile(file, `scripts/${projectId}`, 'script');
       fileUrl = stored.url;
     } else if (pasted) {
       format = ParsedFormat.PASTED;
@@ -154,8 +155,7 @@ export async function saveScript(projectId: string, formData: FormData): Promise
     revalidatePath('/[locale]/producer/projects/[id]', 'page');
     return { ok: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'UNKNOWN';
-    return { ok: false, error: message };
+    return { ok: false, error: publicError(error, 'saveScript') };
   }
 }
 
@@ -169,7 +169,7 @@ export async function updateVisualStyle(projectId: string, tags: string[]): Prom
     revalidatePath('/[locale]/producer/projects/[id]', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'projects') };
   }
 }
 
@@ -200,7 +200,7 @@ export async function revokeShareLinks(projectId: string): Promise<ActionResult>
     revalidatePath('/[locale]/producer/projects/[id]', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'projects') };
   }
 }
 

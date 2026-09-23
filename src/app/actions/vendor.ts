@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { availabilityBlockSchema, inventoryItemSchema } from '@/lib/validation';
 import { uploadFile } from '@/lib/blob';
+import { publicError } from '@/lib/security';
 
 export type ActionResult = { ok: true } | { ok: false; error: string };
 
@@ -49,7 +50,7 @@ export async function saveInventoryItem(formData: FormData): Promise<ActionResul
     const photo = formData.get('photo');
     const photoUrls: string[] = [];
     if (photo instanceof File && photo.size > 0) {
-      const stored = await uploadFile(photo, `inventory/${vendor.id}`);
+      const stored = await uploadFile(photo, `inventory/${vendor.id}`, 'image');
       if (stored.url) photoUrls.push(stored.url);
     }
 
@@ -88,7 +89,7 @@ export async function saveInventoryItem(formData: FormData): Promise<ActionResul
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 
@@ -102,7 +103,7 @@ export async function deleteInventoryItem(itemId: string): Promise<ActionResult>
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 
@@ -116,7 +117,7 @@ export async function toggleInventoryActive(itemId: string, active: boolean): Pr
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 
@@ -158,7 +159,7 @@ export async function addAvailabilityBlock(formData: FormData): Promise<ActionRe
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 
@@ -174,7 +175,7 @@ export async function removeAvailabilityBlock(blockId: string): Promise<ActionRe
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 
@@ -203,7 +204,7 @@ export async function updateCompanyProfile(formData: FormData): Promise<ActionRe
     revalidateVendor();
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'vendor') };
   }
 }
 

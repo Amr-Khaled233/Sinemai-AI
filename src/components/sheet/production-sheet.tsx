@@ -4,6 +4,7 @@ import { Badge, Card, MeterBar, Stat } from '@/components/ui';
 import { MeterFill, Reveal } from '@/components/motion';
 import { InquiryButton } from '@/components/sheet/inquiry-form';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
+import { safeHttpUrls } from '@/lib/security';
 import type {
   BudgetBreakdown,
   DopMatch,
@@ -349,7 +350,8 @@ export async function ProductionSheet({
                 </div>
 
                 <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-                  {dop.portfolioLinks.slice(0, 3).map((link) => (
+                  {/* Rows written before scheme validation existed are filtered here too. */}
+                  {safeHttpUrls(dop.portfolioLinks).slice(0, 3).map((link) => (
                     <a
                       key={link}
                       href={link}

@@ -124,17 +124,19 @@ enum AgentRunStatus {
 // ---------------------------------------------------------------- identity
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  phone         String?
-  passwordHash  String
-  role          Role      @default(PRODUCER)
-  locale        String    @default("ar")
-  emailVerified DateTime?
-  image         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                String    @id @default(cuid())
+  email             String    @unique
+  name              String
+  phone             String?
+  passwordHash      String
+  /// Sessions minted before this moment are rejected (password reset).
+  passwordChangedAt DateTime  @default(now())
+  role              Role      @default(PRODUCER)
+  locale            String    @default("ar")
+  emailVerified     DateTime?
+  image             String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
   projects      Project[]
   dop           Dop?
@@ -626,4 +628,18 @@ model PasswordResetToken {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
+}
+
+/// Fixed-window rate-limit counters.
+///
+/// Kept in Postgres rather than memory because serverless instances do not
+/// share state: an in-process counter would reset on every cold start and let a
+/// caller cycle instances to bypass the limit.
+model RateLimit {
+  key       String   @id
+  count     Int      @default(0)
+  windowEnd DateTime
+  updatedAt DateTime @updatedAt
+
+  @@index([windowEnd])
 }

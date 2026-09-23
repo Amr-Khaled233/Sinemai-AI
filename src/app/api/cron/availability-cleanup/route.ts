@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { isAuthorizedJob } from '@/lib/cron';
 import { purgeExpiredResetTokens } from '@/lib/password-reset';
+import { purgeExpiredRateLimits } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 
@@ -22,11 +23,13 @@ export async function GET(request: Request) {
   });
 
   const resetTokensRemoved = await purgeExpiredResetTokens();
+  const rateLimitRowsRemoved = await purgeExpiredRateLimits();
 
   return NextResponse.json({
     blocksRemoved: count,
     staleAnalysesFailed: stuck.count,
     resetTokensRemoved,
+    rateLimitRowsRemoved,
   });
 }
 

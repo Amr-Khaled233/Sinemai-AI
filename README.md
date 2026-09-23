@@ -248,3 +248,55 @@ Verified rather than assumed: `لا` shapes to a single `uniFEFB` ligature glyph
 to five contextual forms, table columns mirror in RTL, and hyphenation is disabled so Arabic
 words are never broken mid-script. The export language follows `?locale=`, falling back to the
 language the sheet's narrative was generated in.
+
+---
+
+## Security
+
+The platform holds unreleased screenplays, vendor pricing and personal contact details, and it
+spends money on model calls, so the controls below are part of the build rather than a later pass.
+
+**Identity.** Credentials are bcrypt hashed at cost 12. Sign-in is rate limited per email address
+and compares against a dummy hash for unknown accounts, so response timing does not reveal which
+addresses exist. A password reset stamps `passwordChangedAt`, and the session callback rejects any
+JWT minted before that moment — a stolen session cannot outlive the credential it was issued
+against. Reset tokens are 256-bit, stored only as SHA-256 hashes, single use, and expire in an
+hour; requesting one answers identically whether or not the address exists.
+
+**Authorization.** Every page guards with `requireRole`, every server action re-checks ownership
+against the session (never a client-supplied id), and every route handler re-checks both. Share
+links are unguessable bearer tokens, scoped to one project, revocable, and validated against that
+project on both the page and the PDF export.
+
+**Injection and XSS.** Prisma parameterises everything, including the two raw pgvector queries,
+whose vector literal is built from validated numbers. React escapes the UI, but two places bypass
+it and are handled explicitly: HTML email bodies escape every user-supplied field, and anything
+rendered as an `href` is scheme-checked — `z.string().url()` accepts `javascript:`, `data:` and
+`vbscript:`, which would otherwise be stored XSS through a cinematographer's portfolio links.
+Uploads are extension- and MIME-checked (no SVG or HTML into a public blob origin).
+
+**Abuse and cost.** Rate limits live in Postgres, not memory, because serverless instances do not
+share state and a caller could otherwise cycle instances to reset a counter. Sign-in, password
+reset, registration, inquiries and — most importantly — analysis runs are all capped, since each
+run spends real money on model calls.
+
+**Request integrity.** Server Actions get Next's built-in CSRF protection; route handlers do not,
+so every state-changing handler checks the request origin as well, behind the SameSite=Lax session
+cookie. Responses carry `nosniff`, `frame-ancestors 'none'`, `X-Frame-Options`, a strict referrer
+policy, HSTS and a closed `Permissions-Policy`. Server actions return allow-listed error codes;
+anything else is logged server-side and surfaces as a generic failure.
+
+### Known, accepted
+
+- **No full CSP.** Only `frame-ancestors` is set. A useful script policy needs per-request nonces
+  through middleware, because the app ships an inline theme bootstrap alongside Next's own inline
+  runtime. Worth doing before a public launch.
+- **Registration confirms whether an email is taken.** A deliberate UX trade-off, softened by the
+  per-IP limit. Closing it means accepting the signup silently and mailing the existing account.
+- **Two build-time advisories remain**: `postcss` bundled inside Next 15, and `deepmerge-ts` under
+  the Prisma CLI. Neither is reachable at runtime; both need a major upgrade (Next 16 / Prisma 7)
+  to clear.
+- **Password policy is length-only** (8 characters). No breach-list check.
+- **Agent logs store script text.** `AgentRun.input` keeps the prompts, which include scene
+  content. That is what makes the pipeline debuggable; treat the table as customer data and set a
+  retention policy.

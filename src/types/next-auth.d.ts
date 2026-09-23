@@ -21,5 +21,7 @@ declare module 'next-auth/jwt' {
     id?: string;
     role?: Role;
     locale?: string;
+    /** Unix seconds the session was issued; compared against passwordChangedAt. */
+    authAt?: number;
   }
 }

@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { setDopStatus, setVendorStatus, toggleVendorVerified } from '@/app/actions/admin';
 import { Badge } from '@/components/ui';
+import { safeHttpUrls } from '@/lib/security';
 
 export type ApprovalRow = {
   id: string;
@@ -69,7 +70,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
 
               {row.links && row.links.length > 0 && (
                 <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  {row.links.map((link) => (
+                  {safeHttpUrls(row.links).map((link) => (
                     <a
                       key={link}
                       href={link}

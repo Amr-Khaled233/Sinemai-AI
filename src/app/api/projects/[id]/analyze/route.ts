@@ -3,6 +3,8 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { advanceAnalysis, beginAnalysis } from '@/agents/orchestrator';
 import { normaliseLocale } from '@/agents/language';
+import { consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
+import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 import type { ProgressEvent } from '@/agents/types';
 
 /**
@@ -25,6 +27,8 @@ export const dynamic = 'force-dynamic';
 const STEP_BUDGET_MS = 40_000;
 
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!isSameOrigin(request)) return crossOriginRejected();
+
   const { id } = await context.params;
   const session = await auth();
 
@@ -45,6 +49,14 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   const body = (await request.json().catch(() => ({}))) as { start?: boolean; locale?: string };
   const locale = normaliseLocale(body.locale);
+
+  // Every run spends money on model calls, so starting one is capped per user;
+  // continuing an existing run has a looser cap because a single analysis needs
+  // several slices.
+  const limit = body.start
+    ? await consumeRateLimit(`analysis:start:${session.user.id}`, LIMITS.analysis)
+    : await consumeRateLimit(`analysis:step:${session.user.id}`, LIMITS.analysisStep);
+  if (!limit.allowed) return rateLimitResponse(limit);
 
   if (body.start) {
     await beginAnalysis(id, locale);

@@ -4,10 +4,18 @@ import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
 import { inquirySchema } from '@/lib/validation';
 import { inquiryEmail, sendEmail } from '@/lib/email';
+import { consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
+import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) return crossOriginRejected();
+
   const session = await auth();
   if (!session?.user) return NextResponse.json({ error: 'UNAUTHORIZED' }, { status: 401 });
+
+  // An inquiry sends email to a third party, so it is capped per producer.
+  const limit = await consumeRateLimit(`inquiry:${session.user.id}`, LIMITS.inquiry);
+  if (!limit.allowed) return rateLimitResponse(limit);
 
   const parsed = inquirySchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: 'INVALID_INPUT' }, { status: 400 });

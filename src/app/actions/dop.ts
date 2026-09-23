@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { publicError } from '@/lib/security';
 import { auth } from '@/lib/auth';
 import { dopProfileSchema } from '@/lib/validation';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
@@ -74,6 +75,6 @@ export async function saveDopProfile(formData: FormData): Promise<ActionResult> 
     revalidatePath('/[locale]/dop', 'page');
     return { ok: true, embedded };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'dop') };
   }
 }

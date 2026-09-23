@@ -4,8 +4,15 @@ import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { registerSchema } from '@/lib/validation';
 import { sendEmail } from '@/lib/email';
+import { clientIp, consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
+import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) return crossOriginRejected();
+
+  const limit = await consumeRateLimit(`register:${clientIp(request)}`, LIMITS.register);
+  if (!limit.allowed) return rateLimitResponse(limit);
+
   const body = await request.json().catch(() => null);
   const parsed = registerSchema.safeParse(body);
   if (!parsed.success) {

@@ -10,6 +10,7 @@ import {
   Role,
 } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { publicError } from '@/lib/security';
 import { auth } from '@/lib/auth';
 import { approvalEmail, sendEmail } from '@/lib/email';
 import { saveSettings, type PlatformSettings } from '@/lib/settings';
@@ -71,7 +72,7 @@ export async function setVendorStatus(
     revalidatePath('/[locale]/admin', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -128,7 +129,7 @@ export async function setDopStatus(
     revalidatePath('/[locale]/admin', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -144,7 +145,7 @@ export async function toggleVendorVerified(vendorId: string, verified: boolean):
     revalidatePath('/[locale]/admin/vendors', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -214,7 +215,7 @@ export async function saveEquipment(formData: FormData): Promise<ActionResult> {
     revalidatePath('/[locale]/admin/equipment', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -225,7 +226,7 @@ export async function deleteEquipment(id: string): Promise<ActionResult> {
     revalidatePath('/[locale]/admin/equipment', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -279,7 +280,7 @@ export async function savePlatformSettings(formData: FormData): Promise<ActionRe
     revalidatePath('/[locale]/admin/settings', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -300,7 +301,7 @@ export async function saveCrewRate(formData: FormData): Promise<ActionResult> {
     revalidatePath('/[locale]/admin/settings', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -321,7 +322,7 @@ export async function saveStyleTag(formData: FormData): Promise<ActionResult> {
     revalidatePath('/[locale]/admin/settings', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 
@@ -332,7 +333,7 @@ export async function toggleStyleTag(slug: string, active: boolean): Promise<Act
     revalidatePath('/[locale]/admin/settings', 'page');
     return { ok: true };
   } catch (error) {
-    return { ok: false, error: error instanceof Error ? error.message : 'UNKNOWN' };
+    return { ok: false, error: publicError(error, 'admin') };
   }
 }
 

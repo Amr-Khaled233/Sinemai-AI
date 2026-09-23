@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import { hash } from 'bcryptjs';
 import { consumeResetToken, lookupResetToken } from '@/lib/password-reset';
+import { clientIp, consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
+import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 
 export const runtime = 'nodejs';
 
@@ -10,6 +12,12 @@ const schema = z.object({
 });
 
 export async function POST(request: Request) {
+  if (!isSameOrigin(request)) return crossOriginRejected();
+
+  // Tokens are 256 bits, so this is belt-and-braces against automated guessing.
+  const limit = await consumeRateLimit(`reset:submit:${clientIp(request)}`, LIMITS.passwordReset);
+  if (!limit.allowed) return rateLimitResponse(limit);
+
   const parsed = schema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) return Response.json({ error: 'INVALID_INPUT' }, { status: 400 });
 

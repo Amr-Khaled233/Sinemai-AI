@@ -56,7 +56,11 @@ export async function lookupResetToken(token: string): Promise<ResetLookup> {
 
 export async function consumeResetToken(tokenId: string, userId: string, passwordHash: string) {
   await prisma.$transaction([
-    prisma.user.update({ where: { id: userId }, data: { passwordHash } }),
+    prisma.user.update({
+      where: { id: userId },
+      // Stamping the change is what invalidates sessions issued before it.
+      data: { passwordHash, passwordChangedAt: new Date() },
+    }),
     prisma.passwordResetToken.update({ where: { id: tokenId }, data: { usedAt: new Date() } }),
     // Any other pending token for this account is now meaningless.
     prisma.passwordResetToken.updateMany({

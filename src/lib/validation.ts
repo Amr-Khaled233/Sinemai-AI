@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { BudgetTier, ProjectType, Role } from '@prisma/client';
+import { isSafeHttpUrl } from '@/lib/security';
 
 export const registerSchema = z
   .object({
@@ -67,6 +68,10 @@ export const dopProfileSchema = z.object({
   city: z.string().max(80).optional().or(z.literal('')),
   dayRate: z.coerce.number().int().min(0).max(200_000).optional(),
   yearsExperience: z.coerce.number().int().min(0).max(70).optional(),
-  portfolioLinks: z.array(z.string().url().max(400)).max(10),
+  // .url() alone accepts javascript:/data:/vbscript:, and these render as href
+  // in a producer's sheet — so the scheme is checked explicitly.
+  portfolioLinks: z
+    .array(z.string().max(400).refine(isSafeHttpUrl, { message: 'URL must start with http:// or https://' }))
+    .max(10),
   styleTags: z.array(z.string().max(60)).min(1).max(10),
 });
