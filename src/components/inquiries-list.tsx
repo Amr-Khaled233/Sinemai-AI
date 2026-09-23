@@ -31,7 +31,7 @@ export async function InquiriesList({ inquiries, locale }: { inquiries: InquiryR
           </p>
           <p className="whitespace-pre-line text-sm leading-7 text-body/90">{inquiry.message}</p>
           <p className="mt-4 text-xs">
-            <a href={`mailto:${inquiry.contactEmail}`} className="text-info hover:underline" dir="ltr">
+            <a href={`mailto:${inquiry.contactEmail}`} className="tap-link text-info hover:underline" dir="ltr">
               {inquiry.contactEmail}
             </a>
             {inquiry.contactPhone && (

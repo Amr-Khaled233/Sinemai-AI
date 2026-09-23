@@ -104,7 +104,7 @@ export async function ProductionSheet({
           aria-hidden
           className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-accent/50 to-transparent"
         />
-        <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <p className="eyebrow">{t('title')}</p>
             <h1 className="mt-2 text-2xl font-semibold text-strong sm:text-3xl">{project.name}</h1>
@@ -167,7 +167,7 @@ export async function ProductionSheet({
       {/* ---------------------------------------------------------- scenes */}
       {summary && (
         <Card title={t('sceneBreakdown')}>
-          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3 lg:grid-cols-6">
             <Stat label={t('scenes')} value={summary.sceneCount} />
             <Stat label={t('shootDays')} value={summary.shootDays} />
             <Stat label={t('totalHours')} value={summary.totalHours} />
@@ -210,7 +210,7 @@ export async function ProductionSheet({
           </div>
 
           <div className="table-wrap mt-5">
-            <table className="table">
+            <table className="table table-stack">
               <thead>
                 <tr>
                   <th className="w-10">{t('sceneNumber')}</th>
@@ -226,16 +226,16 @@ export async function ProductionSheet({
               <tbody>
                 {scenes.map((scene) => (
                   <tr key={scene.order}>
-                    <td className="tabular-nums text-muted">{scene.order}</td>
-                    <td className="max-w-[18rem] text-strong">
+                    <td data-label={t('sceneNumber')} className="tabular-nums text-muted">{scene.order}</td>
+                    <td className="text-strong sm:max-w-[18rem]">
                       <div className="truncate font-medium">{truncate(scene.heading, 70)}</div>
                       {scene.lightingNotes && (
                         <div className="mt-0.5 text-xs text-muted">{scene.lightingNotes}</div>
                       )}
                     </td>
-                    <td>{scene.intExt ? tEnum(`intExt.${scene.intExt}`) : '—'}</td>
-                    <td>{scene.timeOfDay ? tEnum(`time.${scene.timeOfDay}`) : '—'}</td>
-                    <td>
+                    <td data-label={t('environment')}>{scene.intExt ? tEnum(`intExt.${scene.intExt}`) : '—'}</td>
+                    <td data-label={t('time')}>{scene.timeOfDay ? tEnum(`time.${scene.timeOfDay}`) : '—'}</td>
+                    <td data-label={t('lighting')}>
                       {scene.lightingComplexity ? (
                         <Badge
                           tone={
@@ -252,9 +252,9 @@ export async function ProductionSheet({
                         '—'
                       )}
                     </td>
-                    <td>{scene.cameraMovement ? tEnum(`movement.${scene.cameraMovement}`) : '—'}</td>
-                    <td className="text-end tabular-nums">{scene.estimatedHours ?? '—'}</td>
-                    <td className="text-xs text-muted">
+                    <td data-label={t('movement')}>{scene.cameraMovement ? tEnum(`movement.${scene.cameraMovement}`) : '—'}</td>
+                    <td data-label={t('hours')} className="text-end tabular-nums">{scene.estimatedHours ?? '—'}</td>
+                    <td data-label={t('special')} className="text-xs text-muted">
                       {scene.specialRequirements.length ? scene.specialRequirements.join(', ') : '—'}
                     </td>
                   </tr>
@@ -268,7 +268,7 @@ export async function ProductionSheet({
       {/* ---------------------------------------------------------- equipment */}
       <Card title={t('equipmentTitle')}>
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack">
             <thead>
               <tr>
                 <th>{t('category')}</th>
@@ -281,15 +281,15 @@ export async function ProductionSheet({
             <tbody>
               {pkg.map((item) => (
                 <tr key={item.equipmentId}>
-                  <td className="text-xs uppercase tracking-wider text-accent">
+                  <td data-label={t('category')} className="text-xs uppercase tracking-wider text-accent">
                     {categoryLabel(item.categorySlug)}
                   </td>
-                  <td className="font-medium text-strong">
+                  <td data-label={t('item')} className="font-medium text-strong">
                     {item.brand} {item.model}
                   </td>
-                  <td className="text-end tabular-nums">{item.quantity}</td>
-                  <td className="text-end tabular-nums">{item.rentalDays}</td>
-                  <td className="text-muted">{item.reason}</td>
+                  <td data-label={t('quantity')} className="text-end tabular-nums">{item.quantity}</td>
+                  <td data-label={t('days')} className="text-end tabular-nums">{item.rentalDays}</td>
+                  <td data-label={t('reason')} className="text-muted">{item.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -357,7 +357,7 @@ export async function ProductionSheet({
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-info hover:underline"
+                      className="tap-link text-info hover:underline"
                     >
                       {t('portfolio')} ↗
                     </a>
@@ -392,7 +392,7 @@ export async function ProductionSheet({
           <div className="space-y-4">
             {vendors.map((vendor) => (
               <div key={vendor.vendorId} className="card bg-surface-sunken/60 p-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
                   <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">
                       {vendor.companyName}
@@ -420,7 +420,7 @@ export async function ProductionSheet({
                 </div>
 
                 <div className="table-wrap mt-3">
-                  <table className="table">
+                  <table className="table table-stack">
                     <thead>
                       <tr>
                         <th>{t('item')}</th>
@@ -433,16 +433,16 @@ export async function ProductionSheet({
                     <tbody>
                       {vendor.items.map((line) => (
                         <tr key={line.equipmentId}>
-                          <td className="text-strong">
+                          <td data-label={t('item')} className="text-strong">
                             {line.brand} {line.model}
                             {!line.available && (
                               <span className="ms-2 text-[11px] text-warning">{t('unavailableOnDates')}</span>
                             )}
                           </td>
-                          <td className="text-end tabular-nums">{line.quantity}</td>
-                          <td className="text-end tabular-nums">{line.rentalDays}</td>
-                          <td className="text-end tabular-nums">{money(line.dailyRate)}</td>
-                          <td className="text-end tabular-nums text-strong">{money(line.lineTotal)}</td>
+                          <td data-label={t('quantity')} className="text-end tabular-nums">{line.quantity}</td>
+                          <td data-label={t('days')} className="text-end tabular-nums">{line.rentalDays}</td>
+                          <td data-label={t('rate')} className="text-end tabular-nums">{money(line.dailyRate)}</td>
+                          <td data-label={t('total')} className="text-end tabular-nums text-strong">{money(line.lineTotal)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -474,7 +474,7 @@ export async function ProductionSheet({
             <div>
               <p className="label">{t('crew')}</p>
               <div className="table-wrap">
-                <table className="table min-w-0">
+                <table className="table table-stack min-w-0">
                   <thead>
                     <tr>
                       <th>{t('role')}</th>
@@ -487,11 +487,11 @@ export async function ProductionSheet({
                   <tbody>
                     {budget.crewBreakdown.map((line) => (
                       <tr key={line.roleSlug}>
-                        <td className="text-strong">{locale === 'ar' ? line.labelAr : line.labelEn}</td>
-                        <td className="text-end tabular-nums">{line.headcount}</td>
-                        <td className="text-end tabular-nums">{money(line.dayRate)}</td>
-                        <td className="text-end tabular-nums">{line.days}</td>
-                        <td className="text-end tabular-nums text-strong">{money(line.total)}</td>
+                        <td data-label={t('role')} className="text-strong">{locale === 'ar' ? line.labelAr : line.labelEn}</td>
+                        <td data-label={t('headcount')} className="text-end tabular-nums">{line.headcount}</td>
+                        <td data-label={t('rate')} className="text-end tabular-nums">{money(line.dayRate)}</td>
+                        <td data-label={t('days')} className="text-end tabular-nums">{line.days}</td>
+                        <td data-label={t('total')} className="text-end tabular-nums text-strong">{money(line.total)}</td>
                       </tr>
                     ))}
                   </tbody>

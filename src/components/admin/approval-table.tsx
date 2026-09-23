@@ -76,7 +76,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
                       href={link}
                       target="_blank"
                       rel="noreferrer noopener"
-                      className="text-info hover:underline"
+                      className="tap-link text-info hover:underline"
                       dir="ltr"
                     >
                       {link.replace(/^https?:\/\//, '').slice(0, 48)} ↗

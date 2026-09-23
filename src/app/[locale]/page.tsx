@@ -51,12 +51,14 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
 
         <div className="animate-fade-up">
           <p className="eyebrow">{t('heroKicker')}</p>
-          <h1 className="mt-5 max-w-4xl text-4xl font-semibold leading-[1.12] sm:text-6xl">
+          <h1 className="mt-5 max-w-4xl text-[2rem] font-semibold leading-[1.15] sm:text-5xl sm:leading-[1.12] lg:text-6xl">
             <span className="headline-gradient">{t('heroTitle')}</span>
           </h1>
-          <p className="mt-6 max-w-2xl text-base leading-8 text-muted sm:text-lg">{t('heroBody')}</p>
+          <p className="mt-5 max-w-2xl text-[0.95rem] leading-7 text-muted sm:mt-6 sm:text-lg sm:leading-8">
+            {t('heroBody')}
+          </p>
 
-          <div className="mt-9 flex flex-wrap items-center gap-3">
+          <div className="mt-8 flex flex-col gap-3 sm:mt-9 sm:flex-row sm:flex-wrap sm:items-center">
             <Link
               href={session?.user ? homeForRole(session.user.role) : '/register'}
               className="btn-primary px-5 py-3 text-base"
@@ -80,7 +82,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
         </div>
 
         <Reveal delay={150} className="mt-16">
-          <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <dl className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
             {stats.map((stat) => (
               <div key={stat.label} className="stat">
                 <dt className="stat-label">{stat.label}</dt>
@@ -151,7 +153,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           <Reveal delay={100}>
             <Card interactive title={t('forVendors')}>
               <p className="prose-sheet">{t('forVendorsBody')}</p>
-              <Link href="/register" className="mt-4 inline-flex text-xs text-accent hover:underline">
+              <Link href="/register" className="tap-link mt-4 text-xs text-accent hover:underline">
                 {t('ctaSecondary')} →
               </Link>
             </Card>
@@ -159,7 +161,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           <Reveal delay={180}>
             <Card interactive title={t('forDops')}>
               <p className="prose-sheet">{t('forDopsBody')}</p>
-              <Link href="/register" className="mt-4 inline-flex text-xs text-accent hover:underline">
+              <Link href="/register" className="tap-link mt-4 text-xs text-accent hover:underline">
                 {t('ctaSecondary')} →
               </Link>
             </Card>
@@ -169,9 +171,9 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
 
       {/* ------------------------------------------------------------ closing CTA */}
       <Reveal>
-        <section className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface to-surface p-8 text-center sm:p-14">
+        <section className="relative overflow-hidden rounded-3xl border border-accent/30 bg-gradient-to-br from-accent/10 via-surface to-surface p-6 text-center sm:p-14">
           <div aria-hidden className="absolute inset-0 -z-10 bg-grid opacity-25" />
-          <h2 className="text-2xl font-semibold text-strong sm:text-4xl">{t('heroTitle')}</h2>
+          <h2 className="text-xl font-semibold text-strong sm:text-3xl lg:text-4xl">{t('heroTitle')}</h2>
           <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-muted">{t('closingBody')}</p>
           <Link
             href={session?.user ? homeForRole(session.user.role) : '/register'}

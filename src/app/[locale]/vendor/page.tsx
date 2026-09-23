@@ -52,7 +52,7 @@ export default async function VendorHome({ params }: { params: Promise<{ locale:
         </p>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <Stat label={t('inventoryTitle')} value={vendor._count.inventory} />
         <Stat label={tNav('inquiries')} value={vendor._count.inquiries} />
         <Stat label={t('city')} value={vendor.company.city} />

@@ -44,7 +44,7 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
 
   return (
     <div>
-      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <SectionTitle>{tNav('projects')}</SectionTitle>
         <Link href="/producer/projects/new" className="btn-primary">
           {t('create')}

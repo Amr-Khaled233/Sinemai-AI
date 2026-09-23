@@ -300,3 +300,33 @@ anything else is logged server-side and surfaces as a generic failure.
 - **Agent logs store script text.** `AgentRun.input` keeps the prompts, which include scene
   content. That is what makes the pipeline debuggable; treat the table as customer data and set a
   retention policy.
+
+---
+
+## Responsive behaviour
+
+The interface is built for a 320px phone first and widens from there; nothing is
+desktop-only.
+
+**Tables are the hard part.** The scene breakdown has eight columns, which cannot be read on a
+phone — and scrolling sideways inside a card hides data people do not know is there. Tables marked
+`table-stack` turn each row into a labelled card below `md` and return to a real table above it.
+Every cell carries `data-label`, which is what the stacked layout renders as its heading, so a
+column is never silently dropped. It applies to the scene breakdown, the equipment package, vendor
+line items, the crew budget, the equipment catalog, vendor inventory, crew rates and the agent-run
+log.
+
+**Touch.** Inputs render at 16px on small screens, because anything smaller makes iOS Safari zoom
+the page on focus and leave it scrolled sideways. Buttons hold a 44px minimum height on touch, and
+standalone text links ("forgot password?", "portfolio ↗") grow their hit area under
+`@media (pointer: coarse)` using padding cancelled by a negative margin, so the visual rhythm does
+not change. Content clears the notch and home indicator through `env(safe-area-inset-*)`.
+
+**Layout.** The wordmark drops below 400px and the mark carries the brand alone; navigation becomes
+a scrollable pill row under `md`; the inquiry dialog is a full-width bottom sheet on a phone and a
+centred dialog above `sm`; hero actions go full width and stack; statistics sit two-up on a phone
+rather than one tall column.
+
+Verified by sweeping 320, 360, 375, 414, 640, 768, 1024, 1280 and 1536px in a real browser,
+measuring `scrollWidth` against the viewport at each one and flagging any interactive element under
+32px tall. Both themes and both languages were checked visually at phone and tablet size.

@@ -21,7 +21,7 @@ export function ShareControls({
   const shareUrl = token ? `${typeof window === 'undefined' ? '' : window.location.origin}/${locale}/share/${token}` : null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
       <a href={`/api/projects/${projectId}/pdf?locale=${locale}`} className="btn-secondary text-xs" target="_blank" rel="noreferrer">
         {t('exportPdf')}
       </a>

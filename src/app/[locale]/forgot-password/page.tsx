@@ -14,7 +14,7 @@ export default async function ForgotPasswordPage({ params }: { params: Promise<{
       <Card title={t('forgotTitle')} subtitle={t('forgotSubtitle')}>
         <ForgotPasswordForm />
         <p className="mt-5 text-xs text-muted">
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/login" className="tap-link text-accent hover:underline">
             {t('backToSignIn')}
           </Link>
         </p>

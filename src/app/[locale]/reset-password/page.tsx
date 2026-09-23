@@ -28,7 +28,7 @@ export default async function ResetPasswordPage({
           </p>
         )}
         <p className="mt-5 text-xs text-muted">
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/login" className="tap-link text-accent hover:underline">
             {t('backToSignIn')}
           </Link>
         </p>

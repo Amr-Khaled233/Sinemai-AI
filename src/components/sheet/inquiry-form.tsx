@@ -101,7 +101,7 @@ export function InquiryButton({
 
       {open && (
         <div
-          className="fixed inset-0 z-50 grid animate-fade-in place-items-center bg-page/70 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex animate-fade-in items-end justify-center bg-page/70 backdrop-blur-sm sm:items-center sm:p-4"
           role="dialog"
           aria-modal="true"
           aria-label={t('title')}
@@ -110,7 +110,10 @@ export function InquiryButton({
             if (event.target === event.currentTarget) close();
           }}
         >
-          <div ref={dialogRef} className="card w-full max-w-lg animate-scale-in p-5 shadow-lift">
+          <div
+            ref={dialogRef}
+            className="card max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-b-none p-5 shadow-lift sm:max-h-[85dvh] sm:rounded-2xl"
+          >
             <header className="mb-4">
               <h2 className="text-base font-semibold text-strong">{t('title')}</h2>
               <p className="mt-1 text-xs text-muted">
@@ -140,7 +143,7 @@ export function InquiryButton({
 
               {error && <p className="mb-3 text-xs text-danger">{error}</p>}
 
-              <div className="flex justify-end gap-2">
+              <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
                 <button type="button" className="btn-ghost text-xs" onClick={close}>
                   {tc('cancel')}
                 </button>

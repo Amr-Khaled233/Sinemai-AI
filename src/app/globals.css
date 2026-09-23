@@ -99,6 +99,9 @@
   body {
     @apply overflow-x-clip bg-page text-body antialiased;
     font-family: var(--font-sans);
+    /* Keeps content clear of the notch and home indicator on iOS. */
+    padding-inline: env(safe-area-inset-left) env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
   }
 
   /* Budget columns line up in both locales. */
@@ -189,10 +192,16 @@
   }
 
   .input {
-    @apply w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-2.5 text-sm text-body
+    @apply w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-3 text-base text-body
+      sm:py-2.5 sm:text-sm
       transition-[border-color,box-shadow,background-color] duration-200 ease-smooth
       placeholder:text-muted/60 hover:border-line-strong
       focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/[0.12];
+  }
+
+  /* Comfortable hit area on touch, tighter on a mouse. */
+  .btn {
+    @apply min-h-[2.75rem] sm:min-h-0;
   }
 
   /* ---------------------------------------------------------------- buttons */
@@ -261,6 +270,64 @@
     @apply w-full min-w-[40rem] border-collapse text-start text-sm;
   }
 
+  /**
+   * A table with eight columns cannot be read on a 375px screen, and sideways
+   * scrolling inside a card hides data people do not know is there. Tables
+   * marked `table-stack` turn each row into a labelled card below md and
+   * become a normal table again above it.
+   *
+   * Every cell needs data-label="…" for its heading to survive the transform.
+   */
+  @media (max-width: 767px) {
+    .table-stack {
+      @apply block min-w-0 text-sm;
+    }
+
+    .table-stack thead {
+      @apply hidden;
+    }
+
+    .table-stack tbody,
+    .table-stack tr,
+    .table-stack td {
+      @apply block w-full;
+    }
+
+    .table-stack tr {
+      @apply mb-2.5 rounded-xl border border-line bg-surface/60 p-3;
+    }
+
+    .table-stack tr:last-child {
+      @apply mb-0;
+    }
+
+    .table-stack td {
+      @apply flex items-baseline justify-between gap-4 border-0 px-0 py-1.5 text-start;
+    }
+
+    .table-stack td::before {
+      content: attr(data-label);
+      @apply shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted;
+    }
+
+    /* A cell with no label is a full-width block (actions, long prose). */
+    .table-stack td:not([data-label])::before {
+      @apply hidden;
+    }
+
+    .table-stack td:not([data-label]) {
+      @apply block;
+    }
+
+    .table-stack td.cell-empty {
+      @apply hidden;
+    }
+
+    .table-wrap:has(.table-stack) {
+      @apply overflow-visible rounded-none border-0 bg-transparent;
+    }
+  }
+
   .table thead th {
     @apply sticky top-0 z-10 border-b border-line bg-surface-raised/95 px-3.5 py-3 text-start text-xs
       font-semibold uppercase tracking-wider text-muted backdrop-blur;
@@ -292,6 +359,22 @@
 
   .stat-label {
     @apply text-xs uppercase tracking-wider text-muted;
+  }
+
+  /**
+   * Standalone text links ("forgot password?", "portfolio ↗") are only as tall
+   * as their text, which is well under a comfortable touch target. On a touch
+   * pointer the hit area grows with padding that is pulled back out by a
+   * negative margin, so the layout does not shift.
+   */
+  .tap-link {
+    @apply inline-flex items-center;
+  }
+
+  @media (pointer: coarse) {
+    .tap-link {
+      @apply -my-2.5 min-h-[2.75rem] py-2.5;
+    }
   }
 
   .prose-sheet {

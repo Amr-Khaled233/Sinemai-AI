@@ -37,7 +37,7 @@ export async function TopBar({ locale }: { locale: string }) {
 
   return (
     <header className="glass sticky top-0 z-40 border-b border-line/70">
-      <div className="mx-auto flex max-w-7xl items-center gap-4 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
         <Link href={role ? homeForRole(role) : '/'} className="group flex items-center gap-2.5">
           <span className="relative grid size-9 place-items-center overflow-hidden rounded-xl border border-accent/40 bg-gradient-to-br from-accent/20 to-transparent text-sm font-bold text-accent transition-transform duration-300 ease-smooth group-hover:scale-105">
             س
@@ -47,7 +47,7 @@ export async function TopBar({ locale }: { locale: string }) {
               className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition-transform duration-700 ease-smooth group-hover:translate-x-full"
             />
           </span>
-          <span className="text-sm font-semibold tracking-wide text-strong transition-colors group-hover:text-accent">
+          <span className="hidden whitespace-nowrap text-sm font-semibold tracking-wide text-strong transition-colors group-hover:text-accent min-[400px]:inline">
             Sinemai <span className="text-accent">AI</span>
           </span>
         </Link>
@@ -56,7 +56,7 @@ export async function TopBar({ locale }: { locale: string }) {
           <NavLinks links={links} />
         </nav>
 
-        <div className="ms-auto flex items-center gap-1.5">
+        <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
           <ThemeToggle />
           <LocaleSwitcher locale={locale} />
           {session?.user ? (

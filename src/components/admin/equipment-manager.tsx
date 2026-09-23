@@ -208,7 +208,7 @@ export function EquipmentManager({
       </div>
 
       <div className="table-wrap">
-        <table className="table">
+        <table className="table table-stack">
           <thead>
             <tr>
               <th>{t('category')}</th>
@@ -224,18 +224,18 @@ export function EquipmentManager({
           <tbody>
             {filtered.map((row) => (
               <tr key={row.id} className={row.active ? '' : 'opacity-50'}>
-                <td className="text-xs uppercase tracking-wider text-accent">{row.categorySlug}</td>
-                <td className="text-strong">{row.brand}</td>
-                <td>
+                <td data-label={t('category')} className="text-xs uppercase tracking-wider text-accent">{row.categorySlug}</td>
+                <td data-label={t('brand')} className="text-strong">{row.brand}</td>
+                <td data-label={t('model')}>
                   {row.model}
                   {row.isCore && <Badge className="ms-2">core</Badge>}
                 </td>
-                <td className="text-xs">{row.tiers.join('/')}</td>
-                <td className="text-xs">{row.lighting.join('/')}</td>
-                <td className="text-end tabular-nums">{row.indicativeDayRate ?? '—'}</td>
-                <td className="text-end tabular-nums">{row.vendorCount}</td>
+                <td data-label={t('tiers')} className="text-xs">{row.tiers.join('/')}</td>
+                <td data-label={t('lightingSuitability')} className="text-xs">{row.lighting.join('/')}</td>
+                <td data-label={t('indicativeRate')} className="text-end tabular-nums">{row.indicativeDayRate ?? '—'}</td>
+                <td data-label="Vendors" className="text-end tabular-nums">{row.vendorCount}</td>
                 <td>
-                  <div className="flex justify-end gap-1.5">
+                  <div className="flex justify-end gap-1.5 max-sm:justify-start">
                     <button type="button" className="btn-ghost text-[11px]" onClick={() => setEditing(row)}>
                       {t('save')}
                     </button>

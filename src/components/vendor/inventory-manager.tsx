@@ -185,7 +185,7 @@ export function InventoryManager({
           <p className="prose-sheet">{t('empty')}</p>
         ) : (
           <div className="table-wrap">
-            <table className="table">
+            <table className="table table-stack">
               <thead>
                 <tr>
                   <th>{t('equipment')}</th>
@@ -199,7 +199,7 @@ export function InventoryManager({
               <tbody>
                 {items.map((item) => (
                   <tr key={item.id} className={item.active ? '' : 'opacity-50'}>
-                    <td className="font-medium text-strong">
+                    <td data-label={t('equipment')} className="font-medium text-strong">
                       {item.label}
                       {item.blocks.length > 0 && (
                         <button
@@ -234,14 +234,14 @@ export function InventoryManager({
                         </ul>
                       )}
                     </td>
-                    <td className="text-end tabular-nums">{item.dailyRate}</td>
-                    <td className="text-end tabular-nums">{item.weeklyRate ?? '—'}</td>
-                    <td className="text-end tabular-nums">
+                    <td data-label={t('dailyRate')} className="text-end tabular-nums">{item.dailyRate}</td>
+                    <td data-label={t('weeklyRate')} className="text-end tabular-nums">{item.weeklyRate ?? '—'}</td>
+                    <td data-label={t('quantity')} className="text-end tabular-nums">
                       {item.quantityAvailable}/{item.quantityTotal}
                     </td>
-                    <td>{item.city}</td>
+                    <td data-label={t('city')}>{item.city}</td>
                     <td>
-                      <div className="flex flex-wrap justify-end gap-1.5">
+                      <div className="flex flex-wrap justify-end gap-1.5 max-sm:justify-start">
                         <button type="button" className="btn-ghost text-[11px]" onClick={() => setEditing(item)}>
                           {tc('save')}
                         </button>
@@ -285,7 +285,7 @@ export function InventoryManager({
               if (result.ok) router.refresh();
               else setError(result.error);
             }}
-            className="grid items-end gap-x-4 sm:grid-cols-5"
+            className="grid items-end gap-x-4 sm:grid-cols-2 lg:grid-cols-5"
           >
             <Field label={t('equipment')} className="sm:col-span-2">
               <Select name="itemId" required>
@@ -305,7 +305,7 @@ export function InventoryManager({
             <Field label={t('quantity')}>
               <Input type="number" name="quantity" min={1} defaultValue={1} dir="ltr" />
             </Field>
-            <Field label={`${t('reason')} (${tc('optional')})`} className="sm:col-span-4">
+            <Field label={`${t('reason')} (${tc('optional')})`} className="sm:col-span-2 lg:col-span-4">
               <Input name="reason" />
             </Field>
             <div className="mb-4">

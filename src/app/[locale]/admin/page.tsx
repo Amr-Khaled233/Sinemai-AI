@@ -90,7 +90,7 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-strong">{t('overview')}</h1>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
         <Stat label={t('projects')} value={<AnimatedNumber value={projectCount} />} />
         <Stat label={t('scriptsAnalyzed')} value={<AnimatedNumber value={readyCount} />} />
         <Stat
@@ -161,7 +161,7 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
 
       <Card title={t('recentRuns')} subtitle="Every agent invocation, with tool calls, is stored for debugging.">
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack">
             <thead>
               <tr>
                 <th>{t('agent')}</th>
@@ -176,15 +176,15 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
             <tbody>
               {recentRuns.map((run) => (
                 <tr key={run.id}>
-                  <td className="text-strong">{tEnum(`agent.${run.agent}`)}</td>
-                  <td className="text-muted">{run.project.name}</td>
-                  <td>
+                  <td data-label={t('agent')} className="text-strong">{tEnum(`agent.${run.agent}`)}</td>
+                  <td data-label={t('project')} className="text-muted">{run.project.name}</td>
+                  <td data-label={t('status')}>
                     <Badge tone={RUN_TONE[run.status]}>{run.status}</Badge>
                   </td>
-                  <td className="text-end tabular-nums">{run.attempt}</td>
-                  <td className="text-end tabular-nums">{run.latencyMs ? `${run.latencyMs} ms` : '—'}</td>
-                  <td className="text-xs text-muted">{run.model ?? '—'}</td>
-                  <td className="text-xs text-muted/70">{formatDate(run.startedAt, locale)}</td>
+                  <td data-label={t('attempt')} className="text-end tabular-nums">{run.attempt}</td>
+                  <td data-label={t('latency')} className="text-end tabular-nums">{run.latencyMs ? `${run.latencyMs} ms` : '—'}</td>
+                  <td data-label="Model" className="text-xs text-muted">{run.model ?? '—'}</td>
+                  <td data-label="Date" className="text-xs text-muted/70">{formatDate(run.startedAt, locale)}</td>
                 </tr>
               ))}
             </tbody>

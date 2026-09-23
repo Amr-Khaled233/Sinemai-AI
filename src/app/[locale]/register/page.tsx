@@ -21,7 +21,7 @@ export default async function RegisterPage({ params }: { params: Promise<{ local
         <SignUpForm locale={locale} />
         <p className="mt-5 text-xs text-muted">
           {t('haveAccount')}{' '}
-          <Link href="/login" className="text-accent hover:underline">
+          <Link href="/login" className="tap-link text-accent hover:underline">
             {t('signInTitle')}
           </Link>
         </p>

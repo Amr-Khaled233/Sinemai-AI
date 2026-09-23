@@ -81,7 +81,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
                 <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-accent">
                   {tEnum(`tier.${tier.tier}`)}
                 </p>
-                <div className="grid gap-x-4 sm:grid-cols-4">
+                <div className="grid gap-x-4 sm:grid-cols-2 lg:grid-cols-4">
                   <Field label={t('min')}>
                     <Input name={`tier_${tier.tier}_min`} type="number" min={0} dir="ltr" defaultValue={tier.minTotal} />
                   </Field>
@@ -107,7 +107,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
 
       <Card title={t('crewRates')} subtitle="The only source of crew cost in every generated budget.">
         <div className="table-wrap">
-          <table className="table">
+          <table className="table table-stack">
             <thead>
               <tr>
                 <th>Role</th>
@@ -121,15 +121,15 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
             <tbody>
               {[...ratesByRole.entries()].map(([roleSlug, rates]) => (
                 <tr key={roleSlug}>
-                  <td className="text-strong">
+                  <td data-label="Role" className="text-strong">
                     {locale === 'ar' ? rates[0].labelAr : rates[0].labelEn}
                     <span className="ms-2 text-[11px] text-muted">{roleSlug}</span>
                   </td>
                   {Object.values(BudgetTier).map((tier) => {
                     const rate = rates.find((r) => r.budgetTier === tier);
-                    if (!rate) return <td key={tier} className="text-end">—</td>;
+                    if (!rate) return <td key={tier} data-label={tEnum(`tier.${tier}`)} className="text-end">—</td>;
                     return (
-                      <td key={tier} className="text-end">
+                      <td key={tier} data-label={tEnum(`tier.${tier}`)} className="text-end">
                         <form action={saveCrewRateForm} className="flex items-center justify-end gap-1.5">
                           <input type="hidden" name="roleSlug" value={roleSlug} />
                           <input type="hidden" name="budgetTier" value={tier} />
@@ -164,7 +164,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
       </Card>
 
       <Card title={t('styleTags')} subtitle="Offered to producers and used as the cinematographer style vocabulary.">
-        <form action={saveStyleTagForm} className="mb-5 grid items-end gap-x-4 sm:grid-cols-3">
+        <form action={saveStyleTagForm} className="mb-5 grid items-end gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={t('labelEn')}>
             <Input name="labelEn" required />
           </Field>
