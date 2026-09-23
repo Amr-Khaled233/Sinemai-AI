@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', 'Helvetica Neue', Tahoma, system-ui, sans-serif;
+  --surface: 13 15 20;
+  --surface-raised: 20 23 31;
+  --border: 42 48 64;
+  --text: 233 234 238;
+  --muted: 150 156 172;
+  --accent: 212 169 79;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-ink-900 text-[rgb(var(--text))] antialiased;
+    font-family: var(--font-sans);
+    background-image:
+      radial-gradient(60rem 30rem at 85% -10%, rgba(212, 169, 79, 0.08), transparent),
+      radial-gradient(50rem 25rem at 0% 0%, rgba(79, 209, 197, 0.06), transparent);
+    background-attachment: fixed;
+  }
+
+  /* Arabic numerals stay Latin in tables so budgets line up in both locales. */
+  [dir='rtl'] table,
+  [dir='rtl'] .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  h1,
+  h2,
+  h3 {
+    @apply text-balance;
+  }
+
+  ::selection {
+    background: rgba(212, 169, 79, 0.28);
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-ink-600/70 bg-ink-800/60 backdrop-blur-sm;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-[rgb(var(--muted))];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-ink-600 bg-ink-900/80 px-3 py-2.5 text-sm text-[rgb(var(--text))]
+      placeholder:text-[rgb(var(--muted))]/60 focus:border-brass-500 focus:outline-none focus:ring-1 focus:ring-brass-500/40;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium
+      transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-brass-500 text-ink-950 hover:bg-brass-400;
+  }
+
+  .btn-secondary {
+    @apply btn border border-ink-600 bg-ink-800 text-[rgb(var(--text))] hover:border-brass-600 hover:text-brass-400;
+  }
+
+  .btn-ghost {
+    @apply btn text-[rgb(var(--muted))] hover:text-brass-400;
+  }
+
+  .btn-danger {
+    @apply btn border border-red-900/60 bg-red-950/40 text-red-300 hover:bg-red-900/40;
+  }
+
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-ink-600 px-3 py-1 text-xs text-[rgb(var(--muted))];
+  }
+
+  .chip-on {
+    @apply border-brass-500/70 bg-brass-500/10 text-brass-400;
+  }
+
+  .table-wrap {
+    @apply overflow-x-auto rounded-xl border border-ink-600/70;
+  }
+
+  .table {
+    @apply w-full min-w-[40rem] border-collapse text-start text-sm;
+  }
+
+  .table thead th {
+    @apply border-b border-ink-600 bg-ink-800/80 px-3 py-2.5 text-start text-xs font-semibold
+      uppercase tracking-wider text-[rgb(var(--muted))];
+  }
+
+  .table tbody td {
+    @apply border-b border-ink-700/60 px-3 py-2.5 align-top;
+  }
+
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  .stat {
+    @apply rounded-xl border border-ink-600/70 bg-ink-800/50 p-4;
+  }
+
+  .stat-value {
+    @apply mt-1 text-2xl font-semibold text-[rgb(var(--text))] tabular-nums;
+  }
+
+  .stat-label {
+    @apply text-xs uppercase tracking-wider text-[rgb(var(--muted))];
+  }
+
+  .prose-sheet {
+    @apply text-sm leading-7 text-[rgb(var(--muted))];
+  }
+}
+
+/* The progress rail mirrors itself in RTL without extra markup. */
+.progress-rail {
+  @apply h-1.5 w-full overflow-hidden rounded-full bg-ink-700;
+}
+
+.progress-fill {
+  @apply h-full rounded-full bg-gradient-to-r from-brass-600 to-brass-400 transition-[width] duration-500;
+}
+
+[dir='rtl'] .progress-fill {
+  @apply bg-gradient-to-l;
+}

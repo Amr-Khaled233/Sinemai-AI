@@ -1,0 +1,568 @@
+// Sinemai AI — production intelligence platform
+// Postgres + pgvector (Vercel Postgres / Neon).
+//
+// The `Dop.embedding` column is a pgvector column. Prisma cannot read/write
+// `Unsupported` types through the typed client, so every embedding write and
+// similarity search goes through raw SQL (src/lib/embeddings.ts,
+// src/agents/tools/dop-tools.ts).
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [vector]
+}
+
+// ---------------------------------------------------------------- enums
+
+enum Role {
+  PRODUCER
+  VENDOR
+  DOP
+  ADMIN
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ProjectType {
+  COMMERCIAL
+  SHORT_FILM
+  SERIES
+  FEATURE
+  DOCUMENTARY
+}
+
+enum BudgetTier {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ProjectStatus {
+  DRAFT
+  SCRIPT_UPLOADED
+  ANALYZING
+  READY
+  FAILED
+}
+
+enum ParsedFormat {
+  FOUNTAIN
+  FDX
+  PDF
+  TXT
+  PASTED
+}
+
+enum IntExt {
+  INTERIOR
+  EXTERIOR
+}
+
+enum TimeOfDay {
+  DAY
+  NIGHT
+  DAWN_DUSK
+}
+
+enum Complexity {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum CameraMovement {
+  STATIC
+  HANDHELD
+  STEADICAM_GIMBAL
+  CRANE_DOLLY
+  DRONE
+}
+
+enum DayNightSuitability {
+  DAY
+  NIGHT
+  BOTH
+}
+
+enum InquiryTargetType {
+  DOP
+  VENDOR
+}
+
+enum InquiryStatus {
+  SENT
+  READ
+  REPLIED
+  CLOSED
+}
+
+enum AgentName {
+  ORCHESTRATOR
+  SCRIPT_ANALYST
+  EQUIPMENT
+  DOP_MATCH
+  VENDOR_BUDGET
+  CRITIC
+}
+
+enum AgentRunStatus {
+  RUNNING
+  OK
+  RETRIED
+  FAILED
+}
+
+// ---------------------------------------------------------------- identity
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String
+  phone         String?
+  passwordHash  String
+  role          Role      @default(PRODUCER)
+  locale        String    @default("ar")
+  emailVerified DateTime?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  projects      Project[]
+  dop           Dop?
+  vendor        Vendor?
+  sentInquiries Inquiry[] @relation("InquiryFrom")
+  accounts      Account[]
+  sessions      Session[]
+
+  @@index([role])
+}
+
+// NextAuth tables, kept so the credentials setup can gain OAuth providers later.
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ---------------------------------------------------------------- marketplace side
+
+model Company {
+  id          String   @id @default(cuid())
+  name        String
+  nameEn      String?
+  crNumber    String?  @unique // Saudi commercial registration number
+  city        String
+  country     String   @default("SA")
+  addressLine String?
+  latitude    Float?
+  longitude   Float?
+  phone       String?
+  website     String?
+  logoUrl     String?
+  verified    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vendor Vendor?
+}
+
+model Vendor {
+  id         String         @id @default(cuid())
+  userId     String         @unique
+  companyId  String         @unique
+  status     ApprovalStatus @default(PENDING)
+  verified   Boolean        @default(false)
+  notes      String?
+  approvedAt DateTime?
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  inventory VendorInventoryItem[]
+  inquiries Inquiry[]             @relation("InquiryVendor")
+
+  @@index([status])
+}
+
+model Dop {
+  id              String                       @id @default(cuid())
+  userId          String                       @unique
+  displayName     String
+  displayNameAr   String?
+  bio             String                       @default("")
+  bioAr           String?
+  city            String?
+  country         String                       @default("SA")
+  dayRate         Int? // SAR/day — used by the budget agent when present
+  yearsExperience Int?
+  portfolioLinks  String[]                     @default([])
+  styleTags       String[]                     @default([])
+  reelThumbUrl    String?
+  status          ApprovalStatus               @default(PENDING)
+  approvedAt      DateTime?
+  // pgvector column, 1536 dims: text-embedding-3-large shortened so HNSW can index it.
+  embedding       Unsupported("vector(1536)")?
+  embeddingText   String?
+  embeddedAt      DateTime?
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  inquiries Inquiry[] @relation("InquiryDop")
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------- equipment catalog
+
+model EquipmentCategory {
+  id        String      @id @default(cuid())
+  slug      String      @unique // camera-body | lens | lighting | grip | sound | support | power
+  nameEn    String
+  nameAr    String
+  sortOrder Int         @default(0)
+  equipment Equipment[]
+}
+
+model Equipment {
+  id         String  @id @default(cuid())
+  categoryId String
+  brand      String
+  model      String
+  nameAr     String?
+  /// Spec-sheet data from the manufacturer (sensor, dynamic range, mount, weight, power).
+  specs      Json    @default("{}")
+  summaryEn  String  @default("")
+  summaryAr  String  @default("")
+  imageUrl   String?
+
+  suitableLightingComplexity Complexity[]        @default([])
+  suitableMovementTypes      CameraMovement[]    @default([])
+  budgetTier                 BudgetTier[]        @default([])
+  dayNightSuitability        DayNightSuitability @default(BOTH)
+  /// Matches Scene.specialRequirements strings, e.g. ["underwater", "vehicle mount"].
+  specialCapabilities        String[]            @default([])
+  /// Indicative market day rate in SAR — fallback only when no vendor stocks the item.
+  indicativeDayRate          Int?
+  /// Core kit items are always considered for a package of this category.
+  isCore                     Boolean             @default(false)
+  active                     Boolean             @default(true)
+  createdAt                  DateTime            @default(now())
+  updatedAt                  DateTime            @updatedAt
+
+  category  EquipmentCategory     @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  inventory VendorInventoryItem[]
+
+  @@unique([brand, model])
+  @@index([categoryId])
+}
+
+model VendorInventoryItem {
+  id                String   @id @default(cuid())
+  vendorId          String
+  equipmentId       String
+  dailyRate         Int
+  weeklyRate        Int?
+  monthlyRate       Int?
+  currency          String   @default("SAR")
+  quantityTotal     Int      @default(1)
+  quantityAvailable Int      @default(1)
+  city              String
+  latitude          Float?
+  longitude         Float?
+  photoUrls         String[] @default([])
+  notes             String?
+  active            Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  vendor    Vendor              @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  equipment Equipment           @relation(fields: [equipmentId], references: [id], onDelete: Cascade)
+  blocks    AvailabilityBlock[]
+
+  @@unique([vendorId, equipmentId])
+  @@index([equipmentId])
+  @@index([city])
+}
+
+/// Date ranges where an inventory item is rented out / otherwise unavailable.
+model AvailabilityBlock {
+  id        String   @id @default(cuid())
+  itemId    String
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  quantity  Int      @default(1)
+  reason    String?
+  createdAt DateTime @default(now())
+
+  item VendorInventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId, startDate, endDate])
+}
+
+// ---------------------------------------------------------------- projects
+
+model Project {
+  id              String        @id @default(cuid())
+  ownerId         String
+  name            String
+  type            ProjectType
+  budgetTier      BudgetTier
+  visualStyleTags String[]      @default([])
+  city            String        @default("Riyadh")
+  shootStartDate  DateTime?     @db.Date
+  shootEndDate    DateTime?     @db.Date
+  synopsis        String?
+  status          ProjectStatus @default(DRAFT)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  script         Script?
+  recommendation ProjectRecommendation?
+  inquiries      Inquiry[]
+  agentRuns      AgentRun[]
+  shareLinks     ShareLink[]
+
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Script {
+  id           String       @id @default(cuid())
+  projectId    String       @unique
+  fileUrl      String?
+  fileName     String?
+  parsedFormat ParsedFormat
+  rawText      String
+  pageCount    Int?
+  sceneCount   Int          @default(0)
+  parsedAt     DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  scenes  Scene[]
+}
+
+model Scene {
+  id                  String          @id @default(cuid())
+  scriptId            String
+  order               Int
+  heading             String
+  slug                String? // location slug taken from the scene heading
+  bodyExcerpt         String
+  intExt              IntExt?
+  timeOfDay           TimeOfDay?
+  lightingComplexity  Complexity?
+  lightingNotes       String?
+  cameraMovement      CameraMovement?
+  specialRequirements String[]        @default([])
+  estimatedHours      Float?
+  pageEighths         Int? // classic script-breakdown page measure
+  analyzedAt          DateTime?
+
+  script Script @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+
+  @@unique([scriptId, order])
+  @@index([scriptId])
+}
+
+model ProjectRecommendation {
+  id        String @id @default(cuid())
+  projectId String @unique
+
+  /// Equipment ids ordered by the Equipment Agent's ranking.
+  recommendedEquipmentIds String[] @default([])
+  /// [{ equipmentId, categorySlug, brand, model, quantity, rentalDays, reason }]
+  equipmentPackage        Json     @default("[]")
+  equipmentRationale      String   @default("")
+
+  /// [{ dopId, name, score, reason, portfolioLinks, styleTags }]
+  matchedDops    Json @default("[]")
+  /// [{ vendorId, companyName, city, items: [...], subtotal, coveragePct }]
+  matchedVendors Json @default("[]")
+
+  estimatedBudgetLow  Int    @default(0)
+  estimatedBudgetMid  Int    @default(0)
+  estimatedBudgetHigh Int    @default(0)
+  currency            String @default("SAR")
+  /// { shootDays, equipmentRental, crewTotal, contingency, crewBreakdown: [...] }
+  budgetBreakdown     Json   @default("{}")
+
+  rationaleText String   @default("")
+  criticNotes   String[] @default([])
+  criticPassed  Boolean  @default(true)
+  /// Aggregated scene statistics the whole sheet is derived from.
+  sceneSummary  Json     @default("{}")
+  modelVersions Json     @default("{}")
+  generatedAt   DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+}
+
+model ShareLink {
+  id        String    @id @default(cuid())
+  projectId String
+  token     String    @unique
+  expiresAt DateTime?
+  revoked   Boolean   @default(false)
+  viewCount Int       @default(0)
+  createdAt DateTime  @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Inquiry {
+  id           String            @id @default(cuid())
+  projectId    String?
+  fromUserId   String
+  targetType   InquiryTargetType
+  dopId        String?
+  vendorId     String?
+  subject      String
+  message      String
+  contactEmail String
+  contactPhone String?
+  status       InquiryStatus     @default(SENT)
+  createdAt    DateTime          @default(now())
+
+  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  fromUser User     @relation("InquiryFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  dop      Dop?     @relation("InquiryDop", fields: [dopId], references: [id], onDelete: Cascade)
+  vendor   Vendor?  @relation("InquiryVendor", fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([dopId])
+  @@index([vendorId])
+}
+
+// ---------------------------------------------------------------- agent observability
+
+/// One row per agent invocation, retries included — the debugging and tuning trail.
+model AgentRun {
+  id               String         @id @default(cuid())
+  projectId        String
+  agent            AgentName
+  attempt          Int            @default(1)
+  status           AgentRunStatus @default(RUNNING)
+  model            String?
+  systemPrompt     String?
+  input            Json           @default("{}")
+  output           Json?
+  criticFlag       String?
+  errorText        String?
+  promptTokens     Int?
+  completionTokens Int?
+  latencyMs        Int?
+  startedAt        DateTime       @default(now())
+  finishedAt       DateTime?
+
+  project   Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  toolCalls AgentToolCall[]
+
+  @@index([projectId, agent])
+}
+
+model AgentToolCall {
+  id        String   @id @default(cuid())
+  runId     String
+  toolName  String
+  args      Json     @default("{}")
+  result    Json?
+  errorText String?
+  latencyMs Int?
+  createdAt DateTime @default(now())
+
+  run AgentRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+
+  @@index([runId])
+}
+
+// ---------------------------------------------------------------- admin-configurable data
+
+/// Visual style tags offered to producers, also used as DOP style vocabulary.
+model StyleTag {
+  id        String  @id @default(cuid())
+  slug      String  @unique
+  labelEn   String
+  labelAr   String
+  active    Boolean @default(true)
+  sortOrder Int     @default(0)
+}
+
+/// Crew day rates per role per tier — the budget agent's only source of crew cost.
+model CrewRate {
+  id         String     @id @default(cuid())
+  roleSlug   String
+  labelEn    String
+  labelAr    String
+  budgetTier BudgetTier
+  dayRate    Int
+  currency   String     @default("SAR")
+  /// Headcount assumed for this role in a standard unit at this tier.
+  headcount  Int        @default(1)
+  active     Boolean    @default(true)
+
+  @@unique([roleSlug, budgetTier])
+}
+
+/// Currency window for each declared budget tier (admin-editable).
+model BudgetTierConfig {
+  tier      BudgetTier @id
+  minTotal  Int
+  maxTotal  Int
+  currency  String     @default("SAR")
+  labelEn   String
+  labelAr   String
+  updatedAt DateTime   @updatedAt
+}
+
+/// Key/value platform settings (contingency %, default city, tier overage policy).
+model Setting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+}
