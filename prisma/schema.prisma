@@ -435,16 +435,19 @@ model ProjectRecommendation {
   /// { shootDays, equipmentRental, crewTotal, contingency, crewBreakdown: [...] }
   budgetBreakdown     Json   @default("{}")
 
-  rationaleText String   @default("")
+  /// Set when a producer changed the package by hand, so the sheet can say
+  /// the reviewer signed off on an earlier version.
+  editedAt      DateTime?
+  rationaleText String    @default("")
   /// Language the narrative fields were generated in (ar | en).
-  locale        String   @default("ar")
-  criticNotes   String[] @default([])
-  criticPassed  Boolean  @default(true)
+  locale        String    @default("ar")
+  criticNotes   String[]  @default([])
+  criticPassed  Boolean   @default(true)
   /// Aggregated scene statistics the whole sheet is derived from.
-  sceneSummary  Json     @default("{}")
-  modelVersions Json     @default("{}")
-  generatedAt   DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  sceneSummary  Json      @default("{}")
+  modelVersions Json      @default("{}")
+  generatedAt   DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
 }

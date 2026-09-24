@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { escapeHtml, escapeHtmlMultiline } from '@/lib/security';
+import { reportError } from '@/lib/observability';
 
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM = process.env.EMAIL_FROM ?? 'Sinemai AI <noreply@sinemai.ai>';
@@ -20,7 +21,9 @@ export async function sendEmail({ to, subject, html, replyTo }: Mail) {
     ...(replyTo ? { replyTo } : {}),
   });
   if (error) {
-    console.error('[email:error]', error);
+    // A bounced approval or inquiry mail is invisible to the user, so it has to
+    // be visible to us.
+    reportError(error, { scope: 'email:send', severity: 'warning', extra: { subject } });
     return { delivered: false as const };
   }
   return { delivered: true as const };

@@ -1,5 +1,6 @@
 /**
  * Shared security helpers.
+
  *
  * Each function here exists because of a concrete hole found in review, and the
  * comment says which one, so nobody removes it as "defensive noise" later.
@@ -109,36 +110,4 @@ export function isSameOrigin(request: Request) {
 /** Standard rejection for a request that fails the origin check. */
 export function crossOriginRejected() {
   return Response.json({ error: 'CROSS_ORIGIN_REJECTED' }, { status: 403 });
-}
-
-// ---------------------------------------------------------------- error hygiene
-
-const SAFE_ERROR_CODES = new Set([
-  'INVALID_INPUT',
-  'UNAUTHORIZED',
-  'FORBIDDEN',
-  'NOT_FOUND',
-  'NO_SCRIPT',
-  'EMPTY_SCRIPT',
-  'NO_SCENES_FOUND',
-  'FILE_TOO_LARGE',
-  'UNSUPPORTED_FILE_TYPE',
-  'AVAILABLE_EXCEEDS_TOTAL',
-  'INVALID_RANGE',
-  'INVALID_SPECS_JSON',
-  'RATE_LIMITED',
-  'EMAIL_TAKEN',
-  'INQUIRY_CLOSED',
-]);
-
-/**
- * Server actions were returning raw exception messages to the browser, which
- * leaks Prisma errors and internal state names. Known codes pass through;
- * anything else is logged server-side and reported as a generic failure.
- */
-export function publicError(error: unknown, context: string) {
-  const message = error instanceof Error ? error.message : String(error);
-  if (SAFE_ERROR_CODES.has(message)) return message;
-  console.error(`[${context}]`, error);
-  return 'UNEXPECTED_ERROR';
 }

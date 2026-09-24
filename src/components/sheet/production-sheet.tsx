@@ -3,6 +3,7 @@ import type { BudgetTier, Prisma } from '@prisma/client';
 import { Badge, Card, MeterBar, Stat } from '@/components/ui';
 import { MeterFill } from '@/components/motion';
 import { InquiryButton } from '@/components/sheet/inquiry-form';
+import { PackageEditor, type CatalogOption } from '@/components/sheet/package-editor';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';
 import type {
@@ -36,6 +37,7 @@ export type SheetRecommendation = {
   rationaleText: string;
   criticNotes: string[];
   criticPassed: boolean;
+  editedAt?: Date | null;
   modelVersions: Prisma.JsonValue;
   generatedAt: Date;
 };
@@ -75,6 +77,7 @@ export async function ProductionSheet({
   tierWindow,
   readOnly = false,
   actions,
+  catalog,
 }: {
   locale: string;
   project: SheetProject;
@@ -83,6 +86,8 @@ export async function ProductionSheet({
   tierWindow: { minTotal: number; maxTotal: number; currency: string };
   readOnly?: boolean;
   actions?: React.ReactNode;
+  /** Catalog for the package editor; omitted on a shared, read-only sheet. */
+  catalog?: CatalogOption[];
 }) {
   const [t, tEnum] = await Promise.all([getTranslations('sheet'), getTranslations('enum')]);
 
@@ -266,7 +271,23 @@ export async function ProductionSheet({
       )}
 
       {/* ---------------------------------------------------------- equipment */}
-      <Card title={t('equipmentTitle')}>
+      <Card title={t('equipmentTitle')} subtitle={!readOnly && catalog ? t('repriceHint') : undefined}>
+        {recommendation.editedAt && (
+          <p className="mb-4 rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-xs leading-6 text-accent">
+            {t('editedNotice')}
+          </p>
+        )}
+
+        {!readOnly && catalog ? (
+          <PackageEditor
+            projectId={project.id}
+            items={pkg}
+            catalog={catalog}
+            categoryLabel={Object.fromEntries(
+              Object.keys(CATEGORY_LABELS).map((slug) => [slug, categoryLabel(slug)]),
+            )}
+          />
+        ) : (
         <div className="table-wrap">
           <table className="grid-table [--grid-cols:7rem_minmax(10rem,1.5fr)_4rem_4.5rem_minmax(12rem,2.2fr)]">
             <thead>
@@ -295,6 +316,7 @@ export async function ProductionSheet({
             </tbody>
           </table>
         </div>
+        )}
 
         {recommendation.equipmentRationale && (
           <div className="mt-4 rounded-lg border border-line/60 bg-surface-sunken p-4">

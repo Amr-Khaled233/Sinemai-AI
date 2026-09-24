@@ -7,7 +7,6 @@ import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
 import { withLanguage } from './language';
 import type {
-  BudgetBreakdown,
   CrewLine,
   EquipmentResult,
   ProjectBrief,
@@ -139,52 +138,16 @@ export async function runVendorBudgetAgent(
       });
 
       // ---- pricing: pure arithmetic over tool-sourced rates
-      const allocation = allocatePackage(equipment, inventory, {
-        city: brief.city,
-        weeklyDiscountPct: settings.weeklyRentalDiscountPct,
-      });
-
-      const selectedRoles = new Set(object.crewRoles);
-      const crewLines = buildCrewLines(crewRates, selectedRoles, summary.shootDays);
-      const crewTotal = crewLines.reduce((sum, line) => sum + line.total, 0);
-
-      const contingencyPct = settings.contingencyPct;
-      const low = allocation.equipmentLow + crewTotal;
-      const mid = Math.round(low + (allocation.equipmentLow + crewTotal) * (contingencyPct / 200));
-      const high = Math.round(
-        allocation.equipmentHigh + crewTotal + (allocation.equipmentHigh + crewTotal) * (contingencyPct / 100),
-      );
-
-      const budget: BudgetBreakdown = {
+      const result = priceProject({
+        equipment,
+        inventory,
+        crewRates,
+        selectedRoles: new Set(object.crewRoles),
         shootDays: summary.shootDays,
-        equipmentRental: allocation.equipmentLow,
-        equipmentUncovered: allocation.uncoveredFallbackTotal,
-        crewTotal,
-        crewBreakdown: crewLines,
-        contingencyPct,
-        contingency: high - (allocation.equipmentHigh + crewTotal),
-        currency: settings.currency,
-      };
-
-      const notes = [...object.notes];
-      if (inventory.unstockedIds.length) {
-        notes.push(
-          `${inventory.unstockedIds.length} item(s) are not stocked by any approved vendor yet and are priced from indicative market rates.`,
-        );
-      }
-      if (allocation.vendors.length > 1) {
-        notes.push(`Package splits across ${allocation.vendors.length} vendors for best coverage and price.`);
-      }
-
-      const result: VendorBudgetResult = {
-        vendors: allocation.vendors,
-        budget,
-        low,
-        mid,
-        high,
-        notes,
-        uncoveredEquipment: allocation.uncovered,
-      };
+        city: brief.city,
+        settings,
+        notes: object.notes,
+      });
 
       return { output: result };
     },
@@ -192,6 +155,72 @@ export async function runVendorBudgetAgent(
 }
 
 // ------------------------------------------------------------------ pricing
+
+/**
+ * Turns a package plus vendor and crew rates into a costed sheet.
+ *
+ * The single source of truth for money. The agent calls it after sourcing, and
+ * so does a producer editing the package by hand — if the two computed totals
+ * differently, an edited sheet would silently disagree with the one the agent
+ * produced.
+ */
+export function priceProject(args: {
+  equipment: EquipmentResult;
+  inventory: VendorInventoryResult;
+  crewRates: CrewRateRow[];
+  selectedRoles: Set<string>;
+  shootDays: number;
+  city: string;
+  settings: { weeklyRentalDiscountPct: number; contingencyPct: number; currency: string };
+  notes?: string[];
+}): VendorBudgetResult {
+  const { equipment, inventory, crewRates, selectedRoles, shootDays, city, settings } = args;
+
+  const allocation = allocatePackage(equipment, inventory, {
+    city,
+    weeklyDiscountPct: settings.weeklyRentalDiscountPct,
+  });
+
+  const crewBreakdown = buildCrewLines(crewRates, selectedRoles, shootDays);
+  const crewTotal = crewBreakdown.reduce((sum, line) => sum + line.total, 0);
+
+  const contingencyPct = settings.contingencyPct;
+  const low = allocation.equipmentLow + crewTotal;
+  // Mid carries half the contingency, high carries all of it on the worst
+  // sourcing, so the spread reflects real vendor prices rather than a guess.
+  const mid = Math.round(low + low * (contingencyPct / 200));
+  const highBase = allocation.equipmentHigh + crewTotal;
+  const high = Math.round(highBase + highBase * (contingencyPct / 100));
+
+  const notes = [...(args.notes ?? [])];
+  if (inventory.unstockedIds.length) {
+    notes.push(
+      `${inventory.unstockedIds.length} item(s) are not stocked by any approved vendor yet and are priced from indicative market rates.`,
+    );
+  }
+  if (allocation.vendors.length > 1) {
+    notes.push(`Package splits across ${allocation.vendors.length} vendors for best coverage and price.`);
+  }
+
+  return {
+    vendors: allocation.vendors,
+    budget: {
+      shootDays,
+      equipmentRental: allocation.equipmentLow,
+      equipmentUncovered: allocation.uncoveredFallbackTotal,
+      crewTotal,
+      crewBreakdown,
+      contingencyPct,
+      contingency: high - highBase,
+      currency: settings.currency,
+    },
+    low,
+    mid,
+    high,
+    notes,
+    uncoveredEquipment: allocation.uncovered,
+  };
+}
 
 function mergeInventory(results: VendorInventoryResult[]): VendorInventoryResult | null {
   const usable = results.filter((r) => Array.isArray(r?.vendors));

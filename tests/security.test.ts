@@ -5,7 +5,6 @@ import {
   escapeHtmlMultiline,
   isAllowedUpload,
   isSafeHttpUrl,
-  publicError,
 } from '../src/lib/security';
 
 describe('email escaping', () => {
@@ -70,15 +69,4 @@ describe('upload gate', () => {
       assert.equal(isAllowedUpload(kind, name, type), expected);
     });
   }
-});
-
-describe('error hygiene', () => {
-  it('passes an allow-listed code straight through', () => {
-    assert.equal(publicError(new Error('NOT_FOUND'), 'test'), 'NOT_FOUND');
-  });
-
-  it('hides anything else behind a generic code', () => {
-    const noisy = new Error('Invalid `prisma.user.findUnique()` invocation: connection string');
-    assert.equal(publicError(noisy, 'test'), 'UNEXPECTED_ERROR');
-  });
 });

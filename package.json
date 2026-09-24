@@ -9,16 +9,16 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "postinstall": "prisma generate",
-    "db:extensions": "prisma db execute --file prisma/sql/01_extensions.sql --schema prisma/schema.prisma",
-    "db:push": "prisma db push",
-    "db:index": "prisma db execute --file prisma/sql/02_vector_index.sql --schema prisma/schema.prisma",
-    "db:seed": "tsx prisma/seed.ts",
-    "db:setup": "npm run db:extensions && npm run db:push && npm run db:index && npm run db:seed",
-    "agents:smoke": "tsx scripts/agent-smoke.ts",
     "test": "tsx --test tests/*.test.ts",
     "test:watch": "tsx --test --watch tests/*.test.ts",
-    "verify": "npm run typecheck && npm run lint && npm run test && npm run agents:smoke"
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run agents:smoke",
+    "postinstall": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:baseline": "prisma migrate resolve --applied 0_init",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:setup": "npm run db:deploy && npm run db:seed",
+    "agents:smoke": "tsx scripts/agent-smoke.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
@@ -42,6 +42,7 @@
     "zod": "3.25.76"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",

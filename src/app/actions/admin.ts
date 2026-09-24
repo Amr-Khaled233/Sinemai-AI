@@ -12,6 +12,7 @@ import { approvalEmail, sendEmail } from '@/lib/email';
 import { saveSettings, type PlatformSettings } from '@/lib/settings';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
 import { slugify } from '@/lib/utils';
+import { reportError } from '@/lib/observability';
 import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
 function baseUrl() {
@@ -84,7 +85,7 @@ export async function setDopStatus(dopId: string, status: ApprovalStatus, reason
         const text = buildDopEmbeddingText(dop);
         await writeDopEmbedding(dop.id, text, await embedText(text));
       } catch (error) {
-        console.warn('[admin:approve-dop] embedding deferred to cron', error);
+        reportError(error, { scope: 'admin:approve-dop-embedding', severity: 'warning', extra: { dopId } });
       }
     }
 

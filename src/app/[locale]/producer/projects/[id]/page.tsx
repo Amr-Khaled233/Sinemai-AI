@@ -60,7 +60,17 @@ export default async function ProjectPage({
   if (!project) notFound();
   if (project.ownerId !== session.user.id && session.user.role !== 'ADMIN') notFound();
 
-  const tierWindow = await getBudgetTierConfig(project.budgetTier);
+  const [tierWindow, catalogRows] = await Promise.all([
+    getBudgetTierConfig(project.budgetTier),
+    // Only needed when the sheet is editable.
+    project.recommendation
+      ? prisma.equipment.findMany({
+          where: { active: true },
+          orderBy: [{ category: { sortOrder: 'asc' } }, { brand: 'asc' }],
+          select: { id: true, brand: true, model: true, category: { select: { slug: true } } },
+        })
+      : Promise.resolve([]),
+  ]);
   const hasScript = Boolean(project.script);
   const ready = Boolean(project.recommendation);
   // A run continues on the server with the page closed, so the client rejoins
@@ -150,6 +160,11 @@ export default async function ProjectPage({
             visualStyleTags: project.visualStyleTags,
           }}
           recommendation={project.recommendation}
+          catalog={catalogRows.map((row) => ({
+            id: row.id,
+            label: `${row.brand} ${row.model}`,
+            categorySlug: row.category.slug,
+          }))}
           scenes={project.script?.scenes ?? []}
           tierWindow={tierWindow}
           actions={

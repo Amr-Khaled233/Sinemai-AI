@@ -1,4 +1,5 @@
 import { prisma } from '@/lib/prisma';
+import { reportError } from '@/lib/observability';
 
 /**
  * Fixed-window rate limiting, backed by Postgres.
@@ -71,7 +72,8 @@ export async function consumeRateLimit(
     };
   } catch (error) {
     // Fail open: the limiter is a safeguard, not an authentication control.
-    console.error('[rate-limit] check failed, allowing request', error);
+    // Worth reporting though — a limiter that is silently off is a cost risk.
+    reportError(error, { scope: 'rate-limit', severity: 'warning', extra: { key } });
     return { allowed: true, remaining: 0, retryAfterSeconds: 0 };
   }
 }

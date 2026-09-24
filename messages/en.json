@@ -215,7 +215,15 @@
     "notes": "Sourcing notes",
     "tierWindow": "Declared tier window: {min} – {max}",
     "readOnly": "Read-only shared sheet",
-    "pages": "Script pages"
+    "pages": "Script pages",
+    "addItem": "Add equipment…",
+    "removeItem": "Remove",
+    "addedByYou": "Added by you",
+    "saveAndReprice": "Save and re-price",
+    "repriceHint": "Saving re-checks vendor stock and recalculates the budget. No model is called.",
+    "packageEmpty": "A package needs at least one item.",
+    "editedNotice": "You adjusted this package. The reviewer notes below refer to the version the agents produced.",
+    "editPackage": "Edit package"
   },
   "inquiry": {
     "title": "Send an inquiry",
@@ -422,7 +430,11 @@
     "unauthorized": "You do not have access to this page.",
     "copy": "Copy",
     "open": "Open",
-    "search": "Search"
+    "search": "Search",
+    "errorTitle": "Something went wrong",
+    "errorBody": "The page could not be loaded. The failure has been logged; trying again often works.",
+    "errorReference": "Reference",
+    "retry": "Try again"
   },
   "theme": {
     "system": "Theme: system",

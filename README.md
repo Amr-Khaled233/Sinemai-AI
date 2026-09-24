@@ -37,14 +37,24 @@ npm run db:setup              # pgvector extension → schema push → HNSW inde
 npm run dev
 ```
 
-`db:setup` runs four steps you can also run individually:
+`db:setup` is migrations followed by the seed:
 
 ```bash
-npm run db:extensions   # CREATE EXTENSION vector      (must run before push)
-npm run db:push         # Prisma schema → database
-npm run db:index        # HNSW cosine index on Dop.embedding
-npm run db:seed         # catalog, crew rates, style tags, launch partners, demo accounts
+npm run db:deploy   # applies prisma/migrations — includes the pgvector extension and HNSW index
+npm run db:seed     # catalog, crew rates, style tags, launch partners, demo accounts
 ```
+
+The schema is versioned as a migration history rather than pushed, so production
+has a record of what changed and a path back. Change the schema with
+`npm run db:migrate`, which writes a new migration; deploy applies them in order.
+
+An existing database created with the old `db push` flow is adopted with
+`npm run db:baseline`, which marks the initial migration as already applied
+instead of trying to recreate tables that are already there.
+
+The history is covered by a test: `tests/migration.test.ts` applies every migration to a
+real Postgres running in-process, so a migration that would not apply fails locally rather
+than at deploy time against the production database.
 
 ### Seeded accounts
 
@@ -142,6 +152,17 @@ its system prompt ([`src/agents/language.ts`](src/agents/language.ts)). Equipmen
 cinematographer match reasons, sourcing caveats, reviewer findings and the executive summary
 come back in Arabic on `/ar` and English on `/en`. Ids, enum values, numbers and equipment
 model names stay exactly as the database has them — the UI translates those itself.
+
+### Editing the package
+
+The agents propose, the producer decides. Quantities and rental days are editable on the sheet,
+items can be removed, and anything in the catalog can be added.
+
+Saving does not re-run the agent graph: the script has not changed, so there is nothing for a
+model to re-reason about. It re-queries vendor stock and crew rates and runs the same
+`priceProject` the agent used — instant, free, and arithmetically identical to a generated
+sheet, because both call one function. An edited sheet says so, since the reviewer signed off
+on the version the agents produced.
 
 ### Rejoining a run
 
@@ -361,3 +382,28 @@ Verified by sweeping 320 to 1920px in a real browser: measuring `scrollWidth` ag
 checking every table for overflow inside its own card, asserting that each column shares a pixel
 edge across all rows, and flagging any interactive element under 32px tall. Both themes and both
 languages were checked visually at phone, tablet and desktop size.
+
+---
+
+## Errors and logging
+
+Every server failure — in a page, a route handler or a server action — reaches one place:
+Next's `onRequestError` hook in [`src/instrumentation.ts`](src/instrumentation.ts), plus the
+`publicError` funnel that every server action already returns through.
+
+Reports are written as one JSON object per line to stdout, which Vercel and every log pipeline
+ingest as-is, and optionally POSTed to `ERROR_WEBHOOK_URL` (a Slack/Discord webhook or any
+collector). Nothing here is tied to a vendor: swapping in Sentry means changing one function.
+
+Two things matter more than the destination:
+
+- **Every report carries a short reference** shown to the user in the error boundary, so a
+  support message maps to exactly one log line.
+- **Nothing secret is ever written.** Payloads passing through this code include prompts,
+  connection strings and API keys, so values are pattern-redacted and any field *named* like a
+  credential is dropped whatever it holds. This is covered by tests.
+
+Failures are grouped by a fingerprint — the scope plus the message with ids, numbers and quoted
+values stripped — so the same fault across a thousand projects reads as one problem. The hash is
+FNV-1a rather than SHA-256 because it is a grouping key, not a signature, and the reporter has to
+run in the edge runtime as well as in node.

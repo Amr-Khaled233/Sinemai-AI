@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma';
 import { dopProfileSchema } from '@/lib/validation';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
+import { reportError } from '@/lib/observability';
 import { REVALIDATE, requireDopProfile, revalidate, runAction } from './shared';
 
 /**
@@ -60,7 +61,7 @@ export async function saveDopProfile(formData: FormData) {
       await writeDopEmbedding(dop.id, text, await embedText(text));
       embedded = true;
     } catch (error) {
-      console.warn('[dop:embed] deferred to cron', error);
+      reportError(error, { scope: 'dop:embed', severity: 'warning', userId: user.id });
     }
 
     revalidate(REVALIDATE.dopProfile);

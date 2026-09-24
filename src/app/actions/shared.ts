@@ -3,7 +3,7 @@ import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { auth } from '@/lib/auth';
-import { publicError } from '@/lib/security';
+import { publicError } from '@/lib/errors';
 
 /**
  * The shared spine of every server action.
