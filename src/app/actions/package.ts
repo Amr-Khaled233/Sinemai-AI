@@ -7,6 +7,7 @@ import { getSettings } from '@/lib/settings';
 import { priceProject } from '@/agents/vendor-budget-agent';
 import { getCrewDayRates, queryVendorInventory } from '@/agents/tools/vendor-tools';
 import type { BudgetBreakdown, EquipmentResult, PackageItem, SceneSummary } from '@/agents/types';
+import { snapshotRecommendation } from '@/lib/versions';
 import { REVALIDATE, requireOwnedProject, revalidate, runAction } from './shared';
 
 /**
@@ -119,6 +120,9 @@ export async function updateEquipmentPackage(projectId: string, items: PackageEd
       city: full.city,
       settings,
     });
+
+    // The sheet about to be replaced is worth keeping.
+    await snapshotRecommendation(projectId, 'PACKAGE_EDIT');
 
     await prisma.projectRecommendation.update({
       where: { projectId },

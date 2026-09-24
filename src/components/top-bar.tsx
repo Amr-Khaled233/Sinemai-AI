@@ -13,6 +13,7 @@ const NAV_BY_ROLE: Record<Role, NavLink[]> = {
     { href: '/producer', key: 'projects' },
     { href: '/producer/projects/new', key: 'newProject' },
     { href: '/producer/inquiries', key: 'inquiries' },
+    { href: '/producer/insights', key: 'insights' },
   ],
   VENDOR: [
     { href: '/vendor', key: 'dashboard' },

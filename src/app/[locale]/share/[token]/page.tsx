@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
-import { getBudgetTierConfig } from '@/lib/settings';
+import { getBudgetTierConfig, getSettings } from '@/lib/settings';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -26,8 +26,11 @@ export default async function SharedSheetPage({
               scenes: {
                 orderBy: { order: 'asc' },
                 select: {
+                  id: true,
                   order: true,
                   heading: true,
+                  // The schedule groups on the location slug.
+                  slug: true,
                   intExt: true,
                   timeOfDay: true,
                   lightingComplexity: true,
@@ -51,7 +54,10 @@ export default async function SharedSheetPage({
   // Fire-and-forget: a view counter must never block rendering the sheet.
   void prisma.shareLink.update({ where: { id: link.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
-  const tierWindow = await getBudgetTierConfig(link.project.budgetTier);
+  const [tierWindow, settings] = await Promise.all([
+    getBudgetTierConfig(link.project.budgetTier),
+    getSettings(),
+  ]);
 
   return (
     <ProductionSheet
@@ -60,14 +66,22 @@ export default async function SharedSheetPage({
       actions={
         // The token authorises the export too, so a recipient can download the
         // sheet without an account.
-        <a
-          href={`/api/projects/${link.project.id}/pdf?token=${token}&locale=${locale}`}
-          className="btn-secondary text-xs"
-          target="_blank"
-          rel="noreferrer"
-        >
-          PDF
-        </a>
+        <div className="flex flex-wrap gap-2">
+          <a
+            href={`/api/projects/${link.project.id}/pdf?token=${token}&locale=${locale}`}
+            className="btn-secondary text-xs"
+            target="_blank"
+            rel="noreferrer"
+          >
+            PDF
+          </a>
+          <a
+            href={`/api/projects/${link.project.id}/xlsx?token=${token}&locale=${locale}`}
+            className="btn-secondary text-xs"
+          >
+            XLSX
+          </a>
+        </div>
       }
       project={{
         id: link.project.id,
@@ -80,6 +94,7 @@ export default async function SharedSheetPage({
       recommendation={link.project.recommendation}
       scenes={link.project.script?.scenes ?? []}
       tierWindow={tierWindow}
+      shootDayHours={settings.shootDayHours}
     />
   );
 }

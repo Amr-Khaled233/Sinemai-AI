@@ -8,6 +8,7 @@ import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
 import { languageDirective, languageName } from './language';
+import { snapshotRecommendation } from '@/lib/versions';
 import type {
   CriticIssue,
   CriticResult,
@@ -576,6 +577,9 @@ async function writeExecutiveSummary(
 }
 
 async function persistSheet(projectId: string, sheet: ProductionSheet, locale: string) {
+  // Freeze whatever is being replaced, so the producer can see what changed.
+  await snapshotRecommendation(projectId, 'ANALYSIS');
+
   const data = {
     recommendedEquipmentIds: sheet.equipment.package.map((i) => i.equipmentId),
     equipmentPackage: sheet.equipment.package as unknown as Prisma.InputJsonValue,

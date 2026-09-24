@@ -22,8 +22,18 @@ export function ShareControls({
 
   return (
     <div className="flex flex-wrap items-center gap-2 max-sm:w-full [&>*]:max-sm:flex-1">
-      <a href={`/api/projects/${projectId}/pdf?locale=${locale}`} className="btn-secondary text-xs" target="_blank" rel="noreferrer">
+      <a
+        href={`/api/projects/${projectId}/pdf?locale=${locale}`}
+        className="btn-secondary text-xs"
+        target="_blank"
+        rel="noreferrer"
+      >
         {t('exportPdf')}
+      </a>
+
+      {/* A download, not a new tab: the browser saves it rather than trying to render it. */}
+      <a href={`/api/projects/${projectId}/xlsx?locale=${locale}`} className="btn-secondary text-xs">
+        {t('exportXlsx')}
       </a>
 
       {shareUrl ? (

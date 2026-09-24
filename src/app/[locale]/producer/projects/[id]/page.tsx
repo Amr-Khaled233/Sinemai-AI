@@ -2,12 +2,14 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { getBudgetTierConfig } from '@/lib/settings';
+import { getBudgetTierConfig, getSettings } from '@/lib/settings';
 import { Badge, Card, Stat } from '@/components/ui';
 import { ScriptUpload } from '@/components/producer/script-upload';
 import { AnalysisRunner } from '@/components/producer/analysis-runner';
 import { ShareControls } from '@/components/sheet/share-controls';
 import { DeleteProjectButton } from '@/components/producer/danger-zone';
+import { VersionHistory } from '@/components/sheet/version-compare';
+import { listVersions } from '@/lib/versions';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -40,6 +42,8 @@ export default async function ProjectPage({
             select: {
               order: true,
               heading: true,
+              slug: true,
+              id: true,
               intExt: true,
               timeOfDay: true,
               lightingComplexity: true,
@@ -60,8 +64,10 @@ export default async function ProjectPage({
   if (!project) notFound();
   if (project.ownerId !== session.user.id && session.user.role !== 'ADMIN') notFound();
 
-  const [tierWindow, catalogRows] = await Promise.all([
+  const [tierWindow, settings, versions, catalogRows] = await Promise.all([
     getBudgetTierConfig(project.budgetTier),
+    getSettings(),
+    listVersions(project.id),
     // Only needed when the sheet is editable.
     project.recommendation
       ? prisma.equipment.findMany({
@@ -167,6 +173,7 @@ export default async function ProjectPage({
           }))}
           scenes={project.script?.scenes ?? []}
           tierWindow={tierWindow}
+      shootDayHours={settings.shootDayHours}
           actions={
             <ShareControls
               projectId={project.id}
@@ -176,6 +183,8 @@ export default async function ProjectPage({
           }
         />
       )}
+
+      {ready && <VersionHistory projectId={project.id} versions={versions} locale={locale} />}
 
       <Card
         title={t('delete')}

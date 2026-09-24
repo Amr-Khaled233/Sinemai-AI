@@ -164,6 +164,45 @@ model to re-reason about. It re-queries vendor stock and crew rates and runs the
 sheet, because both call one function. An edited sheet says so, since the reviewer signed off
 on the version the agents produced.
 
+### The shooting schedule
+
+The sheet does not stop at a list of scenes. Scenes are grouped by call — day and night are
+separate units, because a crew cannot shoot both in one twelve-hour day — then by location, and
+filled into days up to the configured day length. Each day reports its locations, hours and page
+count, and the schedule flags what a first AD would flag: a day that runs over its hours, a day
+mixing day and night calls, company moves, and scenes carrying special requirements.
+
+It is a planning aid, not a call sheet: it has no cast availability, no daylight table and no
+travel times, so it is the starting point a scheduler edits rather than the final word.
+
+### Version history
+
+Every replacement of a sheet freezes the outgoing one first — a full re-analysis and a package
+edit both snapshot into `RecommendationVersion` — so "what did that change actually cost" has an
+answer. The compare view diffs a stored version against the live sheet: budget movement with a
+direction (a saving is green), the package line by line as added, removed, changed or untouched,
+and which cinematographers came and went. Snapshotting never fails the operation that triggered
+it; a lost snapshot is a missing history entry, not a failed analysis.
+
+### Spreadsheet export
+
+`GET /api/projects/:id/xlsx` returns a six-tab workbook — overview, scenes, schedule, equipment,
+vendors, budget — under the same access rules as the PDF: the owner, an admin, or anyone holding
+a live share token. Production managers work in spreadsheets, and a PDF is something they retype.
+
+Money is written as numbers with a currency format rather than as formatted strings, so the
+budget column still sums in Excel. Tab names and headers follow the reader's locale.
+
+### Producer insights
+
+`/producer/insights` answers the questions a producer asks across projects rather than inside
+one: how many sheets have been costed, what they total, the average budget, total shoot days,
+the share of night work, which equipment keeps coming back and how many rental days it accounts
+for, which cinematographers keep matching, and the budget band per project.
+
+It is counted from the sheets themselves, with no separate analytics table, so it is exactly as
+accurate as the sheets are — and a package edit shows up in it immediately.
+
 ### Rejoining a run
 
 The analysis keeps going on the server whether or not the page is open, so a producer who
@@ -190,15 +229,18 @@ reloaded page can rejoin a run already in flight.
 ### Tests
 
 ```bash
-npm test      # 60 unit tests, no database and no API calls
+npm test      # 109 unit tests, no database and no API calls
 npm run verify  # typecheck + lint + tests + parser smoke, the pre-push gate
 ```
 
 The suite covers the parts that are expensive to get wrong and cheap to check:
 screenplay segmentation across Fountain, Final Draft, pasted briefs and Arabic headings; the
 budget arithmetic (weekly rates, cheapest-vendor allocation, availability penalties, crew
-totals, uncovered items); scene aggregation; and the security gates (HTML escaping, href scheme
-validation, the upload allow-list, error-code hygiene).
+totals, uncovered items); scene aggregation; schedule packing and its warnings; the version
+diff; the workbook (generated, unzipped and its tab names asserted, because the library silently
+ignored the wrong key once); the migration history applied end to end in an in-process Postgres;
+and the security gates (HTML escaping, href scheme validation, the upload allow-list, error-code
+hygiene).
 
 The pure logic is deliberately separable from the database and the model so it can be tested
 directly — `aggregateScenes` takes its settings as arguments, and `allocatePackage` takes vendor
@@ -229,6 +271,9 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
   search use raw SQL in [`src/lib/embeddings.ts`](src/lib/embeddings.ts).
 - `ProjectRecommendation` stores the whole sheet (package, matches, budget breakdown, critic
   notes, model provenance) so it renders, exports and shares without re-running any agent.
+- `RecommendationVersion` is an append-only copy of a sheet as it stood before it was replaced,
+  keyed `(projectId, version)` and stamped with why it was superseded (a re-analysis or a hand
+  edit), which is what makes the compare view possible after the fact.
 - `Setting`, `CrewRate`, `BudgetTierConfig`, `StyleTag` are admin-editable and read by the agents
   at run time — the budget is never hard-coded in the source.
 

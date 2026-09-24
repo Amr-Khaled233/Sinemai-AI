@@ -361,13 +361,14 @@ model Project {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
 
-  owner          User                   @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   script         Script?
   recommendation ProjectRecommendation?
   inquiries      Inquiry[]
   agentRuns      AgentRun[]
   shareLinks     ShareLink[]
   analysisState  AnalysisState?
+  versions       RecommendationVersion[]
 
   @@index([ownerId])
   @@index([status])
@@ -590,6 +591,43 @@ model BudgetTierConfig {
   labelEn   String
   labelAr   String
   updatedAt DateTime   @updatedAt
+}
+
+/// A frozen copy of a sheet, taken before it is replaced.
+///
+/// Producers change the budget tier, re-run the analysis, or edit the package
+/// by hand, and then want to know what that actually cost them. Without a
+/// snapshot the previous answer is simply gone.
+model RecommendationVersion {
+  id        String  @id @default(cuid())
+  projectId String
+  /// 1 for the first generated sheet, incrementing on every replacement.
+  version   Int
+  /// Why this version was superseded: ANALYSIS or PACKAGE_EDIT.
+  reason    String
+  label     String?
+
+  equipmentPackage    Json
+  matchedDops         Json
+  matchedVendors      Json
+  budgetBreakdown     Json
+  sceneSummary        Json
+  estimatedBudgetLow  Int
+  estimatedBudgetMid  Int
+  estimatedBudgetHigh Int
+  currency            String     @default("SAR")
+  budgetTier          BudgetTier
+  criticPassed        Boolean    @default(true)
+  criticNotes         String[]   @default([])
+  rationaleText       String     @default("")
+
+  generatedAt DateTime
+  createdAt   DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, version])
+  @@index([projectId, createdAt])
 }
 
 /// Key/value platform settings (contingency %, default city, tier overage policy).

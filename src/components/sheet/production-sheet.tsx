@@ -4,6 +4,8 @@ import { Badge, Card, MeterBar, Stat } from '@/components/ui';
 import { MeterFill } from '@/components/motion';
 import { InquiryButton } from '@/components/sheet/inquiry-form';
 import { PackageEditor, type CatalogOption } from '@/components/sheet/package-editor';
+import { ScheduleView } from '@/components/sheet/schedule-view';
+import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';
 import type {
@@ -43,8 +45,11 @@ export type SheetRecommendation = {
 };
 
 export type SheetScene = {
+  id: string;
   order: number;
   heading: string;
+  /// Location taken from the slug line; the schedule groups on it.
+  slug: string | null;
   intExt: string | null;
   timeOfDay: string | null;
   lightingComplexity: string | null;
@@ -78,6 +83,7 @@ export async function ProductionSheet({
   readOnly = false,
   actions,
   catalog,
+  shootDayHours = 10,
 }: {
   locale: string;
   project: SheetProject;
@@ -88,6 +94,8 @@ export async function ProductionSheet({
   actions?: React.ReactNode;
   /** Catalog for the package editor; omitted on a shared, read-only sheet. */
   catalog?: CatalogOption[];
+  /** Hours per shoot day, from platform settings. */
+  shootDayHours?: number;
 }) {
   const [t, tEnum] = await Promise.all([getTranslations('sheet'), getTranslations('enum')]);
 
@@ -98,6 +106,7 @@ export async function ProductionSheet({
   const summary = (recommendation.sceneSummary as unknown as SceneSummary) ?? null;
   const models = Object.values((recommendation.modelVersions as Record<string, string>) ?? {});
   const money = (value: number) => formatMoney(value, locale, recommendation.currency);
+  const schedule = buildSchedule(scenes as ScheduleScene[], { shootDayHours });
   const categoryLabel = (slug: string) =>
     locale === 'ar' ? CATEGORY_LABELS[slug]?.ar ?? slug : CATEGORY_LABELS[slug]?.en ?? slug;
 
@@ -269,6 +278,8 @@ export async function ProductionSheet({
           </div>
         </Card>
       )}
+
+      <ScheduleView schedule={schedule} locale={locale} />
 
       {/* ---------------------------------------------------------- equipment */}
       <Card title={t('equipmentTitle')} subtitle={!readOnly && catalog ? t('repriceHint') : undefined}>

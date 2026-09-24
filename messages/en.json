@@ -19,7 +19,8 @@
     "dops": "Cinematographers",
     "settings": "Settings",
     "analytics": "Analytics",
-    "language": "العربية"
+    "language": "العربية",
+    "insights": "Insights"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -223,7 +224,26 @@
     "repriceHint": "Saving re-checks vendor stock and recalculates the budget. No model is called.",
     "packageEmpty": "A package needs at least one item.",
     "editedNotice": "You adjusted this package. The reviewer notes below refer to the version the agents produced.",
-    "editPackage": "Edit package"
+    "editPackage": "Edit package",
+    "exportXlsx": "Export spreadsheet",
+    "overview": "Overview",
+    "scheduleTab": "Schedule",
+    "project": "Project",
+    "type": "Type",
+    "tier": "Budget tier",
+    "style": "Visual style",
+    "nightPct": "Night scenes %",
+    "exteriorPct": "Exteriors %",
+    "currency": "Currency",
+    "number": "#",
+    "rationale": "Why this package",
+    "day": "Day",
+    "unit": "Call",
+    "dayHours": "Day hours",
+    "locations": "Locations",
+    "cinematographer": "Cinematographer",
+    "generatedLabel": "Generated",
+    "notesShort": "Notes"
   },
   "inquiry": {
     "title": "Send an inquiry",
@@ -440,5 +460,71 @@
     "system": "Theme: system",
     "dark": "Theme: dark",
     "light": "Theme: light"
+  },
+  "schedule": {
+    "title": "Shooting schedule",
+    "subtitle": "A first pass grouped by location and call, built from the scene hours.",
+    "days": "Shoot days",
+    "hours": "Total hours",
+    "companyMoves": "Company moves",
+    "nightDays": "Night units",
+    "day": "Day {number}",
+    "dayHours": "{hours}h",
+    "specialLabel": "Needs",
+    "note": "Derived from the breakdown, not fixed: change a scene and the schedule follows. Locations are grouped so the unit moves as little as possible, and day and night calls are never mixed.",
+    "warning": {
+      "mixed-call": "mixed call",
+      "over-hours": "over hours",
+      "company-moves": "moves",
+      "special": "special"
+    }
+  },
+  "versions": {
+    "title": "Sheet history",
+    "subtitle": "Every version kept when the sheet was replaced.",
+    "empty": "No earlier versions yet. One is kept each time the sheet is re-generated or the package is edited.",
+    "compare": "Compare",
+    "comparing": "{left} compared with {right}",
+    "backToSheet": "Back to the sheet",
+    "packageChanges": "Package changes",
+    "changedCount": "{count} lines changed",
+    "noPackageChange": "The package is unchanged.",
+    "before": "Before",
+    "after": "After",
+    "change": {
+      "added": "added",
+      "removed": "removed",
+      "changed": "changed",
+      "same": "unchanged"
+    },
+    "reason": {
+      "ANALYSIS": "re-analysed",
+      "PACKAGE_EDIT": "package edited"
+    }
+  },
+  "insights": {
+    "title": "Production insights",
+    "subtitle": "Counted from the sheets you have already generated",
+    "empty": "No finished sheets yet, so there is nothing to summarise.",
+    "startProject": "Start a project",
+    "projectsCosted": "Projects costed",
+    "totalValue": "Total value",
+    "averageBudget": "Average budget",
+    "shootDays": "Shoot days",
+    "nightShare": "Night scenes",
+    "topEquipment": "Most recommended equipment",
+    "topEquipmentHint": "Tallied across every costed sheet",
+    "projectCount": "{count, plural, one {# project} other {# projects}}",
+    "rentalDays": "{days, plural, one {# rental day} other {# rental days}}",
+    "projectMix": "Project mix",
+    "topDops": "Most matched cinematographers",
+    "byProject": "Budget by project",
+    "project": "Project",
+    "type": "Type",
+    "tier": "Tier",
+    "low": "Low",
+    "mid": "Mid",
+    "high": "High",
+    "note": "Figures come from each project’s current sheet, so a package edit shows up here straight away."
   }
 }
