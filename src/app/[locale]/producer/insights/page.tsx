@@ -8,6 +8,9 @@ import { formatDate, formatMoney } from '@/lib/utils';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary } from '@/agents/types';
 import type { AppLocale } from '@/i18n/routing';
 
+/** How many of the producer's most recent projects the summary reads. */
+const PROJECT_SCAN_LIMIT = 200;
+
 /**
  * What the producer's own history says about their work.
  *
@@ -24,6 +27,9 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
   const projects = await prisma.project.findMany({
     where: { ownerId: session.user.id },
     orderBy: { updatedAt: 'desc' },
+    // Each row carries the whole stored sheet, so the scan is capped. The
+    // footnote says so rather than quietly showing a partial total.
+    take: PROJECT_SCAN_LIMIT,
     select: {
       id: true,
       name: true,
@@ -227,7 +233,10 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
         </div>
       </Card>
 
-      <p className="px-1 text-[11px] leading-6 text-muted/70">{t('note')}</p>
+      <p className="px-1 text-[11px] leading-6 text-muted/70">
+        {t('note')}
+        {projects.length === PROJECT_SCAN_LIMIT ? ` ${t('capped', { count: PROJECT_SCAN_LIMIT })}` : ''}
+      </p>
     </div>
   );
 }

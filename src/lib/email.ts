@@ -76,6 +76,29 @@ export function approvalEmail(args: { name: string; approved: boolean; reason?: 
       );
 }
 
+/**
+ * The notice admins get when a vendor or cinematographer applies.
+ *
+ * The applicant chose their own name, so it is escaped like any other piece of
+ * user input: an unescaped one arrived in the admin's inbox as working HTML,
+ * which is a phishing link waiting to be clicked by the one account that can
+ * approve listings.
+ */
+export function applicationEmail(args: {
+  name: string;
+  email: string;
+  role: string;
+  reviewUrl: string;
+}) {
+  return shell(
+    `New ${escapeHtml(args.role.toLowerCase())} application`,
+    `<p><strong>${escapeHtml(args.name)}</strong> (${escapeHtml(args.email)}) applied as ${escapeHtml(
+      args.role,
+    )}.</p>
+     <p><a style="color:#4fd1c5" href="${args.reviewUrl}">Open the approval queue</a></p>`,
+  );
+}
+
 export function resetEmail(args: { name: string; locale: string; url: string; ttlMinutes: number }) {
   return args.locale === 'ar'
     ? shell(

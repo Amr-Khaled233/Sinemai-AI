@@ -229,7 +229,7 @@ reloaded page can rejoin a run already in flight.
 ### Tests
 
 ```bash
-npm test      # 109 unit tests, no database and no API calls
+npm test      # 192 unit tests, no database and no API calls
 npm run verify  # typecheck + lint + tests + parser smoke, the pre-push gate
 ```
 
@@ -241,6 +241,11 @@ diff; the workbook (generated, unzipped and its tab names asserted, because the 
 ignored the wrong key once); the migration history applied end to end in an in-process Postgres;
 and the security gates (HTML escaping, href scheme validation, the upload allow-list, error-code
 hygiene).
+
+Three of the suites audit the codebase rather than exercise it —
+[access control](tests/access-control.test.ts), [message scopes](tests/i18n-scopes.test.ts) and the
+error-code allow-list — because the failure they catch is an omission, and an omission has no test
+of its own to fail. Each one found a real defect on the day it was written.
 
 The pure logic is deliberately separable from the database and the model so it can be tested
 directly — `aggregateScenes` takes its settings as arguments, and `allocatePackage` takes vendor
@@ -354,21 +359,62 @@ against. Reset tokens are 256-bit, stored only as SHA-256 hashes, single use, an
 hour; requesting one answers identically whether or not the address exists.
 
 **Authorization.** Every page guards with `requireRole`, every server action re-checks ownership
-against the session (never a client-supplied id), and every route handler re-checks both. Share
-links are unguessable bearer tokens, scoped to one project, revocable, and validated against that
-project on both the page and the PDF export.
+against the session (never a client-supplied id), and every route handler re-checks both. "The
+owner, or an admin" is one predicate ([`mayReadProject`](src/lib/authz.ts)) rather than four copies
+of an expression, and posting is deliberately not covered by it: an admin may read a producer's
+sheet but does not send inquiries as them.
+
+Share links are unguessable bearer tokens (144 bits), scoped to one project, revocable, expiring,
+and compared in constant time. Both exports go through one gate —
+[`src/lib/sheet-export.ts`](src/lib/sheet-export.ts) — so who may download a sheet cannot end up
+meaning something different for the PDF than for the spreadsheet, which is exactly what two
+hand-maintained copies of the check invited.
+
+That the guards are *there* is checked mechanically: [`tests/access-control.test.ts`](tests/access-control.test.ts)
+walks the action layer and every route handler, and fails on one that reaches for neither a session
+nor a documented stand-in (a share token, the cron secret, NextAuth's own handler). A new action
+cannot quietly ship without a guard.
 
 **Injection and XSS.** Prisma parameterises everything, including the two raw pgvector queries,
-whose vector literal is built from validated numbers. React escapes the UI, but two places bypass
-it and are handled explicitly: HTML email bodies escape every user-supplied field, and anything
-rendered as an `href` is scheme-checked — `z.string().url()` accepts `javascript:`, `data:` and
-`vbscript:`, which would otherwise be stored XSS through a cinematographer's portfolio links.
-Uploads are extension- and MIME-checked (no SVG or HTML into a public blob origin).
+whose vector literal is built from validated numbers. React escapes the UI, but three places bypass
+it and are handled explicitly:
+
+- **Email.** Every template lives in [`src/lib/email.ts`](src/lib/email.ts) and escapes every
+  user-supplied field. One route used to build its HTML inline and interpolated the applicant's own
+  name into it, which put working markup in the inbox of the account that approves listings — a
+  phishing link in an email the admin already trusts. A test now fails on any `html:` template
+  literal written outside that module.
+- **Links.** Anything rendered as an `href` is scheme-checked: `z.string().url()` accepts
+  `javascript:`, `data:` and `vbscript:`, which would otherwise be stored XSS through a
+  cinematographer's portfolio links. The exports apply the same allow-list, so a hostile URL cannot
+  ride out inside a PDF or a spreadsheet cell either.
+- **Spreadsheet cells.** User text goes in as inline strings, never formulas, so a project named
+  `=HYPERLINK(...)` opens as text in Excel instead of executing. Asserted by unzipping a generated
+  workbook and checking no `<f>` element exists.
+
+Uploads are extension- and MIME-checked with a size cap (no SVG or HTML into a public blob origin).
 
 **Abuse and cost.** Rate limits live in Postgres, not memory, because serverless instances do not
 share state and a caller could otherwise cycle instances to reset a counter. Sign-in, password
 reset, registration, inquiries and — most importantly — analysis runs are all capped, since each
 run spends real money on model calls.
+
+Exports are capped too, which they were not: rendering a PDF is the heaviest thing the app does and
+a share link is a URL anyone can replay, so the limit is per project and per caller (share token,
+or IP). Checking whether a reset link is still live is capped as well — it answers a question about
+a secret, so it does not stay a free oracle.
+
+**What the browser is given.** Messages are scoped per area rather than shipped whole: the landing
+page used to serialise all 23 KB of the catalog into its HTML, so an anonymous reader could read the
+admin and vendor strings out of the page source. Now each area declares the namespaces its *client*
+components need ([`src/i18n/scopes.ts`](src/i18n/scopes.ts)) and the shell carries three. The
+landing page ships 1.3 KB and no admin strings.
+
+The risk in scoping is a namespace someone forgets, so
+[`tests/i18n-scopes.test.ts`](tests/i18n-scopes.test.ts) walks each page's real import graph, finds
+the client components it renders, and fails if one asks for a namespace its area does not serve —
+and also if an area serves one nothing under it uses. It found a real coupling immediately: the
+cinematographer's profile imported a picker out of the producer's form module.
 
 **Request integrity.** Server Actions get Next's built-in CSRF protection; route handlers do not,
 so every state-changing handler checks the request origin as well, behind the SameSite=Lax session
@@ -383,13 +429,21 @@ anything else is logged server-side and surfaces as a generic failure.
   runtime. Worth doing before a public launch.
 - **Registration confirms whether an email is taken.** A deliberate UX trade-off, softened by the
   per-IP limit. Closing it means accepting the signup silently and mailing the existing account.
-- **Two build-time advisories remain**: `postcss` bundled inside Next 15, and `deepmerge-ts` under
-  the Prisma CLI. Neither is reachable at runtime; both need a major upgrade (Next 16 / Prisma 7)
-  to clear.
+- **Five advisories remain, from two roots**: `postcss` bundled inside Next 15 (XSS in its CSS
+  stringifier, file read via `sourceMappingURL`) and `deepmerge-ts` under the Prisma CLI (stack
+  exhaustion). Both are build-time only — no request path reaches either, and the CSS and Prisma
+  config they process are ours — and both need a major upgrade (Next 16 / Prisma 7) to clear.
+  `npm audit` is therefore expected to be non-empty; read it, do not silence it.
 - **Password policy is length-only** (8 characters). No breach-list check.
 - **Agent logs store script text.** `AgentRun.input` keeps the prompts, which include scene
   content. That is what makes the pipeline debuggable; treat the table as customer data and set a
   retention policy.
+- **Share tokens travel in the URL.** That is what makes a share link a link, but it means they
+  reach proxy logs and browser history. They are revocable and expiring; treat a leaked link as a
+  leaked sheet and revoke it.
+- **`production-sheet.tsx` is still one 580-line component** of six independent cards. Splitting it
+  is worthwhile and was left alone deliberately: without a database to render against, a JSX split
+  that typechecks is not a split that has been seen to work.
 
 ---
 

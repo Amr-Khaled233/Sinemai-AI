@@ -1,4 +1,5 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { safeHttpUrls } from '@/lib/security';
 import { fontsFor, registerPdfFonts } from './fonts';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
@@ -243,7 +244,7 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
                 </Text>
                 <Text style={styles.body}>{dop.reason}</Text>
                 {dop.portfolioLinks.length > 0 && (
-                  <Text style={[styles.body, { color: '#0f766e' }]}>{dop.portfolioLinks.join('  ·  ')}</Text>
+                  <Text style={[styles.body, { color: '#0f766e' }]}>{safeHttpUrls(dop.portfolioLinks).join('  ·  ')}</Text>
                 )}
               </View>
             ))

@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
 import { notFound } from 'next/navigation';
-import { NextIntlClientProvider } from 'next-intl';
-import { getMessages, setRequestLocale } from 'next-intl/server';
+import { setRequestLocale } from 'next-intl/server';
+import { ShellMessages } from '@/i18n/message-scope';
 import { locales, dirFor, type AppLocale } from '@/i18n/routing';
 import { Providers } from '@/components/providers';
 import { TopBar } from '@/components/top-bar';
@@ -30,7 +30,6 @@ export default async function LocaleLayout({
   if (!(locales as readonly string[]).includes(locale)) notFound();
 
   setRequestLocale(locale as AppLocale);
-  const messages = await getMessages();
 
   return (
     <html lang={locale} dir={dirFor(locale)} suppressHydrationWarning>
@@ -39,7 +38,7 @@ export default async function LocaleLayout({
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="min-h-dvh">
-        <NextIntlClientProvider messages={messages}>
+        <ShellMessages>
           <Providers>
             <TopBar locale={locale} />
             <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:py-10">{children}</main>
@@ -47,7 +46,7 @@ export default async function LocaleLayout({
               Sinemai AI · سينمائي — production intelligence for film &amp; advertising.
             </footer>
           </Providers>
-        </NextIntlClientProvider>
+        </ShellMessages>
       </body>
     </html>
   );

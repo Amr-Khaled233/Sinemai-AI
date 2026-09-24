@@ -174,4 +174,27 @@ describe('spreadsheet export', () => {
     const xml = (await zip.files.find((f) => f.path === 'xl/workbook.xml')!.buffer()).toString('utf8');
     assert.match(xml, /name="Scenes"/);
   });
+
+  it('writes attacker-controlled text as text, never as a formula', async () => {
+    // A project name is user input, and a sheet is shared with third parties.
+    // If it landed in the cell as a formula, opening the file would run it.
+    const data = workbookData('en');
+    data.projectName = '=HYPERLINK("http://evil.example","click")';
+    data.equipmentRationale = '@SUM(A1:A9)';
+    data.criticNotes = ['+1+1', '-2-2'];
+
+    const zip = await unzipper.Open.buffer(await buildWorkbook(data));
+    for (const file of zip.files) {
+      if (!/^xl\/worksheets\/sheet\d+\.xml$/.test(file.path)) continue;
+      const xml = (await file.buffer()).toString('utf8');
+      assert.ok(!/<f>/.test(xml), `${file.path} contains a formula element`);
+    }
+
+    const shared = zip.files.find((f) => f.path === 'xl/sharedStrings.xml')!;
+    const strings = (await shared.buffer()).toString('utf8');
+    // It survives intact as a shared string — which is exactly why Excel shows
+    // it instead of evaluating it — rather than being dropped or rewritten.
+    assert.match(strings, /<t>=HYPERLINK\("http:\/\/evil\.example","click"\)<\/t>/);
+    assert.match(strings, /<t>@SUM\(A1:A9\)<\/t>/);
+  });
 });

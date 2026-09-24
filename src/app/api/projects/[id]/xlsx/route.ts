@@ -1,11 +1,14 @@
-import { Role } from '@prisma/client';
-import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
 import { getSettings } from '@/lib/settings';
 import { buildWorkbook, type WorkbookLabels } from '@/lib/workbook';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { pdfEnum } from '@/pdf/labels';
-import { normaliseLocale } from '@/agents/language';
+import {
+  authoriseExport,
+  exportFileName,
+  exportLocale,
+  loadSheetForExport,
+  throttleExport,
+} from '@/lib/sheet-export';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 import messagesAr from '../../../../../../messages/ar.json';
 import messagesEn from '../../../../../../messages/en.json';
@@ -14,59 +17,25 @@ export const runtime = 'nodejs';
 export const maxDuration = 60;
 
 /**
- * Spreadsheet export. Same access rules as the PDF: the owner, an admin, or
- * anyone holding a live share token.
+ * Spreadsheet export. Access, language and throttling come from
+ * `@/lib/sheet-export`, shared with the PDF route.
  */
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
   const url = new URL(request.url);
   const token = url.searchParams.get('token');
 
-  const project = await prisma.project.findUnique({
-    where: { id },
-    include: {
-      recommendation: true,
-      shareLinks: { where: { revoked: false }, select: { token: true, expiresAt: true } },
-      script: {
-        select: {
-          scenes: {
-            orderBy: { order: 'asc' },
-            select: {
-              id: true,
-              order: true,
-              heading: true,
-              slug: true,
-              intExt: true,
-              timeOfDay: true,
-              lightingComplexity: true,
-              lightingNotes: true,
-              cameraMovement: true,
-              estimatedHours: true,
-              specialRequirements: true,
-            },
-          },
-        },
-      },
-    },
-  });
+  const project = await loadSheetForExport(id, token);
+  if (!project) return new Response('Not found', { status: 404 });
 
-  if (!project?.recommendation) return new Response('Not found', { status: 404 });
+  const denied = await authoriseExport(project);
+  if (denied) return denied;
 
-  const validToken =
-    token &&
-    project.shareLinks.some(
-      (link) => link.token === token && (!link.expiresAt || link.expiresAt > new Date()),
-    );
+  const throttled = await throttleExport(request, id, 'xlsx', token);
+  if (throttled) return throttled;
 
-  if (!validToken) {
-    const session = await auth();
-    const allowed =
-      session?.user && (session.user.id === project.ownerId || session.user.role === Role.ADMIN);
-    if (!allowed) return new Response('Forbidden', { status: 403 });
-  }
-
-  const recommendation = project.recommendation;
-  const locale = normaliseLocale(url.searchParams.get('locale') ?? recommendation.locale);
+  const { recommendation } = project;
+  const locale = exportLocale(url, recommendation.locale);
   const settings = await getSettings();
   const scenes = project.script?.scenes ?? [];
 
@@ -119,12 +88,12 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     criticNotes: recommendation.criticNotes,
   });
 
-  const fileName = `sinemai-${project.name.replace(/[^\w؀-ۿ-]+/g, '-').slice(0, 60)}.xlsx`;
-
   return new Response(new Uint8Array(buffer), {
     headers: {
       'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'content-disposition': `attachment; filename="${encodeURIComponent(fileName)}"`,
+      'content-disposition': `attachment; filename="${encodeURIComponent(
+        exportFileName(project.name, 'xlsx'),
+      )}"`,
       'cache-control': 'no-store',
     },
   });

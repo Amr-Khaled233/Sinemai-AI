@@ -1,5 +1,6 @@
-import { AnalysisStage, Role } from '@prisma/client';
+import { AnalysisStage } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
+import { mayReadProject } from '@/lib/authz';
 import { auth } from '@/lib/auth';
 import { advanceAnalysis, beginAnalysis } from '@/agents/orchestrator';
 import { normaliseLocale } from '@/agents/language';
@@ -42,7 +43,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   });
 
   if (!project) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
-  if (project.ownerId !== session.user.id && session.user.role !== Role.ADMIN) {
+  if (!mayReadProject(project, session.user)) {
     return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
   if (!project.script) return Response.json({ error: 'NO_SCRIPT' }, { status: 400 });
@@ -125,7 +126,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     select: { ownerId: true, analysisState: true },
   });
   if (!project) return Response.json({ error: 'NOT_FOUND' }, { status: 404 });
-  if (project.ownerId !== session.user.id && session.user.role !== Role.ADMIN) {
+  if (!mayReadProject(project, session.user)) {
     return Response.json({ error: 'FORBIDDEN' }, { status: 403 });
   }
 

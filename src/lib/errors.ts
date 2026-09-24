@@ -17,6 +17,7 @@ const SAFE_ERROR_CODES = new Set([
   'RATE_LIMITED',
   'EMAIL_TAKEN',
   'INQUIRY_CLOSED',
+  'PACKAGE_EMPTY',
 ]);
 
 /**

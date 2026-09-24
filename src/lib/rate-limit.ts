@@ -23,6 +23,12 @@ export const LIMITS = {
   login: { limit: 8, windowMs: 10 * 60_000 },
   /** Password reset requests per email, and per IP, to prevent mail bombing. */
   passwordReset: { limit: 5, windowMs: 30 * 60_000 },
+  /**
+   * Checking whether a reset link is still live. Looser than requesting one,
+   * because the reset page asks on every load and several people can share an
+   * IP — but capped, since it answers a question about a secret.
+   */
+  resetCheck: { limit: 30, windowMs: 10 * 60_000 },
   /** New accounts per IP. */
   register: { limit: 5, windowMs: 60 * 60_000 },
   /** Inquiries per producer — this sends mail to third parties. */
@@ -31,6 +37,12 @@ export const LIMITS = {
   analysis: { limit: 12, windowMs: 60 * 60_000 },
   /** Slices of an in-flight analysis; generous, since one run needs several. */
   analysisStep: { limit: 200, windowMs: 60 * 60_000 },
+  /**
+   * Sheet exports per project, per caller. Rendering a PDF or building a
+   * workbook is the heaviest thing an unauthenticated share-link holder can
+   * ask for, so replaying that URL in a loop is capped.
+   */
+  export: { limit: 30, windowMs: 10 * 60_000 },
 } as const;
 
 export async function consumeRateLimit(

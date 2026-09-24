@@ -4,53 +4,10 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { createProject } from '@/app/actions/projects';
 import { Field, Input, Select, Textarea } from '@/components/ui';
-
-type StyleTag = { slug: string; labelEn: string; labelAr: string };
+import { StyleTagPicker, type StyleTag } from '@/components/style-tag-picker';
 
 const TYPES = ['COMMERCIAL', 'SHORT_FILM', 'SERIES', 'FEATURE', 'DOCUMENTARY'] as const;
 const TIERS = ['LOW', 'MEDIUM', 'HIGH'] as const;
-
-export function StyleTagPicker({
-  tags,
-  locale,
-  selected,
-  onChange,
-  name = 'visualStyleTags',
-}: {
-  tags: StyleTag[];
-  locale: string;
-  selected: string[];
-  onChange: (next: string[]) => void;
-  name?: string;
-}) {
-  const toggle = (slug: string) => {
-    onChange(selected.includes(slug) ? selected.filter((s) => s !== slug) : [...selected, slug].slice(0, 8));
-  };
-
-  return (
-    <>
-      <div className="flex flex-wrap gap-2">
-        {tags.map((tag) => {
-          const on = selected.includes(tag.slug);
-          return (
-            <button
-              key={tag.slug}
-              type="button"
-              onClick={() => toggle(tag.slug)}
-              className={`chip transition-colors ${on ? 'chip-on' : 'hover:border-accent/60'}`}
-              aria-pressed={on}
-            >
-              {locale === 'ar' ? tag.labelAr : tag.labelEn}
-            </button>
-          );
-        })}
-      </div>
-      {selected.map((slug) => (
-        <input key={slug} type="hidden" name={name} value={slug} />
-      ))}
-    </>
-  );
-}
 
 export function ProjectForm({
   locale,

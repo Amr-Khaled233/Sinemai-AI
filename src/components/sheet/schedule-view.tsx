@@ -14,7 +14,7 @@ const WARNING_TONE = {
  * The schedule is derived from the breakdown, not stored: it is a reading of
  * the scene data, so it stays correct when a scene's hours change.
  */
-export async function ScheduleView({ schedule, locale }: { schedule: Schedule; locale: string }) {
+export async function ScheduleView({ schedule }: { schedule: Schedule }) {
   const [t, tEnum] = await Promise.all([getTranslations('schedule'), getTranslations('enum')]);
 
   if (schedule.days.length === 0) return null;

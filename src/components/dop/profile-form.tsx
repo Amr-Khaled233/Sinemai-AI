@@ -5,7 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { saveDopProfile } from '@/app/actions/dop';
 import { Field, Input, Textarea } from '@/components/ui';
-import { StyleTagPicker } from '@/components/producer/project-form';
+import { StyleTagPicker } from '@/components/style-tag-picker';
 
 type StyleTag = { slug: string; labelEn: string; labelAr: string };
 

@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
+import { sheetScenesArg } from '@/lib/sheet-query';
 import { getBudgetTierConfig, getSettings } from '@/lib/settings';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import type { AppLocale } from '@/i18n/routing';
@@ -23,23 +24,7 @@ export default async function SharedSheetPage({
           recommendation: true,
           script: {
             select: {
-              scenes: {
-                orderBy: { order: 'asc' },
-                select: {
-                  id: true,
-                  order: true,
-                  heading: true,
-                  // The schedule groups on the location slug.
-                  slug: true,
-                  intExt: true,
-                  timeOfDay: true,
-                  lightingComplexity: true,
-                  lightingNotes: true,
-                  cameraMovement: true,
-                  specialRequirements: true,
-                  estimatedHours: true,
-                },
-              },
+              scenes: sheetScenesArg,
             },
           },
         },

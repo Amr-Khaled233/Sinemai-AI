@@ -1,8 +1,4 @@
 {
-  "brand": {
-    "name": "Sinemai AI",
-    "tagline": "Production intelligence for film and advertising"
-  },
   "nav": {
     "home": "Home",
     "login": "Sign in",
@@ -525,6 +521,7 @@
     "low": "Low",
     "mid": "Mid",
     "high": "High",
-    "note": "Figures come from each project’s current sheet, so a package edit shows up here straight away."
+    "note": "Figures come from each project’s current sheet, so a package edit shows up here straight away.",
+    "capped": "Showing your {count} most recent projects."
   }
 }

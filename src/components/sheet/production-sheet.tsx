@@ -279,7 +279,7 @@ export async function ProductionSheet({
         </Card>
       )}
 
-      <ScheduleView schedule={schedule} locale={locale} />
+      <ScheduleView schedule={schedule} />
 
       {/* ---------------------------------------------------------- equipment */}
       <Card title={t('equipmentTitle')} subtitle={!readOnly && catalog ? t('repriceHint') : undefined}>

@@ -3,7 +3,7 @@ import { hash } from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { registerSchema } from '@/lib/validation';
-import { sendEmail } from '@/lib/email';
+import { applicationEmail, sendEmail } from '@/lib/email';
 import { clientIp, consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
 import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 
@@ -67,10 +67,18 @@ export async function POST(request: Request) {
   if (data.role !== Role.PRODUCER) {
     const admins = await prisma.user.findMany({ where: { role: Role.ADMIN }, select: { email: true } });
     if (admins.length) {
+      const origin = new URL(request.url).origin;
       await sendEmail({
         to: admins.map((a) => a.email),
-        subject: `New ${data.role.toLowerCase()} application: ${data.name}`,
-        html: `<p>${data.name} (${email}) applied as ${data.role}. Review it in the admin approval queue.</p>`,
+        // The subject is plain text in Resend's JSON payload, but a name with a
+        // newline in it has no business in a header either.
+        subject: `New ${data.role.toLowerCase()} application: ${data.name.replace(/\s+/g, ' ').slice(0, 80)}`,
+        html: applicationEmail({
+          name: data.name,
+          email,
+          role: data.role,
+          reviewUrl: `${origin}/${data.locale}/admin/${data.role === Role.VENDOR ? 'vendors' : 'dops'}`,
+        }),
       });
     }
   }

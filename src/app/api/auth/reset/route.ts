@@ -30,6 +30,11 @@ export async function POST(request: Request) {
 
 /** Lets the reset page tell the user a link is dead before they type a password. */
 export async function GET(request: Request) {
+  // This answers "is this token live?", so it is throttled like the submit —
+  // otherwise it is a free oracle for anyone testing tokens in bulk.
+  const limit = await consumeRateLimit(`reset:check:${clientIp(request)}`, LIMITS.resetCheck);
+  if (!limit.allowed) return rateLimitResponse(limit);
+
   const token = new URL(request.url).searchParams.get('token') ?? '';
   const lookup = await lookupResetToken(token);
   return Response.json(lookup.ok ? { valid: true } : { valid: false, reason: lookup.reason });

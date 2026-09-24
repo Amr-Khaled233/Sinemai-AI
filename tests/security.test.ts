@@ -1,5 +1,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import { applicationEmail } from '../src/lib/email';
 import {
   escapeHtml,
   escapeHtmlMultiline,
@@ -69,4 +72,45 @@ describe('upload gate', () => {
       assert.equal(isAllowedUpload(kind, name, type), expected);
     });
   }
+});
+
+describe('outbound email', () => {
+  it('escapes an applicant name so mail HTML cannot be injected', () => {
+    const html = applicationEmail({
+      name: '<a href="https://evil.example">Approve now</a>',
+      email: 'a@b.test',
+      role: 'VENDOR',
+      reviewUrl: 'https://app.test/ar/admin/vendors',
+    });
+    assert.ok(!html.includes('<a href="https://evil.example"'), 'an injected anchor survived');
+    assert.match(html, /&lt;a href=&quot;https:\/\/evil\.example&quot;&gt;/);
+  });
+
+  it('escapes the applicant email too', () => {
+    const html = applicationEmail({
+      name: 'Faisal',
+      email: '"><img src=x onerror=alert(1)>@b.test',
+      role: 'DOP',
+      reviewUrl: 'https://app.test/ar/admin/dops',
+    });
+    assert.ok(!html.includes('<img'), 'an injected image tag survived');
+  });
+
+  it('builds no mail HTML outside the email module', () => {
+    // Every template lives in one place, where escaping is the default.
+    const offenders: string[] = [];
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (/\.tsx?$/.test(entry.name) && full !== path.join(process.cwd(), 'src', 'lib', 'email.ts')) {
+          const source = fs.readFileSync(full, 'utf8');
+          // A template literal assigned to `html:` is mail markup built by hand.
+          if (/html:\s*`/.test(source)) offenders.push(path.relative(process.cwd(), full));
+        }
+      }
+    };
+    walk(path.join(process.cwd(), 'src'));
+    assert.deepEqual(offenders, [], `mail HTML built outside src/lib/email.ts: ${offenders.join(', ')}`);
+  });
 });

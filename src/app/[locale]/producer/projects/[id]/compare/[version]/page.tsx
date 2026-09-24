@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { mayReadProject } from '@/lib/authz';
 import { loadComparison } from '@/lib/versions';
 import { VersionComparison } from '@/components/sheet/version-compare';
 import type { AppLocale } from '@/i18n/routing';
@@ -21,7 +22,7 @@ export default async function ComparePage({
     select: { id: true, name: true, ownerId: true },
   });
   if (!project) notFound();
-  if (project.ownerId !== session.user.id && session.user.role !== 'ADMIN') notFound();
+  if (!mayReadProject(project, session.user)) notFound();
 
   const versionNumber = Number(version);
   if (!Number.isInteger(versionNumber) || versionNumber < 1) notFound();

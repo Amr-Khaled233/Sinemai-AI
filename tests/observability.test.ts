@@ -1,5 +1,7 @@
 import { describe, it, mock } from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
 import { fingerprint, redact, reportError } from '../src/lib/observability';
 
 /** Captures what the reporter writes, so the log line itself can be asserted. */
@@ -144,5 +146,67 @@ describe('error hygiene', () => {
     assert.equal(lines.length, 1);
     // The connection string must not survive into the log.
     assert.ok(!lines[0].includes('u:p@h'), lines[0]);
+  });
+});
+
+const SAFE_CODES = new Set(
+  [...fs.readFileSync(path.join(process.cwd(), 'src', 'lib', 'errors.ts'), 'utf8').matchAll(/^  '([A-Z_]+)',$/gm)].map(
+    (match) => match[1],
+  ),
+);
+
+describe('error codes the user is meant to see', () => {
+  /**
+   * The actions layer talks to the browser only through `publicError`, so a code
+   * it throws that is not allow-listed reaches the UI as UNEXPECTED_ERROR — and
+   * gets reported as a fault. `PACKAGE_EMPTY` did exactly that: the editor
+   * checked for it, the user got a generic failure, and every emptied package
+   * landed in error monitoring.
+   */
+  const actionCodes = () => {
+    const dir = path.join(process.cwd(), 'src', 'app', 'actions');
+    const codes = new Set<string>();
+    for (const file of fs.readdirSync(dir)) {
+      if (!file.endsWith('.ts')) continue;
+      const source = fs.readFileSync(path.join(dir, file), 'utf8');
+      for (const match of source.matchAll(/throw new Error\('([A-Z_]+)'\)/g)) codes.add(match[1]);
+    }
+    return codes;
+  };
+
+  it('allow-lists every code the actions layer throws', async () => {
+    const { publicError } = await import('../src/lib/errors');
+    for (const code of actionCodes()) {
+      assert.equal(
+        publicError(new Error(code), 'test'),
+        code,
+        `${code} is thrown by a server action but is not allow-listed, so the user sees UNEXPECTED_ERROR`,
+      );
+    }
+  });
+
+  it('allow-lists every code a component branches on', () => {
+    const handled = new Set<string>();
+    const walk = (dir: string) => {
+      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+        const full = path.join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith('.tsx')) {
+          const source = fs.readFileSync(full, 'utf8');
+          for (const match of source.matchAll(/error === '([A-Z_]+)'/g)) handled.add(match[1]);
+        }
+      }
+    };
+    walk(path.join(process.cwd(), 'src'));
+
+    // UNAUTHORIZED and EMAIL_TAKEN come from route handlers, which return their
+    // own JSON; the rest must survive publicError.
+    assert.ok(handled.size > 0, 'found no error branches at all, so this test proves nothing');
+    for (const code of handled) {
+      assert.ok(
+        SAFE_CODES.has(code),
+        `a component branches on "${code}" but it is not an allow-listed code`,
+      );
+    }
   });
 });

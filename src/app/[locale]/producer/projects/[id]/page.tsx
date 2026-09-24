@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { mayReadProject } from '@/lib/authz';
+import { sheetScenesArg } from '@/lib/sheet-query';
 import { getBudgetTierConfig, getSettings } from '@/lib/settings';
 import { Badge, Card, Stat } from '@/components/ui';
 import { ScriptUpload } from '@/components/producer/script-upload';
@@ -37,22 +39,7 @@ export default async function ProjectPage({
           parsedFormat: true,
           sceneCount: true,
           pageCount: true,
-          scenes: {
-            orderBy: { order: 'asc' },
-            select: {
-              order: true,
-              heading: true,
-              slug: true,
-              id: true,
-              intExt: true,
-              timeOfDay: true,
-              lightingComplexity: true,
-              lightingNotes: true,
-              cameraMovement: true,
-              specialRequirements: true,
-              estimatedHours: true,
-            },
-          },
+          scenes: sheetScenesArg,
         },
       },
       recommendation: true,
@@ -62,7 +49,7 @@ export default async function ProjectPage({
   });
 
   if (!project) notFound();
-  if (project.ownerId !== session.user.id && session.user.role !== 'ADMIN') notFound();
+  if (!mayReadProject(project, session.user)) notFound();
 
   const [tierWindow, settings, versions, catalogRows] = await Promise.all([
     getBudgetTierConfig(project.budgetTier),
