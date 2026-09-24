@@ -262,87 +262,230 @@
 
   /* ---------------------------------------------------------------- tables */
 
+  /**
+   * Grid tables.
+   *
+   * The table element stays for semantics and screen readers, but the layout is
+   * CSS Grid: `thead`, `tbody` and `tr` are `display: contents`, so every cell
+   * becomes a direct grid item of the table itself. Columns are declared once,
+   * in one place, through the `--grid-cols` custom property:
+   *
+   *   <table className="grid-table [--grid-cols:8rem_minmax(10rem,2fr)_5rem]">
+   *
+   * Why not the native table algorithm: it sizes columns from their content, so
+   * the same column lands at a different width on every screen, one long string
+   * of prose drags its column wide and starves the rest, and the only way to
+   * push back is a pile of per-cell width utilities that then fight each other.
+   * A grid template is explicit, identical on every row, and honours minmax() so
+   * a column can shrink without collapsing.
+   *
+   * Stacking is driven by a container query, not the viewport, because what
+   * matters is whether the columns fit *this table's own box* — the crew table
+   * sits in a half-width column and needs to stack long before the page does.
+   * Below its threshold each row becomes a labelled card, which is the only
+   * readable form on a phone; every cell needs `data-label` for its heading to
+   * survive that transform.
+   *
+   * Three thresholds, each set above the sum of that tier's column minimums so
+   * a table never has to scroll sideways inside its own card:
+   *   compact 36rem — few short columns (crew, vendor line items)
+   *   default 48rem — five or six columns
+   *   wide    60rem — the seven and eight column tables
+   */
   .table-wrap {
     @apply overflow-x-auto rounded-2xl border border-line bg-surface/50;
+    container-type: inline-size;
+    container-name: tablewrap;
   }
 
-  .table {
-    @apply w-full min-w-[40rem] border-collapse text-start text-sm;
+  /* Narrow container: labelled cards. This is the default, so a browser without
+     container query support still gets a readable layout. */
+  .grid-table {
+    @apply block w-full min-w-0 text-start text-sm;
   }
 
-  /**
-   * A table with eight columns cannot be read on a 375px screen, and sideways
-   * scrolling inside a card hides data people do not know is there. Tables
-   * marked `table-stack` turn each row into a labelled card below md and
-   * become a normal table again above it.
-   *
-   * Every cell needs data-label="…" for its heading to survive the transform.
-   */
-  @media (max-width: 767px) {
-    .table-stack {
-      @apply block min-w-0 text-sm;
+  .grid-table thead {
+    @apply hidden;
+  }
+
+  .grid-table tbody,
+  .grid-table tr,
+  .grid-table td {
+    @apply block w-full;
+  }
+
+  .grid-table tr {
+    @apply mb-2.5 rounded-xl border border-line bg-surface/60 p-3;
+  }
+
+  .grid-table tr:last-child {
+    @apply mb-0;
+  }
+
+  .grid-table td {
+    @apply flex items-baseline justify-between gap-4 border-0 px-0 py-1.5 text-start;
+  }
+
+  .grid-table td::before {
+    content: attr(data-label);
+    @apply shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted;
+  }
+
+  /* A cell with no label is a full-width block (actions, long prose). */
+  .grid-table td:not([data-label])::before {
+    @apply hidden;
+  }
+
+  .grid-table td:not([data-label]) {
+    @apply block;
+  }
+
+  @container tablewrap (min-width: 36rem) {
+    .grid-table.grid-table-compact {
+      display: grid;
+      grid-template-columns: var(--grid-cols, repeat(auto-fit, minmax(0, 1fr)));
+      align-items: stretch;
     }
 
-    .table-stack thead {
-      @apply hidden;
+    .grid-table.grid-table-compact thead,
+    .grid-table.grid-table-compact tbody,
+    .grid-table.grid-table-compact tr {
+      display: contents;
     }
 
-    .table-stack tbody,
-    .table-stack tr,
-    .table-stack td {
-      @apply block w-full;
+    .grid-table.grid-table-compact th {
+      @apply sticky top-0 z-10 flex items-end border-b border-line bg-surface-raised/95 px-3.5 py-3
+        text-start text-xs font-semibold uppercase tracking-wider text-muted backdrop-blur;
     }
 
-    .table-stack tr {
-      @apply mb-2.5 rounded-xl border border-line bg-surface/60 p-3;
+    .grid-table.grid-table-compact th.text-end {
+      @apply justify-end;
     }
 
-    .table-stack tr:last-child {
-      @apply mb-0;
+    .grid-table.grid-table-compact td {
+      @apply block min-w-0 border-b border-line/60 px-3.5 py-3 transition-colors duration-150;
     }
 
-    .table-stack td {
-      @apply flex items-baseline justify-between gap-4 border-0 px-0 py-1.5 text-start;
+    .grid-table.grid-table-compact td::before {
+      content: none;
     }
 
-    .table-stack td::before {
-      content: attr(data-label);
-      @apply shrink-0 text-[11px] font-medium uppercase tracking-wider text-muted;
+    .grid-table.grid-table-compact tbody tr {
+      @apply mb-0 rounded-none border-0 bg-transparent p-0;
     }
 
-    /* A cell with no label is a full-width block (actions, long prose). */
-    .table-stack td:not([data-label])::before {
-      @apply hidden;
+    .grid-table.grid-table-compact tbody tr:hover td {
+      @apply bg-accent/[0.04];
     }
 
-    .table-stack td:not([data-label]) {
-      @apply block;
+    .grid-table.grid-table-compact tbody tr:last-child td {
+      @apply border-b-0;
+    }
+  }
+
+  @container tablewrap (min-width: 48rem) {
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) {
+      display: grid;
+      grid-template-columns: var(--grid-cols, repeat(auto-fit, minmax(0, 1fr)));
+      align-items: stretch;
     }
 
-    .table-stack td.cell-empty {
-      @apply hidden;
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) thead,
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody,
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) tr {
+      display: contents;
     }
 
-    .table-wrap:has(.table-stack) {
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) th {
+      @apply sticky top-0 z-10 flex items-end border-b border-line bg-surface-raised/95 px-3.5 py-3
+        text-start text-xs font-semibold uppercase tracking-wider text-muted backdrop-blur;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) th.text-end {
+      @apply justify-end;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) td {
+      @apply block min-w-0 border-b border-line/60 px-3.5 py-3 transition-colors duration-150;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) td::before {
+      content: none;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr {
+      @apply mb-0 rounded-none border-0 bg-transparent p-0;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr:hover td {
+      @apply bg-accent/[0.04];
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr:last-child td {
+      @apply border-b-0;
+    }
+  }
+
+  @container tablewrap (min-width: 60rem) {
+    .grid-table.grid-table-wide {
+      display: grid;
+      grid-template-columns: var(--grid-cols, repeat(auto-fit, minmax(0, 1fr)));
+      align-items: stretch;
+    }
+
+    .grid-table.grid-table-wide thead,
+    .grid-table.grid-table-wide tbody,
+    .grid-table.grid-table-wide tr {
+      display: contents;
+    }
+
+    .grid-table.grid-table-wide th {
+      @apply sticky top-0 z-10 flex items-end border-b border-line bg-surface-raised/95 px-3.5 py-3
+        text-start text-xs font-semibold uppercase tracking-wider text-muted backdrop-blur;
+    }
+
+    .grid-table.grid-table-wide th.text-end {
+      @apply justify-end;
+    }
+
+    .grid-table.grid-table-wide td {
+      @apply block min-w-0 border-b border-line/60 px-3.5 py-3 transition-colors duration-150;
+    }
+
+    .grid-table.grid-table-wide td::before {
+      content: none;
+    }
+
+    .grid-table.grid-table-wide tbody tr {
+      @apply mb-0 rounded-none border-0 bg-transparent p-0;
+    }
+
+    .grid-table.grid-table-wide tbody tr:hover td {
+      @apply bg-accent/[0.04];
+    }
+
+    .grid-table.grid-table-wide tbody tr:last-child td {
+      @apply border-b-0;
+    }
+  }
+
+  /* In card mode the wrapper's frame would double the card borders. */
+  @container tablewrap (max-width: 36rem) {
+    .table-wrap:has(.grid-table-compact) {
       @apply overflow-visible rounded-none border-0 bg-transparent;
     }
   }
 
-  .table thead th {
-    @apply sticky top-0 z-10 border-b border-line bg-surface-raised/95 px-3.5 py-3 text-start text-xs
-      font-semibold uppercase tracking-wider text-muted backdrop-blur;
+  @container tablewrap (max-width: 48rem) {
+    .table-wrap:has(.grid-table:not(.grid-table-compact):not(.grid-table-wide)) {
+      @apply overflow-visible rounded-none border-0 bg-transparent;
+    }
   }
 
-  .table tbody td {
-    @apply border-b border-line/60 px-3.5 py-3 align-top transition-colors duration-150;
-  }
-
-  .table tbody tr {
-    @apply transition-colors duration-150 hover:bg-accent/[0.04];
-  }
-
-  .table tbody tr:last-child td {
-    @apply border-b-0;
+  @container tablewrap (max-width: 60rem) {
+    .table-wrap:has(.grid-table-wide) {
+      @apply overflow-visible rounded-none border-0 bg-transparent;
+    }
   }
 
   /* ---------------------------------------------------------------- stats */

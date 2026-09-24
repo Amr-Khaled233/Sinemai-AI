@@ -185,7 +185,7 @@ export function InventoryManager({
           <p className="prose-sheet">{t('empty')}</p>
         ) : (
           <div className="table-wrap">
-            <table className="table table-stack">
+            <table className="grid-table [--grid-cols:minmax(11rem,2.2fr)_6.5rem_6.5rem_6rem_7rem_minmax(9rem,auto)]">
               <thead>
                 <tr>
                   <th>{t('equipment')}</th>

@@ -210,10 +210,10 @@ export async function ProductionSheet({
           </div>
 
           <div className="table-wrap mt-5">
-            <table className="table table-stack">
+            <table className="grid-table grid-table-wide [--grid-cols:3rem_minmax(11rem,2.4fr)_6rem_6rem_7rem_8.5rem_4.5rem_minmax(7rem,1fr)]">
               <thead>
                 <tr>
-                  <th className="w-10">{t('sceneNumber')}</th>
+                  <th>{t('sceneNumber')}</th>
                   <th>{t('heading')}</th>
                   <th>{t('environment')}</th>
                   <th>{t('time')}</th>
@@ -227,8 +227,8 @@ export async function ProductionSheet({
                 {scenes.map((scene) => (
                   <tr key={scene.order}>
                     <td data-label={t('sceneNumber')} className="tabular-nums text-muted">{scene.order}</td>
-                    <td className="text-strong sm:max-w-[18rem]">
-                      <div className="truncate font-medium">{truncate(scene.heading, 70)}</div>
+                    <td data-label={t('heading')} className="text-strong">
+                      <div className="font-medium md:truncate">{truncate(scene.heading, 70)}</div>
                       {scene.lightingNotes && (
                         <div className="mt-0.5 text-xs text-muted">{scene.lightingNotes}</div>
                       )}
@@ -268,13 +268,13 @@ export async function ProductionSheet({
       {/* ---------------------------------------------------------- equipment */}
       <Card title={t('equipmentTitle')}>
         <div className="table-wrap">
-          <table className="table table-stack">
+          <table className="grid-table [--grid-cols:7rem_minmax(10rem,1.5fr)_4rem_4.5rem_minmax(12rem,2.2fr)]">
             <thead>
               <tr>
                 <th>{t('category')}</th>
                 <th>{t('item')}</th>
-                <th className="w-16 text-end">{t('quantity')}</th>
-                <th className="w-16 text-end">{t('days')}</th>
+                <th className="text-end">{t('quantity')}</th>
+                <th className="text-end">{t('days')}</th>
                 <th>{t('reason')}</th>
               </tr>
             </thead>
@@ -420,12 +420,12 @@ export async function ProductionSheet({
                 </div>
 
                 <div className="table-wrap mt-3">
-                  <table className="table table-stack">
+                  <table className="grid-table grid-table-compact [--grid-cols:minmax(11rem,2.5fr)_4rem_4.5rem_7rem_7.5rem]">
                     <thead>
                       <tr>
                         <th>{t('item')}</th>
-                        <th className="w-14 text-end">{t('quantity')}</th>
-                        <th className="w-14 text-end">{t('days')}</th>
+                        <th className="text-end">{t('quantity')}</th>
+                        <th className="text-end">{t('days')}</th>
                         <th className="text-end">{t('rate')}</th>
                         <th className="text-end">{t('total')}</th>
                       </tr>
@@ -474,13 +474,13 @@ export async function ProductionSheet({
             <div>
               <p className="label">{t('crew')}</p>
               <div className="table-wrap">
-                <table className="table table-stack min-w-0">
+                <table className="grid-table grid-table-compact [--grid-cols:minmax(8rem,2fr)_3.5rem_6.5rem_4rem_7rem]">
                   <thead>
                     <tr>
                       <th>{t('role')}</th>
-                      <th className="w-10 text-end">{t('headcount')}</th>
+                      <th className="text-end">{t('headcount')}</th>
                       <th className="text-end">{t('rate')}</th>
-                      <th className="w-12 text-end">{t('days')}</th>
+                      <th className="text-end">{t('days')}</th>
                       <th className="text-end">{t('total')}</th>
                     </tr>
                   </thead>

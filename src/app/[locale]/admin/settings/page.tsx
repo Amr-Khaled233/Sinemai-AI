@@ -107,7 +107,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
 
       <Card title={t('crewRates')} subtitle="The only source of crew cost in every generated budget.">
         <div className="table-wrap">
-          <table className="table table-stack">
+          <table className="grid-table [--grid-cols:minmax(10rem,1.4fr)_repeat(3,minmax(10rem,1fr))]">
             <thead>
               <tr>
                 <th>Role</th>

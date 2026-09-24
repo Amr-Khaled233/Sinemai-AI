@@ -208,7 +208,7 @@ export function EquipmentManager({
       </div>
 
       <div className="table-wrap">
-        <table className="table table-stack">
+        <table className="grid-table grid-table-wide [--grid-cols:7rem_7rem_minmax(10rem,1.8fr)_6.5rem_7.5rem_7rem_5rem_minmax(8rem,auto)]">
           <thead>
             <tr>
               <th>{t('category')}</th>

@@ -308,13 +308,19 @@ anything else is logged server-side and surfaces as a generic failure.
 The interface is built for a 320px phone first and widens from there; nothing is
 desktop-only.
 
-**Tables are the hard part.** The scene breakdown has eight columns, which cannot be read on a
-phone — and scrolling sideways inside a card hides data people do not know is there. Tables marked
-`table-stack` turn each row into a labelled card below `md` and return to a real table above it.
-Every cell carries `data-label`, which is what the stacked layout renders as its heading, so a
-column is never silently dropped. It applies to the scene breakdown, the equipment package, vendor
-line items, the crew budget, the equipment catalog, vendor inventory, crew rates and the agent-run
-log.
+**Tables are grids.** Every table keeps its `<table>` markup for semantics, but the layout is CSS
+Grid: `thead`, `tbody` and `tr` are `display: contents`, so each cell is a direct grid item and the
+columns are declared once through a `--grid-cols` custom property. The native table algorithm sizes
+columns from content, so one long reason string drags its column wide and starves the rest, and the
+same column lands at a different width on every screen; a grid template is explicit and identical
+on every row.
+
+Stacking is driven by a **container query**, not the viewport, because what matters is whether the
+columns fit that table's own box — the crew table sits in a half-width column and has to stack long
+before the page does. Three thresholds, each set above the sum of that tier's column minimums so a
+table never scrolls sideways inside its own card: 36rem for short tables, 48rem for five or six
+columns, 60rem for the seven and eight column ones. Below its threshold each row becomes a labelled
+card, and every cell carries `data-label` so no column is silently dropped.
 
 **Touch.** Inputs render at 16px on small screens, because anything smaller makes iOS Safari zoom
 the page on focus and leave it scrolled sideways. Buttons hold a 44px minimum height on touch, and
@@ -327,6 +333,7 @@ a scrollable pill row under `md`; the inquiry dialog is a full-width bottom shee
 centred dialog above `sm`; hero actions go full width and stack; statistics sit two-up on a phone
 rather than one tall column.
 
-Verified by sweeping 320, 360, 375, 414, 640, 768, 1024, 1280 and 1536px in a real browser,
-measuring `scrollWidth` against the viewport at each one and flagging any interactive element under
-32px tall. Both themes and both languages were checked visually at phone and tablet size.
+Verified by sweeping 320 to 1920px in a real browser: measuring `scrollWidth` against the viewport,
+checking every table for overflow inside its own card, asserting that each column shares a pixel
+edge across all rows, and flagging any interactive element under 32px tall. Both themes and both
+languages were checked visually at phone, tablet and desktop size.

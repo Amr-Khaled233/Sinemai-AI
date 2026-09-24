@@ -161,7 +161,7 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
 
       <Card title={t('recentRuns')} subtitle="Every agent invocation, with tool calls, is stored for debugging.">
         <div className="table-wrap">
-          <table className="table table-stack">
+          <table className="grid-table grid-table-wide [--grid-cols:9rem_minmax(8rem,1.6fr)_6.5rem_5rem_6.5rem_7rem_7rem]">
             <thead>
               <tr>
                 <th>{t('agent')}</th>
