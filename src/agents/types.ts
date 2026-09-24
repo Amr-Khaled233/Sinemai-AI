@@ -220,6 +220,8 @@ export type ProgressEvent =
       failed: boolean;
       stage: string;
       pct: number;
+      /** Another client holds the lease; watch rather than drive. */
+      busy?: boolean;
     }
   | { type: 'stage'; stage: ProgressStage; detail?: string; pct: number }
   | { type: 'log'; message: string }

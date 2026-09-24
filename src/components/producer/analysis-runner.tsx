@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { CheckIcon, Spinner } from '@/components/ui';
@@ -33,18 +33,34 @@ type State = {
   logs: string[];
   error: string | null;
   requests: number;
+  /** Another tab or device is advancing this run; we watch instead of driving. */
+  watching: boolean;
 };
 
-const INITIAL: State = { running: false, stage: 'queued', pct: 0, logs: [], error: null, requests: 0 };
+const INITIAL: State = {
+  running: false,
+  stage: 'queued',
+  pct: 0,
+  logs: [],
+  error: null,
+  requests: 0,
+  watching: false,
+};
+
+/** How often to re-check a run that another client is driving. */
+const WATCH_INTERVAL_MS = 3000;
 
 export function AnalysisRunner({
   projectId,
   label,
   disabled,
+  /** True when the server already has a run in flight for this project. */
+  inFlight = false,
 }: {
   projectId: string;
   label: string;
   disabled?: boolean;
+  inFlight?: boolean;
 }) {
   const t = useTranslations('analysis');
   const locale = useLocale();
@@ -73,6 +89,7 @@ export function AnalysisRunner({
       const decoder = new TextDecoder();
       let buffered = '';
       let finished = false;
+      let busy = false;
 
       for (;;) {
         const { done, value } = await reader.read();
@@ -111,38 +128,131 @@ export function AnalysisRunner({
             }
           });
 
-          if (event.type === 'checkpoint') finished = event.done || event.failed;
+          if (event.type === 'checkpoint') {
+            finished = event.done || event.failed;
+            if (event.busy) {
+              // Someone else holds the lease. Stop driving and watch instead,
+              // so the same step is never executed — and billed — twice.
+              busy = true;
+              finished = true;
+            }
+          }
           if (event.type === 'error') finished = true;
         }
       }
 
+      if (busy) setState((current) => ({ ...current, watching: true }));
       return finished;
     },
     [projectId, locale],
   );
 
-  const run = useCallback(async () => {
-    abortRef.current?.abort();
-    const controller = new AbortController();
-    abortRef.current = controller;
-    setState({ ...INITIAL, running: true });
+  const drive = useCallback(
+    async (start: boolean) => {
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
+      setState({ ...INITIAL, running: true });
 
-    try {
-      // Each request executes as many steps as fit in its budget, then hands
-      // back a resume point — so no single function call has to be long.
-      for (let request = 0; request < MAX_REQUESTS; request += 1) {
-        setState((s) => ({ ...s, requests: request + 1 }));
-        const finished = await runSlice(request === 0, controller.signal);
-        if (finished) break;
+      try {
+        // Each request executes as many steps as fit in its budget, then hands
+        // back a resume point — so no single function call has to be long.
+        for (let request = 0; request < MAX_REQUESTS; request += 1) {
+          setState((s) => ({ ...s, requests: request + 1 }));
+          const finished = await runSlice(start && request === 0, controller.signal);
+          if (finished) break;
+        }
+
+        setState((s) => {
+          if (s.error || s.watching) return { ...s, running: s.watching };
+          return { ...s, running: false, stage: 'done', pct: 100 };
+        });
+        router.refresh();
+      } catch (error) {
+        if ((error as Error).name === 'AbortError') return;
+        setState((s) => ({ ...s, running: false, error: (error as Error).message }));
+      }
+    },
+    [router, runSlice],
+  );
+
+  /** Starts a fresh analysis. */
+  const run = useCallback(() => drive(true), [drive]);
+
+  /**
+   * The run continues on the server whether or not this page is open, so a
+   * producer who closed the tab or reloaded mid-run should rejoin it rather
+   * than see an idle button and start a second one.
+   */
+  useEffect(() => {
+    if (!inFlight) return;
+    let cancelled = false;
+
+    (async () => {
+      const response = await fetch(`/api/projects/${projectId}/analyze`);
+      if (!response.ok || cancelled) return;
+      const status = (await response.json()) as { running?: boolean; driven?: boolean };
+      if (cancelled || !status.running) return;
+
+      // Another client is already advancing it: watch. Otherwise pick it up.
+      if (status.driven) setState((s) => ({ ...s, running: true, watching: true }));
+      else void drive(false);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [inFlight, projectId, drive]);
+
+  /**
+   * While another client drives, poll the checkpoint. If that client goes away
+   * its lease expires and this one takes over, so a run is never orphaned.
+   */
+  useEffect(() => {
+    if (!state.watching) return;
+    let cancelled = false;
+
+    const timer = setInterval(async () => {
+      const response = await fetch(`/api/projects/${projectId}/analyze`);
+      if (!response.ok || cancelled) return;
+      const status = (await response.json()) as {
+        running?: boolean;
+        driven?: boolean;
+        stage?: string;
+        sceneCursor?: number;
+        sceneTotal?: number;
+        errorText?: string | null;
+      };
+      if (cancelled) return;
+
+      if (!status.running) {
+        setState((s) => ({
+          ...s,
+          running: false,
+          watching: false,
+          stage: status.errorText ? 'error' : 'done',
+          pct: 100,
+          error: status.errorText ?? null,
+        }));
+        router.refresh();
+        return;
       }
 
-      setState((s) => (s.error ? s : { ...s, running: false, stage: 'done', pct: 100 }));
-      router.refresh();
-    } catch (error) {
-      if ((error as Error).name === 'AbortError') return;
-      setState((s) => ({ ...s, running: false, error: (error as Error).message }));
-    }
-  }, [router, runSlice]);
+      if (status.sceneTotal) {
+        setState((s) => ({ ...s, detail: `${status.sceneCursor}/${status.sceneTotal}` }));
+      }
+      // The other driver stopped without finishing: take the run over.
+      if (!status.driven) {
+        setState((s) => ({ ...s, watching: false }));
+        void drive(false);
+      }
+    }, WATCH_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [state.watching, projectId, router, drive]);
 
   const currentIndex = STAGE_ORDER.indexOf(state.stage);
 

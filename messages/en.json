@@ -126,7 +126,12 @@
       "ANALYZING": "Analyzing",
       "READY": "Sheet ready",
       "FAILED": "Failed"
-    }
+    },
+    "delete": "Delete project",
+    "deleteTitle": "Delete this project?",
+    "deleteWarning": "This removes the script, the scene breakdown, the generated sheet and every share link. It cannot be undone.",
+    "deleteConfirmLabel": "Type {name} to confirm",
+    "deleteConfirm": "Delete permanently"
   },
   "analysis": {
     "title": "Building your production sheet",
@@ -145,7 +150,9 @@
     },
     "agents": "Six agents: supervisor, script analyst, equipment, cinematographer matching, vendor and budget, reviewer.",
     "failed": "The breakdown failed: {message}",
-    "retry": "Try again"
+    "retry": "Try again",
+    "watching": "This analysis is already running — following its progress.",
+    "resumed": "Rejoined a run that was already in progress."
   },
   "sheet": {
     "title": "Production & Equipment Sheet",
@@ -219,12 +226,21 @@
     "contactEmail": "Reply-to email",
     "contactPhone": "Phone (optional)",
     "send": "Send",
-    "sent": "Sent. They will reply to you directly.",
+    "sent": "Inquiries you sent",
     "received": "Inquiries received",
     "from": "From",
     "date": "Date",
     "empty": "No inquiries yet.",
-    "defaultSubject": "Availability for {project}"
+    "defaultSubject": "Availability for {project}",
+    "sentHint": "Replies land here and in your email.",
+    "receivedHint": "Opening a thread tells the producer their message was read.",
+    "emptySent": "You have not contacted a cinematographer or vendor yet.",
+    "reply": "Send reply",
+    "replyPlaceholder": "Write your reply…",
+    "messageCount": "{count} messages",
+    "close": "Close thread",
+    "reopen": "Reopen",
+    "closedNotice": "This thread is closed. Reopen it to keep talking."
   },
   "vendor": {
     "title": "Vendor dashboard",
@@ -383,6 +399,12 @@
       "DOP_MATCH": "Cinematographer matching",
       "VENDOR_BUDGET": "Vendor & budget",
       "CRITIC": "Reviewer"
+    },
+    "inquiryStatus": {
+      "SENT": "Sent",
+      "READ": "Read",
+      "REPLIED": "Replied",
+      "CLOSED": "Closed"
     }
   },
   "common": {

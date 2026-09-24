@@ -91,6 +91,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           failed: Boolean(outcome.failed),
           stage: outcome.stage,
           pct: outcome.pct,
+          busy: Boolean(outcome.busy),
         });
       } catch (error) {
         send({
@@ -129,8 +130,15 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   }
 
   const state = project.analysisState;
+  const running = Boolean(
+    state && state.stage !== AnalysisStage.DONE && state.stage !== AnalysisStage.FAILED,
+  );
+
   return Response.json({
     stage: state?.stage ?? null,
+    running,
+    // A live lease means another client is actively advancing the run.
+    driven: Boolean(state?.leaseUntil && state.leaseUntil > new Date()),
     sceneCursor: state?.sceneCursor ?? 0,
     sceneTotal: state?.sceneTotal ?? 0,
     errorText: state?.errorText ?? null,

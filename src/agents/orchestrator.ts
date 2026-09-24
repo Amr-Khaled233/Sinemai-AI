@@ -57,7 +57,47 @@ export type StepOutcome = {
   stage: AnalysisStage;
   pct: number;
   failed?: boolean;
+  /** Another client already holds the lease and is advancing this run. */
+  busy?: boolean;
 };
+
+/**
+ * How long a single advance request may hold the run before another client is
+ * allowed to take over. Comfortably longer than one request's time budget, so
+ * a healthy driver never loses its own lease mid-step.
+ */
+const LEASE_MS = 90_000;
+
+/**
+ * Claims the right to advance this run.
+ *
+ * Without it, a producer with the project open in two tabs — or who reloaded
+ * while a run was in flight — would have both clients executing the same step,
+ * duplicating agent runs and paying for the model calls twice. The claim is a
+ * conditional update, so the database decides the winner.
+ */
+async function claimLease(projectId: string, owner: string) {
+  const now = new Date();
+  const { count } = await prisma.analysisState.updateMany({
+    where: {
+      projectId,
+      OR: [{ leaseUntil: null }, { leaseUntil: { lt: now } }, { leaseOwner: owner }],
+    },
+    data: { leaseOwner: owner, leaseUntil: new Date(now.getTime() + LEASE_MS) },
+  });
+  return count > 0;
+}
+
+async function releaseLease(projectId: string, owner: string) {
+  await prisma.analysisState
+    .updateMany({
+      where: { projectId, leaseOwner: owner },
+      data: { leaseOwner: null, leaseUntil: null },
+    })
+    .catch(() => {
+      // A lost release just means the lease expires on its own.
+    });
+}
 
 /** Starts a fresh run, discarding any half-finished state for this project. */
 export async function beginAnalysis(projectId: string, locale: string) {
@@ -74,6 +114,8 @@ export async function beginAnalysis(projectId: string, locale: string) {
     retriedAgents: [],
     criticRound: 0,
     errorText: null,
+    leaseOwner: null,
+    leaseUntil: null,
     startedAt: new Date(),
   };
 
@@ -95,19 +137,43 @@ export async function beginAnalysis(projectId: string, locale: string) {
 export async function advanceAnalysis(
   projectId: string,
   report: ProgressReporter,
-  options: { budgetMs?: number } = {},
+  options: { budgetMs?: number; owner?: string } = {},
 ): Promise<StepOutcome> {
   const budgetMs = options.budgetMs ?? 45_000;
+  const owner = options.owner ?? `req-${Math.random().toString(36).slice(2, 10)}`;
   const startedAt = Date.now();
-  let outcome: StepOutcome = { done: false, stage: AnalysisStage.PARSE, pct: 0 };
 
-  do {
-    outcome = await runSingleStep(projectId, report);
-    if (outcome.done || outcome.failed) break;
-    // Leave room for one more step of the size we have been seeing.
-  } while (Date.now() - startedAt < budgetMs);
+  const state = await prisma.analysisState.findUnique({
+    where: { projectId },
+    select: { stage: true, sceneCursor: true, sceneTotal: true },
+  });
+  if (!state) throw new Error('ANALYSIS_NOT_STARTED');
+  if (state.stage === AnalysisStage.DONE) return { done: true, stage: state.stage, pct: 100 };
+  if (state.stage === AnalysisStage.FAILED) {
+    return { done: true, stage: state.stage, pct: 100, failed: true };
+  }
 
-  return outcome;
+  // Someone else is driving: report where the run is and let the caller watch.
+  if (!(await claimLease(projectId, owner))) {
+    const progress = STAGE_PROGRESS[state.stage];
+    report({ type: 'stage', stage: progress.stage, pct: progress.pct });
+    return { done: false, stage: state.stage, pct: progress.pct, busy: true };
+  }
+
+  try {
+    let outcome: StepOutcome = { done: false, stage: state.stage, pct: 0 };
+    do {
+      outcome = await runSingleStep(projectId, report);
+      if (outcome.done || outcome.failed) break;
+      // Renew while we are still making progress, so a long run keeps its lease.
+      await claimLease(projectId, owner);
+      // Leave room for one more step of the size we have been seeing.
+    } while (Date.now() - startedAt < budgetMs);
+
+    return outcome;
+  } finally {
+    await releaseLease(projectId, owner);
+  }
 }
 
 /** One unit of work. Everything it produces is checkpointed before it returns. */

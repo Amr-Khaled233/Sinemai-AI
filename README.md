@@ -143,6 +143,15 @@ cinematographer match reasons, sourcing caveats, reviewer findings and the execu
 come back in Arabic on `/ar` and English on `/en`. Ids, enum values, numbers and equipment
 model names stay exactly as the database has them — the UI translates those itself.
 
+### Rejoining a run
+
+The analysis keeps going on the server whether or not the page is open, so a producer who
+reloads or closes the tab rejoins the run in progress instead of seeing an idle button and
+starting a second one. A short lease on `AnalysisState` decides who drives: the database picks
+one client through a conditional update, and any other tab watches the checkpoint instead. If
+the driver disappears its lease expires and a watcher takes over, so a run is never orphaned —
+and the same step is never executed, or billed, twice.
+
 ### Resumable execution and streaming
 
 The orchestrator is a **state machine, not one long call**. Each step does one unit of work

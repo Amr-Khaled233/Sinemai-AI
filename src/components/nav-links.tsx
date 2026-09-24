@@ -10,7 +10,16 @@ export type NavLink = { href: string; key: string };
  * Nav with an active indicator. Client-side because it needs the current path;
  * the links themselves are still next-intl Links, so locale prefixes are kept.
  */
-export function NavLinks({ links, variant = 'bar' }: { links: NavLink[]; variant?: 'bar' | 'pills' }) {
+export function NavLinks({
+  links,
+  variant = 'bar',
+  /** Optional count shown beside a link, keyed by the link's translation key. */
+  badges = {},
+}: {
+  links: NavLink[];
+  variant?: 'bar' | 'pills';
+  badges?: Record<string, number>;
+}) {
   const t = useTranslations('nav');
   const pathname = usePathname();
 
@@ -33,6 +42,7 @@ export function NavLinks({ links, variant = 'bar' }: { links: NavLink[]; variant
             )}
           >
             {t(link.key)}
+            {badges[link.key] ? <Count value={badges[link.key]} /> : null}
           </Link>
         ))}
       </>
@@ -54,6 +64,7 @@ export function NavLinks({ links, variant = 'bar' }: { links: NavLink[]; variant
             )}
           >
             {t(link.key)}
+            {badges[link.key] ? <Count value={badges[link.key]} /> : null}
             {/* The underline grows from the centre, so it reads the same in RTL. */}
             <span
               aria-hidden
@@ -66,5 +77,14 @@ export function NavLinks({ links, variant = 'bar' }: { links: NavLink[]; variant
         );
       })}
     </>
+  );
+}
+
+/** Small unread counter; capped so a long backlog cannot stretch the nav. */
+function Count({ value }: { value: number }) {
+  return (
+    <span className="ms-1.5 inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-accent px-1.5 py-0.5 text-[10px] font-semibold text-ink-950">
+      {value > 9 ? '9+' : value}
+    </span>
   );
 }

@@ -6,11 +6,13 @@ import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { SignOutButton } from '@/components/sign-out-button';
 import { NavLinks, type NavLink } from '@/components/nav-links';
+import { countUnreadInquiries } from '@/lib/inquiries';
 
 const NAV_BY_ROLE: Record<Role, NavLink[]> = {
   PRODUCER: [
     { href: '/producer', key: 'projects' },
     { href: '/producer/projects/new', key: 'newProject' },
+    { href: '/producer/inquiries', key: 'inquiries' },
   ],
   VENDOR: [
     { href: '/vendor', key: 'dashboard' },
@@ -35,6 +37,13 @@ export async function TopBar({ locale }: { locale: string }) {
   const role = session?.user?.role;
   const links = role ? NAV_BY_ROLE[role] : [];
 
+  // Vendors and cinematographers should see a waiting inquiry without opening
+  // the page; producers are notified by the reply itself.
+  const unread =
+    session?.user && (role === 'VENDOR' || role === 'DOP')
+      ? await countUnreadInquiries(session.user.id, role === 'VENDOR' ? 'vendor' : 'dop').catch(() => 0)
+      : 0;
+
   return (
     <header className="glass sticky top-0 z-40 border-b border-line/70">
       <div className="mx-auto flex max-w-7xl items-center gap-2 px-4 py-3 sm:gap-4 sm:px-6">
@@ -53,7 +62,7 @@ export async function TopBar({ locale }: { locale: string }) {
         </Link>
 
         <nav className="hidden flex-1 items-center gap-1 md:flex">
-          <NavLinks links={links} />
+          <NavLinks links={links} badges={{ inquiries: unread }} />
         </nav>
 
         <div className="ms-auto flex shrink-0 items-center gap-0.5 sm:gap-1.5">
@@ -81,7 +90,7 @@ export async function TopBar({ locale }: { locale: string }) {
 
       {links.length > 0 && (
         <nav className="flex gap-1.5 overflow-x-auto border-t border-line/60 px-4 py-2 md:hidden">
-          <NavLinks links={links} variant="pills" />
+          <NavLinks links={links} variant="pills" badges={{ inquiries: unread }} />
         </nav>
       )}
     </header>

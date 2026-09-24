@@ -7,6 +7,7 @@ import { Badge, Card, Stat } from '@/components/ui';
 import { ScriptUpload } from '@/components/producer/script-upload';
 import { AnalysisRunner } from '@/components/producer/analysis-runner';
 import { ShareControls } from '@/components/sheet/share-controls';
+import { DeleteProjectButton } from '@/components/producer/danger-zone';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -51,6 +52,7 @@ export default async function ProjectPage({
         },
       },
       recommendation: true,
+      analysisState: { select: { stage: true } },
       shareLinks: { where: { revoked: false }, select: { token: true }, take: 1 },
     },
   });
@@ -61,6 +63,12 @@ export default async function ProjectPage({
   const tierWindow = await getBudgetTierConfig(project.budgetTier);
   const hasScript = Boolean(project.script);
   const ready = Boolean(project.recommendation);
+  // A run continues on the server with the page closed, so the client rejoins
+  // one that is still moving rather than offering to start a second.
+  const inFlight =
+    project.analysisState !== null &&
+    project.analysisState.stage !== 'DONE' &&
+    project.analysisState.stage !== 'FAILED';
 
   return (
     <div className="space-y-6">
@@ -121,6 +129,7 @@ export default async function ProjectPage({
                 projectId={project.id}
                 label={ready ? t('reanalyze') : t('analyze')}
                 disabled={!hasScript}
+                inFlight={inFlight}
               />
             </>
           ) : (
@@ -152,6 +161,13 @@ export default async function ProjectPage({
           }
         />
       )}
+
+      <Card
+        title={t('delete')}
+        subtitle={t('deleteWarning')}
+        className="border-danger/30"
+        action={<DeleteProjectButton projectId={project.id} projectName={project.name} />}
+      />
     </div>
   );
 }

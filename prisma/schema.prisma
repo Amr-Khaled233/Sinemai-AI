@@ -138,13 +138,14 @@ model User {
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
 
-  projects      Project[]
-  dop           Dop?
-  vendor        Vendor?
-  sentInquiries Inquiry[]            @relation("InquiryFrom")
-  accounts      Account[]
-  sessions      Session[]
-  resetTokens   PasswordResetToken[]
+  projects       Project[]
+  dop            Dop?
+  vendor         Vendor?
+  sentInquiries  Inquiry[]            @relation("InquiryFrom")
+  inquiryReplies InquiryMessage[]     @relation("InquiryMessageSender")
+  accounts       Account[]
+  sessions       Session[]
+  resetTokens    PasswordResetToken[]
 
   @@index([role])
 }
@@ -463,26 +464,48 @@ model ShareLink {
 }
 
 model Inquiry {
-  id           String            @id @default(cuid())
-  projectId    String?
-  fromUserId   String
-  targetType   InquiryTargetType
-  dopId        String?
-  vendorId     String?
-  subject      String
-  message      String
-  contactEmail String
-  contactPhone String?
-  status       InquiryStatus     @default(SENT)
-  createdAt    DateTime          @default(now())
+  id            String            @id @default(cuid())
+  projectId     String?
+  fromUserId    String
+  targetType    InquiryTargetType
+  dopId         String?
+  vendorId      String?
+  subject       String
+  message       String
+  contactEmail  String
+  contactPhone  String?
+  status        InquiryStatus     @default(SENT)
+  /// When the recipient first opened it, so a producer can see it landed.
+  readAt        DateTime?
+  closedAt      DateTime?
+  /// Sorts threads by activity without counting messages on every query.
+  lastMessageAt DateTime          @default(now())
+  createdAt     DateTime          @default(now())
 
-  project  Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  fromUser User     @relation("InquiryFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-  dop      Dop?     @relation("InquiryDop", fields: [dopId], references: [id], onDelete: Cascade)
-  vendor   Vendor?  @relation("InquiryVendor", fields: [vendorId], references: [id], onDelete: Cascade)
+  project  Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  fromUser User             @relation("InquiryFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  dop      Dop?             @relation("InquiryDop", fields: [dopId], references: [id], onDelete: Cascade)
+  vendor   Vendor?          @relation("InquiryVendor", fields: [vendorId], references: [id], onDelete: Cascade)
+  messages InquiryMessage[]
 
   @@index([dopId])
   @@index([vendorId])
+  @@index([fromUserId, lastMessageAt])
+}
+
+/// One message in an inquiry thread. The opening message is stored on the
+/// Inquiry itself and mirrored here, so a thread reads as one list.
+model InquiryMessage {
+  id        String   @id @default(cuid())
+  inquiryId String
+  senderId  String
+  body      String
+  createdAt DateTime @default(now())
+
+  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
+  sender  User    @relation("InquiryMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([inquiryId, createdAt])
 }
 
 // ---------------------------------------------------------------- agent observability
@@ -609,6 +632,11 @@ model AnalysisState {
   retriedAgents String[]      @default([])
   criticRound   Int           @default(0)
   errorText     String?
+  /// Short lease held by whichever request is currently advancing the run.
+  /// Two tabs driving the same project would otherwise execute the same step
+  /// twice and pay for the model calls twice.
+  leaseOwner    String?
+  leaseUntil    DateTime?
   startedAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 

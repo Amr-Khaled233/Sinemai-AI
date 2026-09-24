@@ -30,9 +30,12 @@ export type Failed = { ok: false; error: string };
 export const REVALIDATE = {
   producerProjects: '/[locale]/producer',
   producerProject: '/[locale]/producer/projects/[id]',
+  producerInquiries: '/[locale]/producer/inquiries',
   vendorHome: '/[locale]/vendor',
   vendorInventory: '/[locale]/vendor/inventory',
+  vendorInquiries: '/[locale]/vendor/inquiries',
   dopProfile: '/[locale]/dop',
+  dopInquiries: '/[locale]/dop/inquiries',
   adminHome: '/[locale]/admin',
   adminEquipment: '/[locale]/admin/equipment',
   adminVendors: '/[locale]/admin/vendors',

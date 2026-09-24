@@ -88,3 +88,19 @@ export function resetEmail(args: { name: string; locale: string; url: string; tt
          <p>The link is valid for ${args.ttlMinutes} minutes and can be used once. If you did not request this, ignore this email — nothing changes.</p>`,
       );
 }
+
+export function inquiryReplyEmail(args: {
+  recipientName: string;
+  senderName: string;
+  subject: string;
+  message: string;
+  projectName?: string | null;
+}) {
+  return shell(
+    `${escapeHtml(args.senderName)} replied`,
+    `<p><strong>${escapeHtml(args.subject)}</strong></p>
+     ${args.projectName ? `<p>Project: ${escapeHtml(args.projectName)}</p>` : ''}
+     <blockquote style="border-inline-start:3px solid #d4a94f;margin:16px 0;padding:4px 16px">${escapeHtmlMultiline(args.message)}</blockquote>
+     <p style="color:#6d7385">Reply from inside Sinemai AI to keep the thread in one place.</p>`,
+  );
+}

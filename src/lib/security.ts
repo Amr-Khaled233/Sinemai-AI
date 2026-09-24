@@ -128,6 +128,7 @@ const SAFE_ERROR_CODES = new Set([
   'INVALID_SPECS_JSON',
   'RATE_LIMITED',
   'EMAIL_TAKEN',
+  'INQUIRY_CLOSED',
 ]);
 
 /**
