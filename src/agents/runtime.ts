@@ -161,12 +161,44 @@ function toJson(value: unknown): Prisma.InputJsonValue {
   return JSON.parse(JSON.stringify(value ?? null)) as Prisma.InputJsonValue;
 }
 
-export class AgentError extends Error {
-  constructor(
-    public agent: AgentName,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'AgentError';
+
+/**
+ * Wraps one agent invocation: opens the run row, records the outcome, and marks
+ * it FAILED before re-throwing so a crashed agent is never silently missing
+ * from the trail.
+ *
+ * Six agents were each repeating this by hand, which meant six places where a
+ * new failure path could forget to close its run row.
+ */
+export async function withAgentRun<T>(
+  args: {
+    ctx: RunContext;
+    agent: AgentName;
+    attempt?: number;
+    model?: string;
+    systemPrompt?: string;
+    input: unknown;
+  },
+  body: (handle: AgentRunHandle) => Promise<{ output: T; status?: AgentRunStatus; criticFlag?: string }>,
+): Promise<T> {
+  const startedAt = Date.now();
+  const handle = await startRun(args);
+
+  try {
+    const { output, status, criticFlag } = await body(handle);
+    await finishRun(handle, {
+      status: status ?? AgentRunStatus.OK,
+      output,
+      criticFlag,
+      startedAt,
+    });
+    return output;
+  } catch (error) {
+    await finishRun(handle, {
+      status: AgentRunStatus.FAILED,
+      errorText: error instanceof Error ? error.message : String(error),
+      startedAt,
+    });
+    throw error;
   }
 }

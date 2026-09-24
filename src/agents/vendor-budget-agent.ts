@@ -1,8 +1,8 @@
 import { generateObject, generateText, stepCountIs } from 'ai';
 import { z } from 'zod';
-import { AgentName, AgentRunStatus } from '@prisma/client';
+import { AgentName } from '@prisma/client';
 import { getSettings } from '@/lib/settings';
-import { allToolResults, finishRun, model, MODELS, startRun, type RunContext } from './runtime';
+import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/vendor-tools';
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
 import { withLanguage } from './language';
@@ -43,159 +43,152 @@ export async function runVendorBudgetAgent(
   equipment: EquipmentResult,
   options: { attempt?: number; criticFlag?: string } = {},
 ): Promise<VendorBudgetResult> {
-  const startedAt = Date.now();
   const settings = await getSettings();
-  const handle = await startRun({
-    ctx,
-    agent: AgentName.VENDOR_BUDGET,
-    attempt: options.attempt ?? 1,
-    model: MODELS.reasoning,
-    systemPrompt: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
-    input: {
-      package: equipment.package,
-      shootDays: summary.shootDays,
-      criticFlag: options.criticFlag ?? null,
+
+  return withAgentRun(
+    {
+      ctx,
+      agent: AgentName.VENDOR_BUDGET,
+      attempt: options.attempt ?? 1,
+      model: MODELS.reasoning,
+      systemPrompt: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
+      input: {
+        package: equipment.package,
+        shootDays: summary.shootDays,
+        criticFlag: options.criticFlag ?? null,
+      },
     },
-  });
+    async (handle) => {
+      ctx.report({ type: 'stage', stage: 'pricing', pct: 68 });
 
-  try {
-    ctx.report({ type: 'stage', stage: 'pricing', pct: 68 });
+      const tools = makeVendorTools(handle, { budgetTier: brief.budgetTier });
+      const equipmentIds = equipment.package.map((i) => i.equipmentId);
 
-    const tools = makeVendorTools(handle, { budgetTier: brief.budgetTier });
-    const equipmentIds = equipment.package.map((i) => i.equipmentId);
-
-    await generateText({
-      model: model('reasoning'),
-      system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
-      tools,
-      stopWhen: stepCountIs(4),
-      temperature: 0.2,
-      prompt: [
-        `Production: "${brief.name}" — ${brief.type}, budget tier ${brief.budgetTier}, ${summary.shootDays} shoot day(s) in ${brief.city}.`,
-        brief.shootStartDate
-          ? `Shoot dates: ${iso(brief.shootStartDate)} to ${iso(brief.shootEndDate ?? brief.shootStartDate)}.`
-          : 'Shoot dates are not fixed yet; check general availability.',
-        '',
-        'Recommended package:',
-        ...equipment.package.map(
-          (i) => `- ${i.equipmentId} | ${i.brand} ${i.model} | ${i.categorySlug} | qty ${i.quantity} | ${i.rentalDays} day(s)`,
-        ),
-        '',
-        options.criticFlag ? `Reviewer flag on the previous pass: ${options.criticFlag}` : '',
-        'Source this package and pull the crew rates for this tier.',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    });
-
-    // ---- collect tool facts, with a deterministic fallback so the budget is never model-guessed
-    let inventory = mergeInventory(allToolResults<VendorInventoryResult>(handle, 'queryVendorInventory'));
-    if (!inventory || inventory.vendors.length === 0) {
-      inventory = await queryVendorInventory({
-        equipmentIds,
-        startDate: brief.shootStartDate ? iso(brief.shootStartDate) : undefined,
-        endDate: brief.shootEndDate ? iso(brief.shootEndDate) : undefined,
-        city: brief.city,
+      await generateText({
+        model: model('reasoning'),
+        system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
+        tools,
+        stopWhen: stepCountIs(4),
+        temperature: 0.2,
+        prompt: [
+          `Production: "${brief.name}" — ${brief.type}, budget tier ${brief.budgetTier}, ${summary.shootDays} shoot day(s) in ${brief.city}.`,
+          brief.shootStartDate
+            ? `Shoot dates: ${iso(brief.shootStartDate)} to ${iso(brief.shootEndDate ?? brief.shootStartDate)}.`
+            : 'Shoot dates are not fixed yet; check general availability.',
+          '',
+          'Recommended package:',
+          ...equipment.package.map(
+            (i) => `- ${i.equipmentId} | ${i.brand} ${i.model} | ${i.categorySlug} | qty ${i.quantity} | ${i.rentalDays} day(s)`,
+          ),
+          '',
+          options.criticFlag ? `Reviewer flag on the previous pass: ${options.criticFlag}` : '',
+          'Source this package and pull the crew rates for this tier.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
       });
-    }
 
-    let crewRates = allToolResults<{ rates?: CrewRateRow[] }>(handle, 'getCrewDayRates')
-      .flatMap((r) => r.rates ?? [])
-      .filter((r, index, all) => all.findIndex((x) => x.roleSlug === r.roleSlug) === index);
-    if (crewRates.length === 0) {
-      crewRates = (await getCrewDayRates({}, { budgetTier: brief.budgetTier })).rates;
-    }
+      // ---- collect tool facts, with a deterministic fallback so the budget is never model-guessed
+      let inventory = mergeInventory(allToolResults<VendorInventoryResult>(handle, 'queryVendorInventory'));
+      if (!inventory || inventory.vendors.length === 0) {
+        inventory = await queryVendorInventory({
+          equipmentIds,
+          startDate: brief.shootStartDate ? iso(brief.shootStartDate) : undefined,
+          endDate: brief.shootEndDate ? iso(brief.shootEndDate) : undefined,
+          city: brief.city,
+        });
+      }
 
-    // ---- sourcing judgement + caveats from the model, priced by code
-    const { object } = await generateObject({
-      model: model('cheap'),
-      schema: notesSchema,
-      system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
-      temperature: 0.3,
-      prompt: [
-        `Production: ${brief.type}, ${summary.shootDays} shoot day(s) in ${brief.city}, budget tier ${brief.budgetTier}.`,
-        `Night/dawn scenes: ${summary.nightScenePct}%. Exteriors: ${summary.exteriorScenePct}%. Movement: gimbal ${summary.movementMix.STEADICAM_GIMBAL}, crane/dolly ${summary.movementMix.CRANE_DOLLY}, drone ${summary.movementMix.DRONE}.`,
-        '',
-        'Vendor coverage returned by the tool:',
-        ...inventory.vendors.map(
-          (v) =>
-            `- ${v.companyName} (${v.city})${v.verified ? ' [verified]' : ''}: ${v.items.length} of ${
-              equipmentIds.length
-            } items; blocked in range: ${v.items.filter((i) => !i.availableInRange).length}`,
-        ),
-        inventory.unstockedIds.length
-          ? `Items no approved vendor stocks: ${inventory.fallbackRates
-              .map((f) => `${f.brand} ${f.model}`)
-              .join(', ')}`
-          : 'Every package item is stocked by at least one approved vendor.',
-        '',
-        'Crew roles available at this tier:',
-        ...crewRates.map((r) => `- ${r.roleSlug} (${r.labelEn}): ${r.dayRate} ${r.currency}/day × ${r.headcount}`),
-        '',
-        'Return the crew roles this production needs and up to six sourcing caveats. No prices in the notes.',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    });
+      let crewRates = allToolResults<{ rates?: CrewRateRow[] }>(handle, 'getCrewDayRates')
+        .flatMap((r) => r.rates ?? [])
+        .filter((r, index, all) => all.findIndex((x) => x.roleSlug === r.roleSlug) === index);
+      if (crewRates.length === 0) {
+        crewRates = (await getCrewDayRates({}, { budgetTier: brief.budgetTier })).rates;
+      }
 
-    // ---- pricing: pure arithmetic over tool-sourced rates
-    const allocation = allocatePackage(equipment, inventory, {
-      city: brief.city,
-      weeklyDiscountPct: settings.weeklyRentalDiscountPct,
-    });
+      // ---- sourcing judgement + caveats from the model, priced by code
+      const { object } = await generateObject({
+        model: model('cheap'),
+        schema: notesSchema,
+        system: withLanguage(VENDOR_BUDGET_SYSTEM, brief.locale),
+        temperature: 0.3,
+        prompt: [
+          `Production: ${brief.type}, ${summary.shootDays} shoot day(s) in ${brief.city}, budget tier ${brief.budgetTier}.`,
+          `Night/dawn scenes: ${summary.nightScenePct}%. Exteriors: ${summary.exteriorScenePct}%. Movement: gimbal ${summary.movementMix.STEADICAM_GIMBAL}, crane/dolly ${summary.movementMix.CRANE_DOLLY}, drone ${summary.movementMix.DRONE}.`,
+          '',
+          'Vendor coverage returned by the tool:',
+          ...inventory.vendors.map(
+            (v) =>
+              `- ${v.companyName} (${v.city})${v.verified ? ' [verified]' : ''}: ${v.items.length} of ${
+                equipmentIds.length
+              } items; blocked in range: ${v.items.filter((i) => !i.availableInRange).length}`,
+          ),
+          inventory.unstockedIds.length
+            ? `Items no approved vendor stocks: ${inventory.fallbackRates
+                .map((f) => `${f.brand} ${f.model}`)
+                .join(', ')}`
+            : 'Every package item is stocked by at least one approved vendor.',
+          '',
+          'Crew roles available at this tier:',
+          ...crewRates.map((r) => `- ${r.roleSlug} (${r.labelEn}): ${r.dayRate} ${r.currency}/day × ${r.headcount}`),
+          '',
+          'Return the crew roles this production needs and up to six sourcing caveats. No prices in the notes.',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      });
 
-    const selectedRoles = new Set(object.crewRoles);
-    const crewLines = buildCrewLines(crewRates, selectedRoles, summary.shootDays);
-    const crewTotal = crewLines.reduce((sum, line) => sum + line.total, 0);
+      // ---- pricing: pure arithmetic over tool-sourced rates
+      const allocation = allocatePackage(equipment, inventory, {
+        city: brief.city,
+        weeklyDiscountPct: settings.weeklyRentalDiscountPct,
+      });
 
-    const contingencyPct = settings.contingencyPct;
-    const low = allocation.equipmentLow + crewTotal;
-    const mid = Math.round(low + (allocation.equipmentLow + crewTotal) * (contingencyPct / 200));
-    const high = Math.round(
-      allocation.equipmentHigh + crewTotal + (allocation.equipmentHigh + crewTotal) * (contingencyPct / 100),
-    );
+      const selectedRoles = new Set(object.crewRoles);
+      const crewLines = buildCrewLines(crewRates, selectedRoles, summary.shootDays);
+      const crewTotal = crewLines.reduce((sum, line) => sum + line.total, 0);
 
-    const budget: BudgetBreakdown = {
-      shootDays: summary.shootDays,
-      equipmentRental: allocation.equipmentLow,
-      equipmentUncovered: allocation.uncoveredFallbackTotal,
-      crewTotal,
-      crewBreakdown: crewLines,
-      contingencyPct,
-      contingency: high - (allocation.equipmentHigh + crewTotal),
-      currency: settings.currency,
-    };
-
-    const notes = [...object.notes];
-    if (inventory.unstockedIds.length) {
-      notes.push(
-        `${inventory.unstockedIds.length} item(s) are not stocked by any approved vendor yet and are priced from indicative market rates.`,
+      const contingencyPct = settings.contingencyPct;
+      const low = allocation.equipmentLow + crewTotal;
+      const mid = Math.round(low + (allocation.equipmentLow + crewTotal) * (contingencyPct / 200));
+      const high = Math.round(
+        allocation.equipmentHigh + crewTotal + (allocation.equipmentHigh + crewTotal) * (contingencyPct / 100),
       );
-    }
-    if (allocation.vendors.length > 1) {
-      notes.push(`Package splits across ${allocation.vendors.length} vendors for best coverage and price.`);
-    }
 
-    const result: VendorBudgetResult = {
-      vendors: allocation.vendors,
-      budget,
-      low,
-      mid,
-      high,
-      notes,
-      uncoveredEquipment: allocation.uncovered,
-    };
+      const budget: BudgetBreakdown = {
+        shootDays: summary.shootDays,
+        equipmentRental: allocation.equipmentLow,
+        equipmentUncovered: allocation.uncoveredFallbackTotal,
+        crewTotal,
+        crewBreakdown: crewLines,
+        contingencyPct,
+        contingency: high - (allocation.equipmentHigh + crewTotal),
+        currency: settings.currency,
+      };
 
-    await finishRun(handle, { status: AgentRunStatus.OK, output: result, startedAt });
-    return result;
-  } catch (error) {
-    await finishRun(handle, {
-      status: AgentRunStatus.FAILED,
-      errorText: error instanceof Error ? error.message : String(error),
-      startedAt,
-    });
-    throw error;
-  }
+      const notes = [...object.notes];
+      if (inventory.unstockedIds.length) {
+        notes.push(
+          `${inventory.unstockedIds.length} item(s) are not stocked by any approved vendor yet and are priced from indicative market rates.`,
+        );
+      }
+      if (allocation.vendors.length > 1) {
+        notes.push(`Package splits across ${allocation.vendors.length} vendors for best coverage and price.`);
+      }
+
+      const result: VendorBudgetResult = {
+        vendors: allocation.vendors,
+        budget,
+        low,
+        mid,
+        high,
+        notes,
+        uncoveredEquipment: allocation.uncovered,
+      };
+
+      return { output: result };
+    },
+  );
 }
 
 // ------------------------------------------------------------------ pricing
@@ -236,8 +229,13 @@ function mergeInventory(results: VendorInventoryResult[]): VendorInventoryResult
   };
 }
 
-/** Effective rental cost for one line, honouring weekly rates on long bookings. */
-function lineCost(
+/**
+ * Effective rental cost for one line, honouring weekly rates on long bookings.
+ *
+ * Exported for tests: this is the arithmetic a producer will hold us to, so it
+ * is verified directly rather than only through a full agent run.
+ */
+export function lineCost(
   dailyRate: number,
   weeklyRate: number | null,
   days: number,
@@ -251,7 +249,7 @@ function lineCost(
   return (weeks * weekRate + remainder * dailyRate) * quantity;
 }
 
-function allocatePackage(
+export function allocatePackage(
   equipment: EquipmentResult,
   inventory: VendorInventoryResult,
   opts: { city: string; weeklyDiscountPct: number },
@@ -353,7 +351,8 @@ function allocatePackage(
   };
 }
 
-function buildCrewLines(rates: CrewRateRow[], selected: Set<string>, days: number): CrewLine[] {
+/** Crew lines for the chosen roles; falls back to the full unit when none match. */
+export function buildCrewLines(rates: CrewRateRow[], selected: Set<string>, days: number): CrewLine[] {
   const chosen = rates.filter((r) => selected.size === 0 || selected.has(r.roleSlug));
   const pool = chosen.length ? chosen : rates;
   return pool.map((rate) => ({

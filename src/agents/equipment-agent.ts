@@ -1,7 +1,7 @@
 import { generateObject, generateText, stepCountIs } from 'ai';
 import { z } from 'zod';
 import { AgentName, AgentRunStatus } from '@prisma/client';
-import { allToolResults, finishRun, model, MODELS, startRun, type RunContext } from './runtime';
+import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { makeEquipmentTools, queryEquipmentCatalog } from './tools/equipment-tools';
 import { withLanguage } from './language';
 import type { CatalogItem, EquipmentResult, PackageItem, ProjectBrief, SceneSummary } from './types';
@@ -46,106 +46,103 @@ export async function runEquipmentAgent(
   summary: SceneSummary,
   options: { attempt?: number; criticFlag?: string } = {},
 ): Promise<EquipmentResult> {
-  const startedAt = Date.now();
-  const handle = await startRun({
-    ctx,
-    agent: AgentName.EQUIPMENT,
-    attempt: options.attempt ?? 1,
-    model: MODELS.reasoning,
-    systemPrompt: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
-    input: { summary, budgetTier: brief.budgetTier, locale: brief.locale, criticFlag: options.criticFlag ?? null },
-  });
+  return withAgentRun(
+    {
+      ctx,
+      agent: AgentName.EQUIPMENT,
+      attempt: options.attempt ?? 1,
+      model: MODELS.reasoning,
+      systemPrompt: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
+      input: {
+        summary,
+        budgetTier: brief.budgetTier,
+        locale: brief.locale,
+        criticFlag: options.criticFlag ?? null,
+      },
+    },
+    async (handle) => {
+      ctx.report({ type: 'stage', stage: 'matching_equipment', pct: 46 });
 
-  try {
-    ctx.report({ type: 'stage', stage: 'matching_equipment', pct: 46 });
+      const tools = makeEquipmentTools(handle, { budgetTier: brief.budgetTier, city: brief.city });
 
-    const tools = makeEquipmentTools(handle, { budgetTier: brief.budgetTier, city: brief.city });
-
-    // ---- phase 1: retrieval. The model picks the filters; the DB picks the gear.
-    await generateText({
-      model: model('reasoning'),
-      system: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
-      tools,
-      stopWhen: stepCountIs(4),
-      temperature: 0.3,
-      prompt: buildRetrievalPrompt(brief, summary, options.criticFlag),
-    });
-
-    // Union of everything the tool returned across all calls, de-duplicated.
-    const retrieved = new Map<string, CatalogItem>();
-    for (const result of allToolResults<{ items?: CatalogItem[] }>(handle, 'queryEquipmentCatalog')) {
-      for (const item of result.items ?? []) retrieved.set(item.id, item);
-    }
-
-    // A silent empty shortlist would push the model toward inventing gear, so we
-    // run the deterministic fallback query ourselves instead.
-    if (retrieved.size === 0) {
-      const fallback = await queryEquipmentCatalog(
-        { includeAdjacentTiers: true, limitPerCategory: 5 },
-        { budgetTier: brief.budgetTier, city: brief.city },
-      );
-      for (const item of fallback.items) retrieved.set(item.id, item);
-    }
-    if (retrieved.size === 0) throw new Error('EMPTY_EQUIPMENT_CATALOG');
-
-    // ---- phase 2: selection, constrained to the retrieved shortlist.
-    const shortlist = [...retrieved.values()];
-    const { object } = await generateObject({
-      model: model('reasoning'),
-      schema: packageSchema,
-      system: withLanguage(SELECTION_SYSTEM, brief.locale),
-      temperature: 0.3,
-      prompt: buildSelectionPrompt(brief, summary, shortlist, options.criticFlag),
-    });
-
-    // ---- phase 3: enforcement. Anything not in the shortlist is dropped, loudly.
-    const dropped: string[] = [];
-    const seen = new Set<string>();
-    const pkg: PackageItem[] = [];
-
-    for (const item of object.items) {
-      const catalogItem = retrieved.get(item.equipmentId);
-      if (!catalogItem) {
-        dropped.push(item.equipmentId);
-        continue;
-      }
-      if (seen.has(item.equipmentId)) continue;
-      seen.add(item.equipmentId);
-      pkg.push({
-        equipmentId: catalogItem.id,
-        categorySlug: catalogItem.categorySlug,
-        brand: catalogItem.brand,
-        model: catalogItem.model,
-        quantity: item.quantity,
-        rentalDays: Math.min(item.rentalDays, Math.max(summary.shootDays, 1)),
-        reason: item.reason,
+      // ---- phase 1: retrieval. The model picks the filters; the DB picks the gear.
+      await generateText({
+        model: model('reasoning'),
+        system: withLanguage(EQUIPMENT_SYSTEM, brief.locale),
+        tools,
+        stopWhen: stepCountIs(4),
+        temperature: 0.3,
+        prompt: buildRetrievalPrompt(brief, summary, options.criticFlag),
       });
-    }
 
-    if (pkg.length === 0) throw new Error('NO_VALID_EQUIPMENT_SELECTED');
+      // Union of everything the tool returned across all calls, de-duplicated.
+      const retrieved = new Map<string, CatalogItem>();
+      for (const result of allToolResults<{ items?: CatalogItem[] }>(handle, 'queryEquipmentCatalog')) {
+        for (const item of result.items ?? []) retrieved.set(item.id, item);
+      }
 
-    const result: EquipmentResult = {
-      package: pkg.sort((a, b) => a.categorySlug.localeCompare(b.categorySlug)),
-      rationale: object.rationale,
-      droppedHallucinatedIds: dropped,
-    };
+      // A silent empty shortlist would push the model toward inventing gear, so we
+      // run the deterministic fallback query ourselves instead.
+      if (retrieved.size === 0) {
+        const fallback = await queryEquipmentCatalog(
+          { includeAdjacentTiers: true, limitPerCategory: 5 },
+          { budgetTier: brief.budgetTier, city: brief.city },
+        );
+        for (const item of fallback.items) retrieved.set(item.id, item);
+      }
+      if (retrieved.size === 0) throw new Error('EMPTY_EQUIPMENT_CATALOG');
 
-    await finishRun(handle, {
-      status: dropped.length ? AgentRunStatus.RETRIED : AgentRunStatus.OK,
-      output: { ...result, shortlistSize: shortlist.length },
-      criticFlag: dropped.length ? `Dropped ${dropped.length} equipment id(s) not present in the catalog shortlist.` : undefined,
-      startedAt,
-    });
+      // ---- phase 2: selection, constrained to the retrieved shortlist.
+      const shortlist = [...retrieved.values()];
+      const { object } = await generateObject({
+        model: model('reasoning'),
+        schema: packageSchema,
+        system: withLanguage(SELECTION_SYSTEM, brief.locale),
+        temperature: 0.3,
+        prompt: buildSelectionPrompt(brief, summary, shortlist, options.criticFlag),
+      });
 
-    return result;
-  } catch (error) {
-    await finishRun(handle, {
-      status: AgentRunStatus.FAILED,
-      errorText: error instanceof Error ? error.message : String(error),
-      startedAt,
-    });
-    throw error;
-  }
+      // ---- phase 3: enforcement. Anything not in the shortlist is dropped, loudly.
+      const dropped: string[] = [];
+      const seen = new Set<string>();
+      const pkg: PackageItem[] = [];
+
+      for (const item of object.items) {
+        const catalogItem = retrieved.get(item.equipmentId);
+        if (!catalogItem) {
+          dropped.push(item.equipmentId);
+          continue;
+        }
+        if (seen.has(item.equipmentId)) continue;
+        seen.add(item.equipmentId);
+        pkg.push({
+          equipmentId: catalogItem.id,
+          categorySlug: catalogItem.categorySlug,
+          brand: catalogItem.brand,
+          model: catalogItem.model,
+          quantity: item.quantity,
+          rentalDays: Math.min(item.rentalDays, Math.max(summary.shootDays, 1)),
+          reason: item.reason,
+        });
+      }
+
+      if (pkg.length === 0) throw new Error('NO_VALID_EQUIPMENT_SELECTED');
+
+      const result: EquipmentResult = {
+        package: pkg.sort((a, b) => a.categorySlug.localeCompare(b.categorySlug)),
+        rationale: object.rationale,
+        droppedHallucinatedIds: dropped,
+      };
+
+      return {
+        output: result,
+        status: dropped.length ? AgentRunStatus.RETRIED : AgentRunStatus.OK,
+        criticFlag: dropped.length
+          ? `Dropped ${dropped.length} equipment id(s) not present in the catalog shortlist.`
+          : undefined,
+      };
+    },
+  );
 }
 
 function buildRetrievalPrompt(brief: ProjectBrief, summary: SceneSummary, criticFlag?: string) {

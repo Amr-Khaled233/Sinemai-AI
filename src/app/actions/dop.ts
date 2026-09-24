@@ -1,25 +1,19 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { publicError } from '@/lib/security';
-import { auth } from '@/lib/auth';
 import { dopProfileSchema } from '@/lib/validation';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
-
-export type ActionResult = { ok: true; embedded: boolean } | { ok: false; error: string };
+import { REVALIDATE, requireDopProfile, revalidate, runAction } from './shared';
 
 /**
  * Saving a profile re-generates its style vector. Embedding is attempted inline
- * (it is a single fast call) and, if it fails or no API key is configured, the
- * profile is left stale for the nightly cron job to pick up — the save itself
- * never fails because of the embedding step.
+ * (one fast call) and, if it fails or no API key is configured, the profile is
+ * left stale for the nightly cron to pick up — the save itself never fails
+ * because of the embedding step.
  */
-export async function saveDopProfile(formData: FormData): Promise<ActionResult> {
-  try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== Role.DOP) return { ok: false, error: 'UNAUTHORIZED' };
+export async function saveDopProfile(formData: FormData) {
+  return runAction('saveDopProfile', async () => {
+    const { user } = await requireDopProfile();
 
     const parsed = dopProfileSchema.safeParse({
       displayName: formData.get('displayName'),
@@ -35,13 +29,11 @@ export async function saveDopProfile(formData: FormData): Promise<ActionResult> 
       styleTags: formData.getAll('styleTags').map(String),
     });
 
-    if (!parsed.success) {
-      return { ok: false, error: parsed.error.issues[0]?.message ?? 'INVALID_INPUT' };
-    }
+    if (!parsed.success) throw new Error('INVALID_INPUT');
     const data = parsed.data;
 
     const dop = await prisma.dop.update({
-      where: { userId: session.user.id },
+      where: { userId: user.id },
       data: {
         displayName: data.displayName,
         displayNameAr: data.displayNameAr || null,
@@ -65,16 +57,13 @@ export async function saveDopProfile(formData: FormData): Promise<ActionResult> 
     let embedded = false;
     try {
       const text = buildDopEmbeddingText(dop);
-      const vector = await embedText(text);
-      await writeDopEmbedding(dop.id, text, vector);
+      await writeDopEmbedding(dop.id, text, await embedText(text));
       embedded = true;
     } catch (error) {
       console.warn('[dop:embed] deferred to cron', error);
     }
 
-    revalidatePath('/[locale]/dop', 'page');
-    return { ok: true, embedded };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'dop') };
-  }
+    revalidate(REVALIDATE.dopProfile);
+    return { embedded };
+  });
 }

@@ -20,13 +20,6 @@ export function formatDate(date: Date | string, locale: string) {
   }).format(d);
 }
 
-/** Inclusive day count between two dates; defaults to 1 when unknown. */
-export function dayCount(start?: Date | null, end?: Date | null) {
-  if (!start || !end) return null;
-  const ms = new Date(end).getTime() - new Date(start).getTime();
-  return Math.max(1, Math.round(ms / 86_400_000) + 1);
-}
-
 export function slugify(input: string) {
   return input
     .toLowerCase()
@@ -44,7 +37,3 @@ export function randomToken(bytes = 24) {
   return Array.from(array, (b) => b.toString(16).padStart(2, '0')).join('');
 }
 
-export function percent(part: number, whole: number) {
-  if (whole <= 0) return 0;
-  return Math.round((part / whole) * 100);
-}

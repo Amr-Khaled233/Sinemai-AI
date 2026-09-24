@@ -48,13 +48,6 @@ export function safeHttpUrls(values: readonly string[]) {
   return values.filter((value) => isSafeHttpUrl(value));
 }
 
-/** Returns the URL when it is safe to link to, otherwise null. */
-export function safeHttpUrl(value: string | null | undefined) {
-  if (!value) return null;
-  const trimmed = value.trim();
-  return isSafeHttpUrl(trimmed) ? trimmed : null;
-}
-
 // ---------------------------------------------------------------- uploads
 
 const SCRIPT_EXTENSIONS = ['.pdf', '.txt', '.md', '.fountain', '.fdx', '.xml'];

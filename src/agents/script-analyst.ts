@@ -299,17 +299,16 @@ export async function loadSceneRequirements(projectId: string): Promise<SceneReq
   }));
 }
 
-/** Aggregation is pure arithmetic — no model is asked to count anything. */
-export async function summariseScenes(
-  projectId: string,
+/**
+ * Aggregation is pure arithmetic — no model is asked to count anything.
+ *
+ * Split from its database wrapper so the numbers every downstream agent reasons
+ * over can be tested without a database.
+ */
+export function aggregateScenes(
   requirements: SceneRequirement[],
-): Promise<SceneSummary> {
-  const settings = await getSettings();
-  const script = await prisma.script.findUnique({
-    where: { projectId },
-    select: { pageCount: true },
-  });
-
+  context: { shootDayHours: number; pageCount: number },
+): SceneSummary {
   const count = requirements.length;
   const lightingMix: Record<Complexity, number> = { LOW: 0, MEDIUM: 0, HIGH: 0 };
   const movementMix: Record<CameraMovement, number> = {
@@ -342,8 +341,8 @@ export async function summariseScenes(
   return {
     sceneCount: count,
     totalHours: Math.round(totalHours * 10) / 10,
-    shootDays: Math.max(1, Math.ceil(totalHours / settings.shootDayHours)),
-    pageCount: script?.pageCount ?? 0,
+    shootDays: Math.max(1, Math.ceil(totalHours / context.shootDayHours)),
+    pageCount: context.pageCount,
     nightScenePct: pct(timeMix.NIGHT + timeMix.DAWN_DUSK),
     exteriorScenePct: pct(environmentMix.EXTERIOR),
     highComplexityPct: pct(lightingMix.HIGH),
@@ -360,4 +359,20 @@ export async function summariseScenes(
       .slice(0, 8)
       .map((n) => n.note),
   };
+}
+
+/** Database-backed wrapper: reads the configured shoot day length and page count. */
+export async function summariseScenes(
+  projectId: string,
+  requirements: SceneRequirement[],
+): Promise<SceneSummary> {
+  const [settings, script] = await Promise.all([
+    getSettings(),
+    prisma.script.findUnique({ where: { projectId }, select: { pageCount: true } }),
+  ]);
+
+  return aggregateScenes(requirements, {
+    shootDayHours: settings.shootDayHours,
+    pageCount: script?.pageCount ?? 0,
+  });
 }

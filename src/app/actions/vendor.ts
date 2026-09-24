@@ -1,34 +1,16 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
-import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
 import { availabilityBlockSchema, inventoryItemSchema } from '@/lib/validation';
 import { uploadFile } from '@/lib/blob';
-import { publicError } from '@/lib/security';
+import { REVALIDATE, requireVendorProfile, revalidate, runAction } from './shared';
 
-export type ActionResult = { ok: true } | { ok: false; error: string };
+const VENDOR_PAGES = [REVALIDATE.vendorHome, REVALIDATE.vendorInventory] as const;
 
-async function requireVendor() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== Role.VENDOR) throw new Error('UNAUTHORIZED');
-  const vendor = await prisma.vendor.findUnique({
-    where: { userId: session.user.id },
-    select: { id: true, status: true, company: { select: { city: true } } },
-  });
-  if (!vendor) throw new Error('NO_VENDOR_PROFILE');
-  return vendor;
-}
+export async function saveInventoryItem(formData: FormData) {
+  return runAction('saveInventoryItem', async () => {
+    const { vendor } = await requireVendorProfile();
 
-function revalidateVendor() {
-  revalidatePath('/[locale]/vendor', 'page');
-  revalidatePath('/[locale]/vendor/inventory', 'page');
-}
-
-export async function saveInventoryItem(formData: FormData): Promise<ActionResult> {
-  try {
-    const vendor = await requireVendor();
     const parsed = inventoryItemSchema.safeParse({
       id: formData.get('id') || undefined,
       equipmentId: formData.get('equipmentId'),
@@ -40,12 +22,10 @@ export async function saveInventoryItem(formData: FormData): Promise<ActionResul
       city: formData.get('city') || vendor.company.city,
       notes: formData.get('notes') ?? '',
     });
-    if (!parsed.success) return { ok: false, error: 'INVALID_INPUT' };
+    if (!parsed.success) throw new Error('INVALID_INPUT');
     const data = parsed.data;
 
-    if (data.quantityAvailable > data.quantityTotal) {
-      return { ok: false, error: 'AVAILABLE_EXCEEDS_TOTAL' };
-    }
+    if (data.quantityAvailable > data.quantityTotal) throw new Error('AVAILABLE_EXCEEDS_TOTAL');
 
     const photo = formData.get('photo');
     const photoUrls: string[] = [];
@@ -69,7 +49,7 @@ export async function saveInventoryItem(formData: FormData): Promise<ActionResul
         where: { id: data.id, vendorId: vendor.id },
         select: { id: true, photoUrls: true },
       });
-      if (!owned) return { ok: false, error: 'NOT_FOUND' };
+      if (!owned) throw new Error('NOT_FOUND');
       await prisma.vendorInventoryItem.update({
         where: { id: owned.id },
         data: {
@@ -86,44 +66,37 @@ export async function saveInventoryItem(formData: FormData): Promise<ActionResul
       });
     }
 
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
-export async function deleteInventoryItem(itemId: string): Promise<ActionResult> {
-  try {
-    const vendor = await requireVendor();
+export async function deleteInventoryItem(itemId: string) {
+  return runAction('deleteInventoryItem', async () => {
+    const { vendor } = await requireVendorProfile();
     const deleted = await prisma.vendorInventoryItem.deleteMany({
       where: { id: itemId, vendorId: vendor.id },
     });
-    if (deleted.count === 0) return { ok: false, error: 'NOT_FOUND' };
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    if (deleted.count === 0) throw new Error('NOT_FOUND');
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
-export async function toggleInventoryActive(itemId: string, active: boolean): Promise<ActionResult> {
-  try {
-    const vendor = await requireVendor();
-    await prisma.vendorInventoryItem.updateMany({
+export async function toggleInventoryActive(itemId: string, active: boolean) {
+  return runAction('toggleInventoryActive', async () => {
+    const { vendor } = await requireVendorProfile();
+    const updated = await prisma.vendorInventoryItem.updateMany({
       where: { id: itemId, vendorId: vendor.id },
       data: { active },
     });
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    if (updated.count === 0) throw new Error('NOT_FOUND');
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
-export async function addAvailabilityBlock(formData: FormData): Promise<ActionResult> {
-  try {
-    const vendor = await requireVendor();
+export async function addAvailabilityBlock(formData: FormData) {
+  return runAction('addAvailabilityBlock', async () => {
+    const { vendor } = await requireVendorProfile();
+
     const parsed = availabilityBlockSchema.safeParse({
       itemId: formData.get('itemId'),
       startDate: formData.get('startDate'),
@@ -131,20 +104,20 @@ export async function addAvailabilityBlock(formData: FormData): Promise<ActionRe
       quantity: formData.get('quantity') ?? 1,
       reason: formData.get('reason') ?? '',
     });
-    if (!parsed.success) return { ok: false, error: 'INVALID_INPUT' };
+    if (!parsed.success) throw new Error('INVALID_INPUT');
     const data = parsed.data;
 
     const start = new Date(data.startDate);
     const end = new Date(data.endDate);
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
-      return { ok: false, error: 'INVALID_RANGE' };
+      throw new Error('INVALID_RANGE');
     }
 
     const item = await prisma.vendorInventoryItem.findFirst({
       where: { id: data.itemId, vendorId: vendor.id },
       select: { id: true, quantityTotal: true },
     });
-    if (!item) return { ok: false, error: 'NOT_FOUND' };
+    if (!item) throw new Error('NOT_FOUND');
 
     await prisma.availabilityBlock.create({
       data: {
@@ -156,56 +129,46 @@ export async function addAvailabilityBlock(formData: FormData): Promise<ActionRe
       },
     });
 
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
-export async function removeAvailabilityBlock(blockId: string): Promise<ActionResult> {
-  try {
-    const vendor = await requireVendor();
+export async function removeAvailabilityBlock(blockId: string) {
+  return runAction('removeAvailabilityBlock', async () => {
+    const { vendor } = await requireVendorProfile();
     const block = await prisma.availabilityBlock.findFirst({
       where: { id: blockId, item: { vendorId: vendor.id } },
       select: { id: true },
     });
-    if (!block) return { ok: false, error: 'NOT_FOUND' };
+    if (!block) throw new Error('NOT_FOUND');
     await prisma.availabilityBlock.delete({ where: { id: block.id } });
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
-export async function updateCompanyProfile(formData: FormData): Promise<ActionResult> {
-  try {
-    const session = await auth();
-    if (!session?.user || session.user.role !== Role.VENDOR) return { ok: false, error: 'UNAUTHORIZED' };
-    const vendor = await prisma.vendor.findUnique({
-      where: { userId: session.user.id },
-      select: { companyId: true },
-    });
-    if (!vendor) return { ok: false, error: 'NO_VENDOR_PROFILE' };
+export async function updateCompanyProfile(formData: FormData) {
+  return runAction('updateCompanyProfile', async () => {
+    const { vendor } = await requireVendorProfile();
+    const text = (field: string, max: number) => String(formData.get(field) ?? '').trim().slice(0, max);
+
+    const name = text('name', 200);
+    const city = text('city', 80);
+    if (!name || !city) throw new Error('INVALID_INPUT');
 
     await prisma.company.update({
       where: { id: vendor.companyId },
       data: {
-        name: String(formData.get('name') ?? '').slice(0, 200) || undefined,
-        city: String(formData.get('city') ?? '').slice(0, 80) || undefined,
-        phone: String(formData.get('phone') ?? '').slice(0, 40) || null,
-        website: String(formData.get('website') ?? '').slice(0, 200) || null,
-        addressLine: String(formData.get('addressLine') ?? '').slice(0, 200) || null,
-        crNumber: String(formData.get('crNumber') ?? '').slice(0, 40) || null,
+        name,
+        city,
+        phone: text('phone', 40) || null,
+        website: text('website', 200) || null,
+        addressLine: text('addressLine', 200) || null,
+        crNumber: text('crNumber', 40) || null,
       },
     });
 
-    revalidateVendor();
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'vendor') };
-  }
+    revalidate(...VENDOR_PAGES);
+  });
 }
 
 /** void-returning binding for <form action={...}> in the vendor dashboard. */

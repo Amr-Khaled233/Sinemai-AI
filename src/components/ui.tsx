@@ -262,25 +262,3 @@ export function CheckIcon({ className }: { className?: string }) {
   );
 }
 
-const ALERT_TONES = {
-  info: 'border-info/40 bg-info/10 text-info',
-  warning: 'border-warning/40 bg-warning/10 text-warning',
-  danger: 'border-danger/40 bg-danger/10 text-danger',
-  accent: 'border-accent/40 bg-accent/[0.08] text-accent',
-} as const;
-
-export function Alert({
-  children,
-  tone = 'info',
-  className,
-}: {
-  children: ReactNode;
-  tone?: keyof typeof ALERT_TONES;
-  className?: string;
-}) {
-  return (
-    <div className={cn('alert animate-fade-in', ALERT_TONES[tone], className)} role="status">
-      {children}
-    </div>
-  );
-}

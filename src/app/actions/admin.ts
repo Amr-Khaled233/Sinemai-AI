@@ -1,29 +1,18 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import {
   ApprovalStatus,
   BudgetTier,
   CameraMovement,
   Complexity,
   DayNightSuitability,
-  Role,
 } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { publicError } from '@/lib/security';
-import { auth } from '@/lib/auth';
 import { approvalEmail, sendEmail } from '@/lib/email';
 import { saveSettings, type PlatformSettings } from '@/lib/settings';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
 import { slugify } from '@/lib/utils';
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
-
-async function requireAdmin() {
-  const session = await auth();
-  if (!session?.user || session.user.role !== Role.ADMIN) throw new Error('UNAUTHORIZED');
-  return session.user;
-}
+import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
 function baseUrl() {
   return process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
@@ -31,64 +20,52 @@ function baseUrl() {
 
 // ---------------------------------------------------------------- approvals
 
-export async function setVendorStatus(
-  vendorId: string,
-  status: ApprovalStatus,
-  reason?: string,
-): Promise<ActionResult> {
-  try {
+export async function setVendorStatus(vendorId: string, status: ApprovalStatus, reason?: string) {
+  return runAction('setVendorStatus', async () => {
     await requireAdmin();
+    const approved = status === ApprovalStatus.APPROVED;
+
     const vendor = await prisma.vendor.update({
       where: { id: vendorId },
       data: {
         status,
-        verified: status === ApprovalStatus.APPROVED,
-        approvedAt: status === ApprovalStatus.APPROVED ? new Date() : null,
+        verified: approved,
+        approvedAt: approved ? new Date() : null,
         notes: reason ?? null,
       },
-      select: { user: { select: { email: true, name: true, locale: true } }, company: { select: { id: true } } },
+      select: {
+        user: { select: { email: true, name: true, locale: true } },
+        company: { select: { id: true } },
+      },
     });
 
-    await prisma.company.update({
-      where: { id: vendor.company.id },
-      data: { verified: status === ApprovalStatus.APPROVED },
-    });
+    await prisma.company.update({ where: { id: vendor.company.id }, data: { verified: approved } });
 
     await sendEmail({
       to: vendor.user.email,
-      subject:
-        status === ApprovalStatus.APPROVED
-          ? 'Your Sinemai AI vendor listing is live'
-          : 'Your Sinemai AI vendor application needs changes',
+      subject: approved
+        ? 'Your Sinemai AI vendor listing is live'
+        : 'Your Sinemai AI vendor application needs changes',
       html: approvalEmail({
         name: vendor.user.name,
-        approved: status === ApprovalStatus.APPROVED,
+        approved,
         reason,
         loginUrl: `${baseUrl()}/${vendor.user.locale}/vendor`,
       }),
     });
 
-    revalidatePath('/[locale]/admin/vendors', 'page');
-    revalidatePath('/[locale]/admin', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminVendors, REVALIDATE.adminHome);
+  });
 }
 
-export async function setDopStatus(
-  dopId: string,
-  status: ApprovalStatus,
-  reason?: string,
-): Promise<ActionResult> {
-  try {
+export async function setDopStatus(dopId: string, status: ApprovalStatus, reason?: string) {
+  return runAction('setDopStatus', async () => {
     await requireAdmin();
+    const approved = status === ApprovalStatus.APPROVED;
+
     const dop = await prisma.dop.update({
       where: { id: dopId },
-      data: {
-        status,
-        approvedAt: status === ApprovalStatus.APPROVED ? new Date() : null,
-      },
+      data: { status, approvedAt: approved ? new Date() : null },
       select: {
         id: true,
         displayName: true,
@@ -102,7 +79,7 @@ export async function setDopStatus(
     });
 
     // An approved profile needs a style vector before it can ever be matched.
-    if (status === ApprovalStatus.APPROVED && !dop.embeddedAt && process.env.OPENAI_API_KEY) {
+    if (approved && !dop.embeddedAt && process.env.OPENAI_API_KEY) {
       try {
         const text = buildDopEmbeddingText(dop);
         await writeDopEmbedding(dop.id, text, await embedText(text));
@@ -113,28 +90,23 @@ export async function setDopStatus(
 
     await sendEmail({
       to: dop.user.email,
-      subject:
-        status === ApprovalStatus.APPROVED
-          ? 'Your Sinemai AI cinematographer profile is live'
-          : 'Your Sinemai AI profile needs changes',
+      subject: approved
+        ? 'Your Sinemai AI cinematographer profile is live'
+        : 'Your Sinemai AI profile needs changes',
       html: approvalEmail({
         name: dop.user.name,
-        approved: status === ApprovalStatus.APPROVED,
+        approved,
         reason,
         loginUrl: `${baseUrl()}/${dop.user.locale}/dop`,
       }),
     });
 
-    revalidatePath('/[locale]/admin/dops', 'page');
-    revalidatePath('/[locale]/admin', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
+  });
 }
 
-export async function toggleVendorVerified(vendorId: string, verified: boolean): Promise<ActionResult> {
-  try {
+export async function toggleVendorVerified(vendorId: string, verified: boolean) {
+  return runAction('toggleVendorVerified', async () => {
     await requireAdmin();
     const vendor = await prisma.vendor.update({
       where: { id: vendorId },
@@ -142,11 +114,8 @@ export async function toggleVendorVerified(vendorId: string, verified: boolean):
       select: { companyId: true },
     });
     await prisma.company.update({ where: { id: vendor.companyId }, data: { verified } });
-    revalidatePath('/[locale]/admin/vendors', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminVendors);
+  });
 }
 
 // ---------------------------------------------------------------- catalog CRUD
@@ -158,15 +127,15 @@ function parseEnumList<T extends string>(formData: FormData, field: string, allo
     .filter((value): value is T => (allowed as readonly string[]).includes(value));
 }
 
-export async function saveEquipment(formData: FormData): Promise<ActionResult> {
-  try {
+export async function saveEquipment(formData: FormData) {
+  return runAction('saveEquipment', async () => {
     await requireAdmin();
 
     const id = String(formData.get('id') ?? '');
     const brand = String(formData.get('brand') ?? '').trim();
     const model = String(formData.get('model') ?? '').trim();
     const categoryId = String(formData.get('categoryId') ?? '');
-    if (!brand || !model || !categoryId) return { ok: false, error: 'INVALID_INPUT' };
+    if (!brand || !model || !categoryId) throw new Error('INVALID_INPUT');
 
     let specs: unknown = {};
     const specsRaw = String(formData.get('specs') ?? '').trim();
@@ -174,7 +143,7 @@ export async function saveEquipment(formData: FormData): Promise<ActionResult> {
       try {
         specs = JSON.parse(specsRaw);
       } catch {
-        return { ok: false, error: 'INVALID_SPECS_JSON' };
+        throw new Error('INVALID_SPECS_JSON');
       }
     }
 
@@ -212,33 +181,29 @@ export async function saveEquipment(formData: FormData): Promise<ActionResult> {
       });
     }
 
-    revalidatePath('/[locale]/admin/equipment', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminEquipment);
+  });
 }
 
-export async function deleteEquipment(id: string): Promise<ActionResult> {
-  try {
+export async function deleteEquipment(id: string) {
+  return runAction('deleteEquipment', async () => {
     await requireAdmin();
     await prisma.equipment.delete({ where: { id } });
-    revalidatePath('/[locale]/admin/equipment', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminEquipment);
+  });
 }
 
 // ---------------------------------------------------------------- settings
 
-export async function savePlatformSettings(formData: FormData): Promise<ActionResult> {
-  try {
+export async function savePlatformSettings(formData: FormData) {
+  return runAction('savePlatformSettings', async () => {
     await requireAdmin();
 
     const numeric = (field: string) => {
       const raw = String(formData.get(field) ?? '').trim();
-      return raw === '' ? undefined : Number(raw);
+      if (raw === '') return undefined;
+      const value = Number(raw);
+      return Number.isFinite(value) ? value : undefined;
     };
 
     const patch: Partial<PlatformSettings> = {
@@ -251,66 +216,58 @@ export async function savePlatformSettings(formData: FormData): Promise<ActionRe
     };
 
     await saveSettings(
-      Object.fromEntries(Object.entries(patch).filter(([, value]) => value !== undefined)) as Partial<PlatformSettings>,
+      Object.fromEntries(
+        Object.entries(patch).filter(([, value]) => value !== undefined),
+      ) as Partial<PlatformSettings>,
     );
 
-    // Budget tier windows
     for (const tier of Object.values(BudgetTier)) {
       const min = numeric(`tier_${tier}_min`);
       const max = numeric(`tier_${tier}_max`);
       if (min === undefined || max === undefined) continue;
+      const labels = {
+        labelEn: String(formData.get(`tier_${tier}_labelEn`) ?? tier),
+        labelAr: String(formData.get(`tier_${tier}_labelAr`) ?? tier),
+      };
       await prisma.budgetTierConfig.upsert({
         where: { tier },
-        create: {
-          tier,
-          minTotal: min,
-          maxTotal: max,
-          labelEn: String(formData.get(`tier_${tier}_labelEn`) ?? tier),
-          labelAr: String(formData.get(`tier_${tier}_labelAr`) ?? tier),
-        },
-        update: {
-          minTotal: min,
-          maxTotal: max,
-          labelEn: String(formData.get(`tier_${tier}_labelEn`) ?? tier),
-          labelAr: String(formData.get(`tier_${tier}_labelAr`) ?? tier),
-        },
+        create: { tier, minTotal: min, maxTotal: max, ...labels },
+        update: { minTotal: min, maxTotal: max, ...labels },
       });
     }
 
-    revalidatePath('/[locale]/admin/settings', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminSettings);
+  });
 }
 
-export async function saveCrewRate(formData: FormData): Promise<ActionResult> {
-  try {
+export async function saveCrewRate(formData: FormData) {
+  return runAction('saveCrewRate', async () => {
     await requireAdmin();
     const roleSlug = String(formData.get('roleSlug') ?? '');
     const tier = String(formData.get('budgetTier') ?? '') as BudgetTier;
     const dayRate = Number(formData.get('dayRate') ?? 0);
     const headcount = Number(formData.get('headcount') ?? 1);
-    if (!roleSlug || !Object.values(BudgetTier).includes(tier)) return { ok: false, error: 'INVALID_INPUT' };
+
+    if (!roleSlug || !Object.values(BudgetTier).includes(tier)) throw new Error('INVALID_INPUT');
+    if (!Number.isFinite(dayRate) || dayRate < 0 || !Number.isFinite(headcount) || headcount < 1) {
+      throw new Error('INVALID_INPUT');
+    }
 
     await prisma.crewRate.update({
       where: { roleSlug_budgetTier: { roleSlug, budgetTier: tier } },
       data: { dayRate, headcount },
     });
 
-    revalidatePath('/[locale]/admin/settings', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminSettings);
+  });
 }
 
-export async function saveStyleTag(formData: FormData): Promise<ActionResult> {
-  try {
+export async function saveStyleTag(formData: FormData) {
+  return runAction('saveStyleTag', async () => {
     await requireAdmin();
     const labelEn = String(formData.get('labelEn') ?? '').trim();
     const labelAr = String(formData.get('labelAr') ?? '').trim();
-    if (!labelEn || !labelAr) return { ok: false, error: 'INVALID_INPUT' };
+    if (!labelEn || !labelAr) throw new Error('INVALID_INPUT');
     const slug = String(formData.get('slug') ?? '') || slugify(labelEn);
 
     await prisma.styleTag.upsert({
@@ -319,27 +276,21 @@ export async function saveStyleTag(formData: FormData): Promise<ActionResult> {
       update: { labelEn, labelAr },
     });
 
-    revalidatePath('/[locale]/admin/settings', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminSettings);
+  });
 }
 
-export async function toggleStyleTag(slug: string, active: boolean): Promise<ActionResult> {
-  try {
+export async function toggleStyleTag(slug: string, active: boolean) {
+  return runAction('toggleStyleTag', async () => {
     await requireAdmin();
     await prisma.styleTag.update({ where: { slug }, data: { active } });
-    revalidatePath('/[locale]/admin/settings', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'admin') };
-  }
+    revalidate(REVALIDATE.adminSettings);
+  });
 }
 
 // ---------------------------------------------------------------- form bindings
-// <form action={...}> requires a void-returning action; these wrap the result-
-// returning versions above for server-rendered forms that rely on revalidation.
+// <form action={...}> requires a void-returning action; these wrap the
+// result-returning versions above for server-rendered forms.
 
 export async function savePlatformSettingsForm(formData: FormData): Promise<void> {
   await savePlatformSettings(formData);

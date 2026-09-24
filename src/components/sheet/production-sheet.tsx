@@ -1,7 +1,7 @@
 import { getTranslations } from 'next-intl/server';
 import type { BudgetTier, Prisma } from '@prisma/client';
 import { Badge, Card, MeterBar, Stat } from '@/components/ui';
-import { MeterFill, Reveal } from '@/components/motion';
+import { MeterFill } from '@/components/motion';
 import { InquiryButton } from '@/components/sheet/inquiry-form';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';

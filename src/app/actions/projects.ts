@@ -1,36 +1,20 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import { ParsedFormat, ProjectStatus, Role } from '@prisma/client';
+import { ParsedFormat, ProjectStatus } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
 import { projectSchema } from '@/lib/validation';
 import { detectFormat, parseScriptSource } from '@/lib/script/parse';
 import { uploadFile, deleteFile } from '@/lib/blob';
 import { randomToken } from '@/lib/utils';
-import { publicError } from '@/lib/security';
-
-async function requireProducer() {
-  const session = await auth();
-  if (!session?.user || (session.user.role !== Role.PRODUCER && session.user.role !== Role.ADMIN)) {
-    throw new Error('UNAUTHORIZED');
-  }
-  return session.user;
-}
-
-async function ownedProject(projectId: string) {
-  const user = await requireProducer();
-  const project = await prisma.project.findUnique({
-    where: { id: projectId },
-    select: { id: true, ownerId: true, script: { select: { id: true, fileUrl: true } } },
-  });
-  if (!project) throw new Error('NOT_FOUND');
-  if (project.ownerId !== user.id && user.role !== Role.ADMIN) throw new Error('UNAUTHORIZED');
-  return project;
-}
-
-export type ActionResult = { ok: true } | { ok: false; error: string };
+import {
+  REVALIDATE,
+  requireOwnedProject,
+  requireProducer,
+  revalidate,
+  runAction,
+  type Failed,
+} from './shared';
 
 export async function createProject(locale: string, formData: FormData) {
   const user = await requireProducer();
@@ -64,6 +48,7 @@ export async function createProject(locale: string, formData: FormData) {
     select: { id: true },
   });
 
+  revalidate(REVALIDATE.producerProjects);
   redirect(`/${locale}/producer/projects/${project.id}`);
 }
 
@@ -72,9 +57,9 @@ export async function createProject(locale: string, formData: FormData) {
  * count before paying for an analysis run. Parsing is deterministic code; the
  * agents only ever interpret what this produced.
  */
-export async function saveScript(projectId: string, formData: FormData): Promise<ActionResult> {
-  try {
-    const project = await ownedProject(projectId);
+export async function saveScript(projectId: string, formData: FormData) {
+  return runAction('saveScript', async () => {
+    const { project } = await requireOwnedProject(projectId);
 
     const file = formData.get('file');
     const pasted = String(formData.get('pasted') ?? '').trim();
@@ -96,7 +81,7 @@ export async function saveScript(projectId: string, formData: FormData): Promise
       format = ParsedFormat.PASTED;
       rawText = pasted;
     } else {
-      return { ok: false, error: 'NO_SCRIPT' };
+      throw new Error('NO_SCRIPT');
     }
 
     const parsed = await parseScriptSource({ format, text: rawText, buffer });
@@ -145,68 +130,62 @@ export async function saveScript(projectId: string, formData: FormData): Promise
         })),
       });
 
+      // A new script invalidates the sheet and any half-finished run.
       await tx.projectRecommendation.deleteMany({ where: { projectId } });
+      await tx.analysisState.deleteMany({ where: { projectId } });
       await tx.project.update({
         where: { id: projectId },
         data: { status: ProjectStatus.SCRIPT_UPLOADED },
       });
     });
 
-    revalidatePath('/[locale]/producer/projects/[id]', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'saveScript') };
-  }
+    revalidate(REVALIDATE.producerProject, REVALIDATE.producerProjects);
+    return { sceneCount: parsed.scenes.length };
+  });
 }
 
-export async function updateVisualStyle(projectId: string, tags: string[]): Promise<ActionResult> {
-  try {
-    await ownedProject(projectId);
+export async function updateVisualStyle(projectId: string, tags: string[]) {
+  return runAction('updateVisualStyle', async () => {
+    await requireOwnedProject(projectId);
     await prisma.project.update({
       where: { id: projectId },
       data: { visualStyleTags: tags.slice(0, 8) },
     });
-    revalidatePath('/[locale]/producer/projects/[id]', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'projects') };
-  }
+    revalidate(REVALIDATE.producerProject);
+  });
 }
 
-export async function createShareLink(projectId: string): Promise<{ ok: boolean; token?: string }> {
-  try {
-    await ownedProject(projectId);
+export async function createShareLink(projectId: string): Promise<{ ok: true; token: string } | Failed> {
+  return runAction('createShareLink', async () => {
+    await requireOwnedProject(projectId);
+
     const existing = await prisma.shareLink.findFirst({
       where: { projectId, revoked: false },
       select: { token: true },
     });
-    if (existing) return { ok: true, token: existing.token };
+    if (existing) return { token: existing.token };
 
     const link = await prisma.shareLink.create({
       data: { projectId, token: randomToken(18) },
       select: { token: true },
     });
-    revalidatePath('/[locale]/producer/projects/[id]', 'page');
-    return { ok: true, token: link.token };
-  } catch {
-    return { ok: false };
-  }
+    revalidate(REVALIDATE.producerProject);
+    return { token: link.token };
+  });
 }
 
-export async function revokeShareLinks(projectId: string): Promise<ActionResult> {
-  try {
-    await ownedProject(projectId);
+export async function revokeShareLinks(projectId: string) {
+  return runAction('revokeShareLinks', async () => {
+    await requireOwnedProject(projectId);
     await prisma.shareLink.updateMany({ where: { projectId }, data: { revoked: true } });
-    revalidatePath('/[locale]/producer/projects/[id]', 'page');
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, error: publicError(error, 'projects') };
-  }
+    revalidate(REVALIDATE.producerProject);
+  });
 }
 
 export async function deleteProject(locale: string, projectId: string) {
-  const project = await ownedProject(projectId);
+  const { project } = await requireOwnedProject(projectId);
   if (project.script?.fileUrl) await deleteFile(project.script.fileUrl);
   await prisma.project.delete({ where: { id: projectId } });
+  revalidate(REVALIDATE.producerProjects);
   redirect(`/${locale}/producer`);
 }

@@ -4,7 +4,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { countEmbeddableDops } from '@/lib/embeddings';
 import { Badge, Card, Stat } from '@/components/ui';
-import { AnimatedNumber, Reveal } from '@/components/motion';
+import { AnimatedNumber } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
 import type { AppLocale } from '@/i18n/routing';
 

@@ -1,8 +1,8 @@
 import { generateObject } from 'ai';
 import { z } from 'zod';
-import { AgentName, AgentRunStatus } from '@prisma/client';
+import { AgentName } from '@prisma/client';
 import { getBudgetTierConfig } from '@/lib/settings';
-import { finishRun, model, MODELS, startRun, type RunContext } from './runtime';
+import { model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { describeSummary } from './equipment-agent';
 import { withLanguage } from './language';
 import type {
@@ -53,97 +53,93 @@ export async function runCriticAgent(
   },
   options: { attempt?: number } = {},
 ): Promise<CriticResult> {
-  const startedAt = Date.now();
   const tierConfig = await getBudgetTierConfig(brief.budgetTier);
-  const handle = await startRun({
-    ctx,
-    agent: AgentName.CRITIC,
-    attempt: options.attempt ?? 1,
-    model: MODELS.reasoning,
-    systemPrompt: withLanguage(CRITIC_SYSTEM, brief.locale),
-    input: { budgetTier: brief.budgetTier, tierWindow: [tierConfig.minTotal, tierConfig.maxTotal] },
-  });
 
+  // The review is wrapped rather than allowed to throw: a reviewer that cannot
+  // run must not block a sheet that is otherwise complete, so the failure is
+  // recorded on the run row and the sheet ships with a visible caveat instead.
   try {
-    ctx.report({ type: 'stage', stage: 'reviewing', pct: 80 });
+    return await withAgentRun(
+      {
+        ctx,
+        agent: AgentName.CRITIC,
+        attempt: options.attempt ?? 1,
+        model: MODELS.reasoning,
+        systemPrompt: withLanguage(CRITIC_SYSTEM, brief.locale),
+        input: { budgetTier: brief.budgetTier, tierWindow: [tierConfig.minTotal, tierConfig.maxTotal] },
+      },
+      async () => {
+      ctx.report({ type: 'stage', stage: 'reviewing', pct: 80 });
 
-    const { object } = await generateObject({
-      model: model('reasoning'),
-      schema: criticSchema,
-      system: withLanguage(CRITIC_SYSTEM, brief.locale),
-      temperature: 0.1,
-      prompt: [
-        `PROJECT: "${brief.name}" — ${brief.type}, declared budget tier ${brief.budgetTier} (${tierConfig.minTotal}–${tierConfig.maxTotal} ${tierConfig.currency}), ${brief.city}.`,
-        brief.visualStyleTags.length ? `Requested visual style: ${brief.visualStyleTags.join(', ')}.` : '',
-        '',
-        'SCENE BREAKDOWN:',
-        describeSummary(parts.summary),
-        '',
-        'RECOMMENDED PACKAGE:',
-        ...parts.equipment.package.map(
-          (i) =>
-            `- ${i.categorySlug}: ${i.brand} ${i.model} ×${i.quantity} for ${i.rentalDays} day(s) — ${i.reason}`,
-        ),
-        `Rationale: ${parts.equipment.rationale}`,
-        parts.equipment.droppedHallucinatedIds.length
-          ? `NOTE: ${parts.equipment.droppedHallucinatedIds.length} selected id(s) were not in the catalog shortlist and were dropped before pricing.`
-          : '',
-        '',
-        'DOP MATCHES:',
-        parts.dops.matches.length
-          ? parts.dops.matches
-              .map(
-                (d) =>
-                  `- ${d.name} (score ${d.score}) tags: ${d.styleTags.join(', ') || '—'} — ${d.reason}`,
-              )
-              .join('\n')
-          : '- none returned',
-        parts.dops.note ? `Matching note: ${parts.dops.note}` : '',
-        '',
-        'VENDORS & BUDGET:',
-        ...parts.vendorBudget.vendors.map(
-          (v) =>
-            `- ${v.companyName} (${v.city}): ${v.itemsCovered} item(s), ${v.coveragePct}% coverage, subtotal ${v.subtotal} ${parts.vendorBudget.budget.currency}`,
-        ),
-        parts.vendorBudget.uncoveredEquipment.length
-          ? `Unstocked items: ${parts.vendorBudget.uncoveredEquipment
-              .map((u) => `${u.brand} ${u.model}${u.fallbackDayRate ? '' : ' (no rate at all)'}`)
-              .join(', ')}`
-          : '',
-        `Equipment rental: ${parts.vendorBudget.budget.equipmentRental}. Crew: ${parts.vendorBudget.budget.crewTotal} across ${parts.vendorBudget.budget.crewBreakdown.length} role(s) over ${parts.vendorBudget.budget.shootDays} day(s).`,
-        `Estimate — low ${parts.vendorBudget.low}, mid ${parts.vendorBudget.mid}, high ${parts.vendorBudget.high} ${parts.vendorBudget.budget.currency}.`,
-        parts.vendorBudget.notes.length ? `Sourcing notes: ${parts.vendorBudget.notes.join(' | ')}` : '',
-      ]
-        .filter(Boolean)
-        .join('\n'),
-    });
+      const { object } = await generateObject({
+        model: model('reasoning'),
+        schema: criticSchema,
+        system: withLanguage(CRITIC_SYSTEM, brief.locale),
+        temperature: 0.1,
+        prompt: [
+          `PROJECT: "${brief.name}" — ${brief.type}, declared budget tier ${brief.budgetTier} (${tierConfig.minTotal}–${tierConfig.maxTotal} ${tierConfig.currency}), ${brief.city}.`,
+          brief.visualStyleTags.length ? `Requested visual style: ${brief.visualStyleTags.join(', ')}.` : '',
+          '',
+          'SCENE BREAKDOWN:',
+          describeSummary(parts.summary),
+          '',
+          'RECOMMENDED PACKAGE:',
+          ...parts.equipment.package.map(
+            (i) =>
+              `- ${i.categorySlug}: ${i.brand} ${i.model} ×${i.quantity} for ${i.rentalDays} day(s) — ${i.reason}`,
+          ),
+          `Rationale: ${parts.equipment.rationale}`,
+          parts.equipment.droppedHallucinatedIds.length
+            ? `NOTE: ${parts.equipment.droppedHallucinatedIds.length} selected id(s) were not in the catalog shortlist and were dropped before pricing.`
+            : '',
+          '',
+          'DOP MATCHES:',
+          parts.dops.matches.length
+            ? parts.dops.matches
+                .map(
+                  (d) =>
+                    `- ${d.name} (score ${d.score}) tags: ${d.styleTags.join(', ') || '—'} — ${d.reason}`,
+                )
+                .join('\n')
+            : '- none returned',
+          parts.dops.note ? `Matching note: ${parts.dops.note}` : '',
+          '',
+          'VENDORS & BUDGET:',
+          ...parts.vendorBudget.vendors.map(
+            (v) =>
+              `- ${v.companyName} (${v.city}): ${v.itemsCovered} item(s), ${v.coveragePct}% coverage, subtotal ${v.subtotal} ${parts.vendorBudget.budget.currency}`,
+          ),
+          parts.vendorBudget.uncoveredEquipment.length
+            ? `Unstocked items: ${parts.vendorBudget.uncoveredEquipment
+                .map((u) => `${u.brand} ${u.model}${u.fallbackDayRate ? '' : ' (no rate at all)'}`)
+                .join(', ')}`
+            : '',
+          `Equipment rental: ${parts.vendorBudget.budget.equipmentRental}. Crew: ${parts.vendorBudget.budget.crewTotal} across ${parts.vendorBudget.budget.crewBreakdown.length} role(s) over ${parts.vendorBudget.budget.shootDays} day(s).`,
+          `Estimate — low ${parts.vendorBudget.low}, mid ${parts.vendorBudget.mid}, high ${parts.vendorBudget.high} ${parts.vendorBudget.budget.currency}.`,
+          parts.vendorBudget.notes.length ? `Sourcing notes: ${parts.vendorBudget.notes.join(' | ')}` : '',
+        ]
+          .filter(Boolean)
+          .join('\n'),
+      });
 
-    // Deterministic checks the model should not be trusted to do by eye.
-    const mechanical = mechanicalChecks(brief, parts, tierConfig);
-    const issues: CriticIssue[] = [...mechanical, ...(object.issues as CriticIssue[])];
-    const passed = object.passed && !issues.some((i) => i.severity === 'blocker');
+      // Deterministic checks the model should not be trusted to do by eye.
+      const mechanical = mechanicalChecks(brief, parts, tierConfig);
+      const issues: CriticIssue[] = [...mechanical, ...(object.issues as CriticIssue[])];
+      const passed = object.passed && !issues.some((i) => i.severity === 'blocker');
 
-    const result: CriticResult = {
-      passed,
-      issues: dedupeIssues(issues),
-      summary: object.summary,
-    };
+      const result: CriticResult = {
+        passed,
+        issues: dedupeIssues(issues),
+        summary: object.summary,
+      };
 
-    await finishRun(handle, {
-      status: AgentRunStatus.OK,
-      output: result,
-      criticFlag: passed ? undefined : issues.map((i) => `${i.agent}: ${i.problem}`).join(' | '),
-      startedAt,
-    });
-
-    return result;
-  } catch (error) {
-    // A failed critic must not block delivery: the sheet ships with a visible caveat.
-    await finishRun(handle, {
-      status: AgentRunStatus.FAILED,
-      errorText: error instanceof Error ? error.message : String(error),
-      startedAt,
-    });
+        return {
+          output: result,
+          criticFlag: passed ? undefined : issues.map((i) => `${i.agent}: ${i.problem}`).join(' | '),
+        };
+      },
+    );
+  } catch {
     return {
       passed: true,
       issues: [

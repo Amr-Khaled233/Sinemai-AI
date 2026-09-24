@@ -15,7 +15,10 @@
     "db:index": "prisma db execute --file prisma/sql/02_vector_index.sql --schema prisma/schema.prisma",
     "db:seed": "tsx prisma/seed.ts",
     "db:setup": "npm run db:extensions && npm run db:push && npm run db:index && npm run db:seed",
-    "agents:smoke": "tsx scripts/agent-smoke.ts"
+    "agents:smoke": "tsx scripts/agent-smoke.ts",
+    "test": "tsx --test tests/*.test.ts",
+    "test:watch": "tsx --test --watch tests/*.test.ts",
+    "verify": "npm run typecheck && npm run lint && npm run test && npm run agents:smoke"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

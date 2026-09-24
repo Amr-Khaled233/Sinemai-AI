@@ -157,7 +157,22 @@ batch, a timed-out or retried request resumes at the next cursor instead of re-a
 re-paying for — the whole script. `GET` on the same route returns the current checkpoint, so a
 reloaded page can rejoin a run already in flight.
 
-### Testing the pipeline
+### Tests
+
+```bash
+npm test      # 60 unit tests, no database and no API calls
+npm run verify  # typecheck + lint + tests + parser smoke, the pre-push gate
+```
+
+The suite covers the parts that are expensive to get wrong and cheap to check:
+screenplay segmentation across Fountain, Final Draft, pasted briefs and Arabic headings; the
+budget arithmetic (weekly rates, cheapest-vendor allocation, availability penalties, crew
+totals, uncovered items); scene aggregation; and the security gates (HTML escaping, href scheme
+validation, the upload allow-list, error-code hygiene).
+
+The pure logic is deliberately separable from the database and the model so it can be tested
+directly — `aggregateScenes` takes its settings as arguments, and `allocatePackage` takes vendor
+rows rather than reaching for Prisma.
 
 ```bash
 npm run agents:smoke            # parses every file in ./samples — no API calls, no DB writes
