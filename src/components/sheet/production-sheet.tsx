@@ -2,9 +2,10 @@ import { getTranslations } from 'next-intl/server';
 import type { BudgetTier, Prisma } from '@prisma/client';
 import { Badge, Card, MeterBar, Stat } from '@/components/ui';
 import { MeterFill } from '@/components/motion';
-import { InquiryButton } from '@/components/sheet/inquiry-form';
 import { PackageEditor, type CatalogOption } from '@/components/sheet/package-editor';
 import { ScheduleView } from '@/components/sheet/schedule-view';
+import { CurrencySwitcher } from '@/components/currency-switcher';
+import { getDisplayCurrency } from '@/lib/currency-server';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';
@@ -97,7 +98,11 @@ export async function ProductionSheet({
   /** Hours per shoot day, from platform settings. */
   shootDayHours?: number;
 }) {
-  const [t, tEnum] = await Promise.all([getTranslations('sheet'), getTranslations('enum')]);
+  const [t, tEnum, display] = await Promise.all([
+    getTranslations('sheet'),
+    getTranslations('enum'),
+    getDisplayCurrency(),
+  ]);
 
   const pkg = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
   const dops = (recommendation.matchedDops as unknown as DopMatch[]) ?? [];
@@ -401,16 +406,6 @@ export async function ProductionSheet({
                       {t('dayRate')}: {money(dop.dayRate)}
                     </span>
                   ) : null}
-                  {!readOnly && (
-                    <InquiryButton
-                      className="ms-auto"
-                      projectId={project.id}
-                      projectName={project.name}
-                      targetType="DOP"
-                      targetId={dop.dopId}
-                      targetName={dop.name}
-                    />
-                  )}
                 </div>
               </li>
             ))}
@@ -441,14 +436,20 @@ export async function ProductionSheet({
                       <div className="text-xs text-muted">{t('subtotal')}</div>
                       <div className="font-semibold tabular-nums text-strong">{money(vendor.subtotal)}</div>
                     </div>
-                    {!readOnly && (
-                      <InquiryButton
-                        projectId={project.id}
-                        projectName={project.name}
-                        targetType="VENDOR"
-                        targetId={vendor.vendorId}
-                        targetName={vendor.companyName}
-                      />
+                    {/* Companies have no accounts, so contact is direct. */}
+                    {vendor.contactEmail && (
+                      <a
+                        href={`mailto:${vendor.contactEmail}`}
+                        className="btn-secondary px-4 text-xs"
+                        dir="ltr"
+                      >
+                        {t('email')}
+                      </a>
+                    )}
+                    {vendor.phone && (
+                      <a href={`tel:${vendor.phone.replace(/[^+d]/g, '')}`} className="btn-ghost px-3 text-xs" dir="ltr">
+                        {vendor.phone}
+                      </a>
                     )}
                   </div>
                 </div>
@@ -497,7 +498,10 @@ export async function ProductionSheet({
 
       {/* ---------------------------------------------------------- budget */}
       {budget && (
-        <Card title={t('budgetTitle')}>
+        <Card
+          title={t('budgetTitle')}
+          action={<CurrencySwitcher current={display.code} options={display.options} label={t('showIn')} />}
+        >
           <div className="grid gap-3 sm:grid-cols-3">
             <Stat label={t('budgetLow')} value={money(recommendation.estimatedBudgetLow)} />
             <Stat label={t('budgetMid')} value={money(recommendation.estimatedBudgetMid)} highlight />

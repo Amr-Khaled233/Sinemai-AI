@@ -93,18 +93,6 @@ enum DayNightSuitability {
   BOTH
 }
 
-enum InquiryTargetType {
-  DOP
-  VENDOR
-}
-
-enum InquiryStatus {
-  SENT
-  READ
-  REPLIED
-  CLOSED
-}
-
 enum AgentName {
   ORCHESTRATOR
   SCRIPT_ANALYST
@@ -141,8 +129,8 @@ model User {
   projects       Project[]
   dop            Dop?
   vendor         Vendor?
-  sentInquiries  Inquiry[]            @relation("InquiryFrom")
-  inquiryReplies InquiryMessage[]     @relation("InquiryMessageSender")
+  supportThreads  SupportThread[]
+  supportMessages SupportMessage[]
   accounts       Account[]
   sessions       Session[]
   resetTokens    PasswordResetToken[]
@@ -200,6 +188,8 @@ model Company {
   latitude    Float?
   longitude   Float?
   phone       String?
+  /// Where producers reach the company; companies have no accounts.
+  email       String?
   website     String?
   logoUrl     String?
   verified    Boolean  @default(false)
@@ -209,9 +199,11 @@ model Company {
   vendor Vendor?
 }
 
+/// A rental company. The admin manages it; it has no login of its own
+/// (userId is kept only for rows created before that change).
 model Vendor {
   id         String         @id @default(cuid())
-  userId     String         @unique
+  userId     String?        @unique
   companyId  String         @unique
   status     ApprovalStatus @default(PENDING)
   verified   Boolean        @default(false)
@@ -220,17 +212,17 @@ model Vendor {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
-  user      User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user      User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
   company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inventory VendorInventoryItem[]
-  inquiries Inquiry[]             @relation("InquiryVendor")
 
   @@index([status])
 }
 
+/// A cinematographer profile the admin manages; no login of its own.
 model Dop {
   id              String                       @id @default(cuid())
-  userId          String                       @unique
+  userId          String?                      @unique
   displayName     String
   displayNameAr   String?
   bio             String                       @default("")
@@ -251,8 +243,7 @@ model Dop {
   createdAt       DateTime                     @default(now())
   updatedAt       DateTime                     @updatedAt
 
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  inquiries Inquiry[] @relation("InquiryDop")
+  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([status])
 }
@@ -364,7 +355,7 @@ model Project {
   owner          User                    @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   script         Script?
   recommendation ProjectRecommendation?
-  inquiries      Inquiry[]
+  chatMessages   ProjectChatMessage[]
   agentRuns      AgentRun[]
   shareLinks     ShareLink[]
   analysisState  AnalysisState?
@@ -467,49 +458,53 @@ model ShareLink {
   @@index([projectId])
 }
 
-model Inquiry {
-  id            String            @id @default(cuid())
-  projectId     String?
-  fromUserId    String
-  targetType    InquiryTargetType
-  dopId         String?
-  vendorId      String?
+/// A conversation a user opens with the admin: questions, problems, requests.
+model SupportThread {
+  id            String    @id @default(cuid())
+  userId        String
   subject       String
-  message       String
-  contactEmail  String
-  contactPhone  String?
-  status        InquiryStatus     @default(SENT)
-  /// When the recipient first opened it, so a producer can see it landed.
-  readAt        DateTime?
   closedAt      DateTime?
-  /// Sorts threads by activity without counting messages on every query.
-  lastMessageAt DateTime          @default(now())
-  createdAt     DateTime          @default(now())
+  /// Sorts the inbox by activity without counting messages.
+  lastMessageAt DateTime  @default(now())
+  /// When each side last looked, so both can see what is new.
+  userReadAt    DateTime?
+  adminReadAt   DateTime?
+  createdAt     DateTime  @default(now())
 
-  project  Project?         @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  fromUser User             @relation("InquiryFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
-  dop      Dop?             @relation("InquiryDop", fields: [dopId], references: [id], onDelete: Cascade)
-  vendor   Vendor?          @relation("InquiryVendor", fields: [vendorId], references: [id], onDelete: Cascade)
-  messages InquiryMessage[]
+  user     User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportMessage[]
 
-  @@index([dopId])
-  @@index([vendorId])
-  @@index([fromUserId, lastMessageAt])
+  @@index([userId, lastMessageAt])
+  @@index([lastMessageAt])
 }
 
-/// One message in an inquiry thread. The opening message is stored on the
-/// Inquiry itself and mirrored here, so a thread reads as one list.
-model InquiryMessage {
+model SupportMessage {
   id        String   @id @default(cuid())
-  inquiryId String
+  threadId  String
   senderId  String
+  /// Whether the admin wrote it; kept on the row so a later role change cannot rewrite history.
+  fromAdmin Boolean  @default(false)
   body      String
   createdAt DateTime @default(now())
 
-  inquiry Inquiry @relation(fields: [inquiryId], references: [id], onDelete: Cascade)
-  sender  User    @relation("InquiryMessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  thread SupportThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  sender User          @relation(fields: [senderId], references: [id], onDelete: Cascade)
 
-  @@index([inquiryId, createdAt])
+  @@index([threadId, createdAt])
+}
+
+/// The project's conversation with the assistant, in order. `parts` is the
+/// message as the chat UI renders it: text, tool calls and their results.
+model ProjectChatMessage {
+  id        String   @id @default(cuid())
+  projectId String
+  role      String
+  parts     Json
+  createdAt DateTime @default(now())
+
+  project Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId, createdAt])
 }
 
 // ---------------------------------------------------------------- agent observability

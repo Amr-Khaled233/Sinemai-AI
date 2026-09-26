@@ -6,17 +6,11 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { Field, Input, Spinner } from '@/components/ui';
 
-const HOME_BY_ROLE: Record<string, string> = {
-  ADMIN: '/admin',
-  VENDOR: '/vendor',
-  DOP: '/dop',
-  PRODUCER: '/producer',
-};
 
 async function homeForCurrentSession() {
   const session = await getSession();
   const role = (session?.user as { role?: string } | undefined)?.role ?? 'PRODUCER';
-  return HOME_BY_ROLE[role] ?? '/producer';
+  return role === 'ADMIN' ? '/admin' : '/producer';
 }
 
 export function SignInForm() {

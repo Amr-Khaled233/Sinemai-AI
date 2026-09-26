@@ -1,7 +1,6 @@
 'use client';
 
 import { useTransition } from 'react';
-import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { CURRENCY_COOKIE } from '@/lib/currency';
 
@@ -9,8 +8,15 @@ import { CURRENCY_COOKIE } from '@/lib/currency';
  * Picks the currency amounts are shown in. The choice lives in a cookie so the
  * server renders the right figures on the first paint, with no flash of SAR.
  */
-export function CurrencySwitcher({ current, options }: { current: string; options: string[] }) {
-  const t = useTranslations('nav');
+export function CurrencySwitcher({
+  current,
+  options,
+  label,
+}: {
+  current: string;
+  options: string[];
+  label: string;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -19,12 +25,12 @@ export function CurrencySwitcher({ current, options }: { current: string; option
 
   return (
     <label className="relative inline-flex items-center">
-      <span className="sr-only">{t('currency')}</span>
+      <span className="sr-only">{label}</span>
       <select
         className="h-9 cursor-pointer appearance-none rounded-full border border-line bg-transparent ps-3 pe-7 font-display text-xs font-medium uppercase tracking-wider text-muted transition-colors hover:border-accent-soft hover:text-accent focus:outline-none disabled:opacity-50"
         value={current}
         disabled={pending}
-        title={t('currency')}
+        title={label}
         onChange={(event) => {
           const code = event.target.value;
           document.cookie = `${CURRENCY_COOKIE}=${code}; path=/; max-age=31536000; samesite=lax`;

@@ -59,8 +59,9 @@ describe('migration history', () => {
       'VendorInventoryItem',
       'ProjectRecommendation',
       'AnalysisState',
-      'Inquiry',
-      'InquiryMessage',
+      'SupportThread',
+      'SupportMessage',
+      'ProjectChatMessage',
       'PasswordResetToken',
       'RateLimit',
       'AgentRun',
@@ -68,6 +69,8 @@ describe('migration history', () => {
     ]) {
       assert.ok(names.includes(expected), `missing table ${expected}`);
     }
+    // The inquiry threads went with the vendor and cinematographer accounts.
+    assert.ok(!names.includes('Inquiry'), 'Inquiry should have been dropped');
   });
 
   it('wires up the foreign keys', async () => {

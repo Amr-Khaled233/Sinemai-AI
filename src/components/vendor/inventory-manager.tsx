@@ -3,13 +3,6 @@
 import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import {
-  addAvailabilityBlock,
-  deleteInventoryItem,
-  removeAvailabilityBlock,
-  saveInventoryItem,
-  toggleInventoryActive,
-} from '@/app/actions/vendor';
 import { Badge, Card, Field, Input, Select, Textarea } from '@/components/ui';
 
 export type CatalogOption = {
@@ -36,11 +29,7 @@ export type InventoryRow = {
 
 type ActionResult = { ok: boolean; error?: string };
 
-/**
- * The writes this editor performs. A vendor gets their own actions by default;
- * the admin rentals page passes the admin actions bound to the vendor being
- * edited, so one editor serves both.
- */
+/** The writes this editor performs: the admin actions, bound to the company being edited. */
 export type InventoryActions = {
   save: (formData: FormData) => Promise<ActionResult>;
   remove: (itemId: string) => Promise<ActionResult>;
@@ -49,25 +38,17 @@ export type InventoryActions = {
   removeBlock: (blockId: string) => Promise<ActionResult>;
 };
 
-const VENDOR_ACTIONS: InventoryActions = {
-  save: saveInventoryItem,
-  remove: deleteInventoryItem,
-  toggle: toggleInventoryActive,
-  addBlock: addAvailabilityBlock,
-  removeBlock: removeAvailabilityBlock,
-};
-
 export function InventoryManager({
   catalog,
   items,
   defaultCity,
-  actions = VENDOR_ACTIONS,
+  actions,
   title,
 }: {
   catalog: CatalogOption[];
   items: InventoryRow[];
   defaultCity: string;
-  actions?: InventoryActions;
+  actions: InventoryActions;
   /** Overrides the card title, e.g. with the vendor's name on the admin page. */
   title?: string;
 }) {

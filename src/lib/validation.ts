@@ -26,16 +26,6 @@ export const projectSchema = z.object({
   synopsis: z.string().max(2000).optional().or(z.literal('')),
 });
 
-export const inquirySchema = z.object({
-  projectId: z.string().optional(),
-  targetType: z.enum(['DOP', 'VENDOR']),
-  targetId: z.string().min(1),
-  subject: z.string().min(3).max(160),
-  message: z.string().min(10).max(4000),
-  contactEmail: z.string().email(),
-  contactPhone: z.string().max(40).optional().or(z.literal('')),
-});
-
 export const inventoryItemSchema = z.object({
   id: z.string().optional(),
   equipmentId: z.string().min(1),
@@ -54,6 +44,20 @@ export const availabilityBlockSchema = z.object({
   endDate: z.string().min(8),
   quantity: z.coerce.number().int().min(1).max(500),
   reason: z.string().max(160).optional().or(z.literal('')),
+});
+
+export const rentalCompanySchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(2).max(200),
+  city: z.string().trim().min(2).max(80),
+  phone: z.string().trim().max(40),
+  email: z.string().trim().email().max(160).or(z.literal('')),
+  website: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((value) => value === '' || isSafeHttpUrl(value), { message: 'URL must start with http:// or https://' }),
+  crNumber: z.string().trim().max(40),
 });
 
 export const dopProfileSchema = z.object({

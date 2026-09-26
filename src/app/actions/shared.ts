@@ -2,7 +2,7 @@ import 'server-only';
 import { revalidatePath } from 'next/cache';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { auth } from '@/lib/auth';
+import { auth, effectiveRole } from '@/lib/auth';
 import { publicError } from '@/lib/errors';
 
 /**
@@ -30,18 +30,13 @@ export type Failed = { ok: false; error: string };
 export const REVALIDATE = {
   producerProjects: '/[locale]/producer',
   producerProject: '/[locale]/producer/projects/[id]',
-  producerInquiries: '/[locale]/producer/inquiries',
-  vendorHome: '/[locale]/vendor',
-  vendorInventory: '/[locale]/vendor/inventory',
-  vendorInquiries: '/[locale]/vendor/inquiries',
-  dopProfile: '/[locale]/dop',
-  dopInquiries: '/[locale]/dop/inquiries',
   adminHome: '/[locale]/admin',
   adminEquipment: '/[locale]/admin/equipment',
   adminVendors: '/[locale]/admin/vendors',
   adminDops: '/[locale]/admin/dops',
   adminSettings: '/[locale]/admin/settings',
   adminRentals: '/[locale]/admin/rentals',
+  adminUsers: '/[locale]/admin/users',
 } as const;
 
 export function revalidate(...paths: Array<(typeof REVALIDATE)[keyof typeof REVALIDATE]>) {
@@ -62,7 +57,8 @@ export async function requireSession() {
 
 export async function requireRoles(...roles: Role[]) {
   const user = await requireSession();
-  if (!roles.includes(user.role)) throw new Error('FORBIDDEN');
+  // Anyone who is not the admin is a regular user (see effectiveRole).
+  if (!roles.includes(effectiveRole(user.role))) throw new Error('FORBIDDEN');
   return user;
 }
 
@@ -73,23 +69,6 @@ export async function requireAdmin() {
 /** Producers own projects; an admin can act on any of them for support. */
 export async function requireProducer() {
   return requireRoles(Role.PRODUCER, Role.ADMIN);
-}
-
-export async function requireVendorProfile() {
-  const user = await requireRoles(Role.VENDOR);
-  const vendor = await prisma.vendor.findUnique({
-    where: { userId: user.id },
-    select: { id: true, status: true, companyId: true, company: { select: { city: true } } },
-  });
-  if (!vendor) throw new Error('NOT_FOUND');
-  return { user, vendor };
-}
-
-export async function requireDopProfile() {
-  const user = await requireRoles(Role.DOP);
-  const dop = await prisma.dop.findUnique({ where: { userId: user.id }, select: { id: true } });
-  if (!dop) throw new Error('NOT_FOUND');
-  return { user, dop };
 }
 
 /** Loads a project only if the caller owns it (or is an admin). */

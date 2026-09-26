@@ -42,7 +42,7 @@ function exportedFunctions(source: string): Array<{ name: string; body: string }
 }
 
 const GUARD =
-  /require(?:Session|Roles|Admin|Producer|VendorProfile|DopProfile|OwnedProject|User|Role)\s*\(|participantFor\s*\(/;
+  /require(?:Session|Roles|Admin|Producer|OwnedProject|User|Role)\s*\(/;
 
 describe('server actions', () => {
   const files = fs
@@ -52,7 +52,8 @@ describe('server actions', () => {
     .filter((file) => /^'use server'/m.test(read(file)));
 
   it('finds the action modules', () => {
-    assert.ok(files.length >= 5, `expected the action layer, saw ${files.length} modules`);
+    // admin, package, projects — the vendor, DOP and inquiry modules went with those accounts.
+    assert.ok(files.length >= 3, `expected the action layer, saw ${files.length} modules`);
   });
 
   for (const file of files) {

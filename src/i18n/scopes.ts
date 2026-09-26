@@ -20,16 +20,12 @@ export const SHELL_SCOPE = ['nav', 'theme', 'common'] as const;
 export const SCOPES = {
   /** Sign in, register, forgot and reset password. */
   auth: ['auth', 'common'],
-  /** The producer area: project form, upload, analysis runner, sheet editing, inquiries. */
-  producer: ['project', 'analysis', 'sheet', 'enum', 'inquiry', 'common'],
-  /** Vendor inventory and inquiry threads. */
-  vendor: ['vendor', 'enum', 'inquiry', 'common'],
-  /** Cinematographer profile and inquiry threads. */
-  dop: ['dop', 'enum', 'inquiry', 'common'],
-  /** Admin catalog, approvals, settings, and every vendor's rental prices (the vendor editor). */
-  admin: ['admin', 'vendor', 'enum', 'common'],
-  /** A shared read-only sheet: export controls and the inquiry form. */
-  share: ['sheet', 'inquiry', 'common'],
+  /** The user area: project form, upload, analysis runner, sheet editing. */
+  producer: ['project', 'analysis', 'sheet', 'enum', 'common'],
+  /** Admin: catalog, rental companies and their stock, cinematographers, content, settings. */
+  admin: ['admin', 'vendor', 'dop', 'enum', 'common'],
+  /** A shared read-only sheet: export controls. */
+  share: ['sheet', 'common'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type ScopeName = keyof typeof SCOPES;

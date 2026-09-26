@@ -1,5 +1,4 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { countEmbeddableDops } from '@/lib/embeddings';
@@ -18,22 +17,20 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
   const [t, tEnum] = await Promise.all([getTranslations('admin'), getTranslations('enum')]);
 
   const [
+    userCount,
     projectCount,
     readyCount,
     vendorsApproved,
-    vendorsPending,
     dopsApproved,
-    dopsPending,
     embedded,
     recommendations,
     recentRuns,
   ] = await Promise.all([
+    prisma.user.count({ where: { role: { not: 'ADMIN' } } }),
     prisma.project.count(),
     prisma.project.count({ where: { status: 'READY' } }),
     prisma.vendor.count({ where: { status: 'APPROVED' } }),
-    prisma.vendor.count({ where: { status: 'PENDING' } }),
     prisma.dop.count({ where: { status: 'APPROVED' } }),
-    prisma.dop.count({ where: { status: 'PENDING' } }),
     countEmbeddableDops().catch(() => 0),
     prisma.projectRecommendation.findMany({
       select: { recommendedEquipmentIds: true, matchedDops: true },
@@ -91,41 +88,16 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
       <h1 className="text-xl font-semibold text-strong">{t('overview')}</h1>
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
+        <Stat label={t('users')} value={<AnimatedNumber value={userCount} />} />
         <Stat label={t('projects')} value={<AnimatedNumber value={projectCount} />} />
         <Stat label={t('scriptsAnalyzed')} value={<AnimatedNumber value={readyCount} />} />
-        <Stat
-          label={t('vendorsApproved')}
-          value={<AnimatedNumber value={vendorsApproved} />}
-          hint={t('pendingCount', { count: vendorsPending })}
-        />
+        <Stat label={t('vendorsApproved')} value={<AnimatedNumber value={vendorsApproved} />} />
         <Stat
           label={t('dopsApproved')}
           value={<AnimatedNumber value={dopsApproved} />}
-          hint={t('pendingCount', { count: dopsPending })}
-        />
-        <Stat
-          label={t('styleVectors')}
-          value={<AnimatedNumber value={embedded} />}
-          hint={t('missingCount', { count: dopsApproved - embedded })}
+          hint={dopsApproved > embedded ? t('missingCount', { count: dopsApproved - embedded }) : undefined}
         />
       </div>
-
-      {(vendorsPending > 0 || dopsPending > 0) && (
-        <Card title={t('pendingApprovals')}>
-          <div className="flex flex-wrap gap-3">
-            {vendorsPending > 0 && (
-              <Link href="/admin/vendors" className="btn-secondary text-xs">
-                {t('vendorsTitle')} · {vendorsPending}
-              </Link>
-            )}
-            {dopsPending > 0 && (
-              <Link href="/admin/dops" className="btn-secondary text-xs">
-                {t('dopsTitle')} · {dopsPending}
-              </Link>
-            )}
-          </div>
-        </Card>
-      )}
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card title={t('topEquipment')}>

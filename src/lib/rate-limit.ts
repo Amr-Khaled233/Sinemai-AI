@@ -31,8 +31,6 @@ export const LIMITS = {
   resetCheck: { limit: 30, windowMs: 10 * 60_000 },
   /** New accounts per IP. */
   register: { limit: 5, windowMs: 60 * 60_000 },
-  /** Inquiries per producer — this sends mail to third parties. */
-  inquiry: { limit: 20, windowMs: 60 * 60_000 },
   /** Analysis runs per user. Each one spends real money on model calls. */
   analysis: { limit: 12, windowMs: 60 * 60_000 },
   /** Slices of an in-flight analysis; generous, since one run needs several. */

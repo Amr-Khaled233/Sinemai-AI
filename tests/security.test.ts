@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { inquiryEmail } from '../src/lib/email';
+import { resetEmail } from '../src/lib/email';
 import {
   escapeHtml,
   escapeHtmlMultiline,
@@ -75,17 +75,17 @@ describe('upload gate', () => {
 });
 
 describe('outbound email', () => {
-  it('escapes user-supplied fields so mail HTML cannot be injected', () => {
-    const html = inquiryEmail({
-      recipientName: 'Najd',
-      producerName: '<a href="https://evil.example">Approve now</a>',
-      subject: '"><img src=x onerror=alert(1)>',
-      message: 'hi',
-      contactEmail: 'a@b.test',
-    });
-    assert.ok(!html.includes('<a href="https://evil.example"'), 'an injected anchor survived');
-    assert.ok(!html.includes('<img'), 'an injected image tag survived');
-    assert.match(html, /&lt;a href=&quot;https:\/\/evil\.example&quot;&gt;/);
+  it('escapes a user-supplied name so mail HTML cannot be injected', () => {
+    for (const locale of ['en', 'ar']) {
+      const html = resetEmail({
+        name: '<a href="https://evil.example">Verify now</a><img src=x onerror=alert(1)>',
+        locale,
+        url: 'https://app.test/reset?token=abc',
+        ttlMinutes: 60,
+      });
+      assert.ok(!html.includes('<a href="https://evil.example"'), 'an injected anchor survived');
+      assert.ok(!html.includes('<img'), 'an injected image tag survived');
+    }
   });
 
   it('builds no mail HTML outside the email module', () => {

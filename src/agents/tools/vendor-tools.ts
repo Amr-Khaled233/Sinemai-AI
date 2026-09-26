@@ -74,8 +74,7 @@ export async function queryVendorInventory(
         select: {
           id: true,
           verified: true,
-          user: { select: { email: true } },
-          company: { select: { name: true, city: true, phone: true } },
+          company: { select: { name: true, city: true, phone: true, email: true } },
         },
       },
       blocks: hasRange
@@ -99,7 +98,7 @@ export async function queryVendorInventory(
       companyName: item.vendor.company.name,
       city: item.vendor.company.city,
       verified: item.vendor.verified,
-      contactEmail: item.vendor.user.email,
+      contactEmail: item.vendor.company.email,
       phone: item.vendor.company.phone,
       items: [],
     };

@@ -110,22 +110,24 @@ export async function requireUser(locale = 'en') {
   return session;
 }
 
+/**
+ * There are two kinds of account: the admin, and everyone else. The VENDOR and
+ * DOP roles are left in the schema for old rows only; they count as regular
+ * users, so an old account lands in the user area instead of a dead end.
+ */
+export function effectiveRole(role: Role): 'ADMIN' | 'PRODUCER' {
+  return role === 'ADMIN' ? 'ADMIN' : 'PRODUCER';
+}
+
 export async function requireRole(role: Role | Role[], locale = 'en') {
   const session = await requireUser(locale);
   const allowed = Array.isArray(role) ? role : [role];
-  if (!allowed.includes(session.user.role)) redirect(`/${locale}${homeForRole(session.user.role)}`);
+  if (!allowed.includes(effectiveRole(session.user.role))) {
+    redirect(`/${locale}${homeForRole(session.user.role)}`);
+  }
   return session;
 }
 
 export function homeForRole(role: Role) {
-  switch (role) {
-    case 'ADMIN':
-      return '/admin';
-    case 'VENDOR':
-      return '/vendor';
-    case 'DOP':
-      return '/dop';
-    default:
-      return '/producer';
-  }
+  return effectiveRole(role) === 'ADMIN' ? '/admin' : '/producer';
 }

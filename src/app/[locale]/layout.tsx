@@ -8,6 +8,8 @@ import { locales, dirFor, type AppLocale } from '@/i18n/routing';
 import { Providers } from '@/components/providers';
 import { TopBar } from '@/components/top-bar';
 import { THEME_INIT_SCRIPT } from '@/components/theme-toggle';
+import { CurrencySwitcher } from '@/components/currency-switcher';
+import { getDisplayCurrency } from '@/lib/currency-server';
 import '../globals.css';
 
 // Oswald sets headings and buttons in Latin; it has no Arabic, so Arabic in the
@@ -49,7 +51,11 @@ export default async function LocaleLayout({
   if (!(locales as readonly string[]).includes(locale)) notFound();
 
   setRequestLocale(locale as AppLocale);
-  const t = await getTranslations({ locale, namespace: 'common' });
+  const [t, tNav, currency] = await Promise.all([
+    getTranslations({ locale, namespace: 'common' }),
+    getTranslations({ locale, namespace: 'nav' }),
+    getDisplayCurrency(),
+  ]);
 
   return (
     <html
@@ -72,7 +78,10 @@ export default async function LocaleLayout({
             <footer className="border-t border-line">
               <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-xs text-muted sm:flex-row sm:items-center sm:justify-between sm:px-6">
                 <span>{t('tagline')}</span>
-                <span dir="ltr">© {new Date().getFullYear()} Sinemai AI</span>
+                <span className="flex items-center gap-4">
+                  <CurrencySwitcher current={currency.code} options={currency.options} label={tNav('currency')} />
+                  <span dir="ltr">© {new Date().getFullYear()} Sinemai AI</span>
+                </span>
               </div>
             </footer>
           </Providers>

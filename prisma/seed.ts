@@ -25,22 +25,32 @@ import { DEFAULT_BUDGET_TIERS, DEFAULT_SETTINGS } from '../src/lib/settings';
 const prisma = new PrismaClient();
 
 /**
- * Seeded accounts are real Gmail addresses built with plus-addressing, so every
- * demo inbox (approval mails, inquiries, password resets) lands in the owner's
- * mailbox and can actually be signed into.
- *
- *   SEED_GMAIL=you@gmail.com  →  you+admin@gmail.com, you+producer@gmail.com, …
+ * One account is seeded: the admin, at SEED_GMAIL itself. Everyone else signs
+ * up as a regular user. Rental companies and cinematographers are records the
+ * admin manages, not accounts.
  *
  * The password comes from SEED_PASSWORD. When it is missing a strong one is
  * generated and printed once, so a public deployment never ships with a
  * password that is committed to the repository.
  */
-const SEED_GMAIL = process.env.SEED_GMAIL ?? 'amr.khufra250@gmail.com';
+const SEED_GMAIL = (process.env.SEED_GMAIL ?? 'amr.khufra250@gmail.com').trim().toLowerCase();
+if (!SEED_GMAIL.includes('@')) throw new Error('SEED_GMAIL must be a full email address');
 
-function seedEmail(tag: string) {
+/** The plus-addressed demo accounts earlier versions of this seed created. */
+const LEGACY_DEMO_TAGS = [
+  'admin',
+  'producer',
+  'vendor-riyadh',
+  'vendor-jeddah',
+  'dop-faisal',
+  'dop-noura',
+  'dop-omar',
+  'dop-layla',
+  'dop-tariq',
+];
+
+function legacyDemoEmail(tag: string) {
   const [local, domain] = SEED_GMAIL.split('@');
-  if (!domain) throw new Error('SEED_GMAIL must be a full email address');
-  // Strip any existing +tag so re-runs stay idempotent.
   return `${local.split('+')[0]}+${tag}@${domain}`;
 }
 
@@ -856,39 +866,43 @@ async function main() {
   });
 
   // ---------------------------------------------------------------- accounts
-  console.log('→ accounts');
+  console.log('→ admin account');
   const credentials = seedPassword();
   const password = await hash(credentials.value, 12);
 
+  // Re-running with SEED_PASSWORD set resets the admin password on purpose;
+  // without it an existing admin keeps theirs.
   const admin = await prisma.user.upsert({
-    where: { email: seedEmail('admin') },
-    create: {
-      email: seedEmail('admin'),
-      name: 'Platform Admin',
-      passwordHash: password,
+    where: { email: SEED_GMAIL },
+    create: { email: SEED_GMAIL, name: 'Admin', passwordHash: password, role: Role.ADMIN, locale: 'en' },
+    update: {
       role: Role.ADMIN,
-      locale: 'ar',
+      ...(credentials.generated ? {} : { passwordHash: password, passwordChangedAt: new Date() }),
     },
-    update: { role: Role.ADMIN },
   });
 
-  await prisma.user.upsert({
-    where: { email: seedEmail('producer') },
-    create: {
-      email: seedEmail('producer'),
-      name: 'Demo Producer',
-      passwordHash: password,
-      role: Role.PRODUCER,
-      locale: 'ar',
-    },
-    update: {},
+  // One admin only: any other admin becomes a regular user.
+  const demoted = await prisma.user.updateMany({
+    where: { role: Role.ADMIN, id: { not: admin.id } },
+    data: { role: Role.PRODUCER },
   });
+  if (demoted.count) console.log(`  ${demoted.count} other admin account(s) are now regular users`);
+
+  // Companies and cinematographers no longer hang off accounts. Unlink them
+  // first so removing the old demo logins keeps the records they point to.
+  const legacyEmails = LEGACY_DEMO_TAGS.map(legacyDemoEmail).filter((email) => email !== SEED_GMAIL);
+  const legacyUsers = await prisma.user.findMany({ where: { email: { in: legacyEmails } }, select: { id: true } });
+  if (legacyUsers.length) {
+    const ids = legacyUsers.map((user) => user.id);
+    await prisma.vendor.updateMany({ where: { userId: { in: ids } }, data: { userId: null } });
+    await prisma.dop.updateMany({ where: { userId: { in: ids } }, data: { userId: null } });
+    await prisma.user.deleteMany({ where: { id: { in: ids } } });
+    console.log(`  removed ${ids.length} old demo account(s)`);
+  }
 
   // ---- launch-partner vendors
   const vendorSeeds = [
     {
-      email: seedEmail('vendor-riyadh'),
-      contact: 'Riyadh Rentals Manager',
       company: {
         name: 'استوديوهات نجد للتأجير',
         nameEn: 'Najd Studios Rentals',
@@ -916,8 +930,6 @@ async function main() {
       } as Record<string, [number, number]>,
     },
     {
-      email: seedEmail('vendor-jeddah'),
-      contact: 'Jeddah Rentals Manager',
       company: {
         name: 'البحر الأحمر للإنتاج',
         nameEn: 'Red Sea Production Services',
@@ -955,19 +967,6 @@ async function main() {
   );
 
   for (const seed of vendorSeeds) {
-    const user = await prisma.user.upsert({
-      where: { email: seed.email },
-      create: {
-        email: seed.email,
-        name: seed.contact,
-        passwordHash: password,
-        role: Role.VENDOR,
-        locale: 'ar',
-        phone: seed.company.phone,
-      },
-      update: { role: Role.VENDOR },
-    });
-
     const company = await prisma.company.upsert({
       where: { crNumber: seed.company.crNumber },
       create: seed.company,
@@ -975,15 +974,9 @@ async function main() {
     });
 
     const vendor = await prisma.vendor.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        companyId: company.id,
-        status: 'APPROVED',
-        verified: true,
-        approvedAt: new Date(),
-      },
-      update: { status: 'APPROVED', verified: true },
+      where: { companyId: company.id },
+      create: { companyId: company.id, status: 'APPROVED', verified: true, approvedAt: new Date() },
+      update: {},
     });
 
     for (const [key, [dailyRate, quantity]] of Object.entries(seed.stock)) {
@@ -1012,7 +1005,6 @@ async function main() {
   // ---- launch-partner cinematographers
   const dopSeeds = [
     {
-      email: seedEmail('dop-faisal'),
       name: 'Faisal Al-Harbi',
       nameAr: 'فيصل الحربي',
       city: 'Riyadh',
@@ -1023,7 +1015,6 @@ async function main() {
       links: ['https://vimeo.com/example/faisal-reel', 'https://www.imdb.com/name/nm0000001/'],
     },
     {
-      email: seedEmail('dop-noura'),
       name: 'Noura Al-Qahtani',
       nameAr: 'نورة القحطاني',
       city: 'Riyadh',
@@ -1034,7 +1025,6 @@ async function main() {
       links: ['https://vimeo.com/example/noura-reel', 'https://www.youtube.com/@example-noura'],
     },
     {
-      email: seedEmail('dop-omar'),
       name: 'Omar Haddad',
       nameAr: 'عمر حداد',
       city: 'Jeddah',
@@ -1045,7 +1035,6 @@ async function main() {
       links: ['https://vimeo.com/example/omar-reel'],
     },
     {
-      email: seedEmail('dop-layla'),
       name: 'Layla Mansour',
       nameAr: 'ليلى منصور',
       city: 'AlUla',
@@ -1056,7 +1045,6 @@ async function main() {
       links: ['https://vimeo.com/example/layla-reel', 'https://www.imdb.com/name/nm0000004/'],
     },
     {
-      email: seedEmail('dop-tariq'),
       name: 'Tariq Bin Saleh',
       nameAr: 'طارق بن صالح',
       city: 'Riyadh',
@@ -1075,40 +1063,21 @@ async function main() {
   let canEmbed = Boolean(process.env.OPENAI_API_KEY);
   let embedFailure: string | null = null;
   for (const seed of dopSeeds) {
-    const user = await prisma.user.upsert({
-      where: { email: seed.email },
-      create: {
-        email: seed.email,
-        name: seed.name,
-        passwordHash: password,
-        role: Role.DOP,
-        locale: 'ar',
-      },
-      update: { role: Role.DOP },
-    });
-
-    const dop = await prisma.dop.upsert({
-      where: { userId: user.id },
-      create: {
-        userId: user.id,
-        displayName: seed.name,
-        displayNameAr: seed.nameAr,
-        bio: seed.bio,
-        city: seed.city,
-        dayRate: seed.dayRate,
-        yearsExperience: seed.years,
-        portfolioLinks: seed.links,
-        styleTags: seed.styleTags,
-        status: 'APPROVED',
-        approvedAt: new Date(),
-      },
-      update: {
-        bio: seed.bio,
-        styleTags: seed.styleTags,
-        portfolioLinks: seed.links,
-        status: 'APPROVED',
-      },
-    });
+    const profile = {
+      displayName: seed.name,
+      displayNameAr: seed.nameAr,
+      bio: seed.bio,
+      city: seed.city,
+      dayRate: seed.dayRate,
+      yearsExperience: seed.years,
+      portfolioLinks: seed.links,
+      styleTags: seed.styleTags,
+    };
+    // No unique key but the name: re-runs update the profile rather than adding a twin.
+    const existing = await prisma.dop.findFirst({ where: { displayName: seed.name }, select: { id: true } });
+    const dop = existing
+      ? await prisma.dop.update({ where: { id: existing.id }, data: profile })
+      : await prisma.dop.create({ data: { ...profile, status: 'APPROVED', approvedAt: new Date() } });
 
     if (canEmbed) {
       const text = buildDopEmbeddingText({
@@ -1140,19 +1109,14 @@ async function main() {
   }
 
   console.log(`
-Seed complete. Accounts (every address delivers to ${SEED_GMAIL}):
-  ${seedEmail('admin').padEnd(40)} ADMIN
-  ${seedEmail('producer').padEnd(40)} PRODUCER
-  ${seedEmail('vendor-riyadh').padEnd(40)} VENDOR (approved)
-  ${seedEmail('vendor-jeddah').padEnd(40)} VENDOR (approved)
-  ${seedEmail('dop-faisal').padEnd(40)} DOP (approved, 5 profiles seeded)
-
-Password: ${credentials.value}${
+Seed complete.
+  Admin: ${SEED_GMAIL}
+  Password: ${
     credentials.generated
-      ? '  <- generated for this run. Save it now, or set SEED_PASSWORD to choose your own.'
-      : '  (from SEED_PASSWORD)'
+      ? `${credentials.value}  <- generated for this run. Save it now, or set SEED_PASSWORD to choose your own.`
+      : '(from SEED_PASSWORD)'
   }
-Admin id: ${admin.id}`);
+  Sign in at /en/login. Everyone else creates their own account.`);
 }
 
 main()

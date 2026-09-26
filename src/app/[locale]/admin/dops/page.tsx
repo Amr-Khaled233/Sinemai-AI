@@ -2,9 +2,8 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Card } from '@/components/ui';
-import { ApprovalTable } from '@/components/admin/approval-table';
 import { ReembedButton } from '@/components/admin/reembed-button';
-import { formatDate, truncate } from '@/lib/utils';
+import { CinematographerManager } from '@/components/admin/cinematographer-manager';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function AdminDopsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -12,37 +11,37 @@ export default async function AdminDopsPage({ params }: { params: Promise<{ loca
   setRequestLocale(locale as AppLocale);
   await requireRole('ADMIN', locale);
 
-  const t = await getTranslations('admin');
-  const dops = await prisma.dop.findMany({
-    orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-    include: { user: { select: { email: true } } },
-  });
-
-  const rows = dops.map((dop) => ({
-    id: dop.id,
-    title: dop.displayName,
-    subtitle: [dop.city, dop.user.email, dop.dayRate ? `${dop.dayRate} SAR/day` : null]
-      .filter(Boolean)
-      .join(' · '),
-    detail: truncate(dop.bio, 320),
-    status: dop.status,
-    tags: dop.styleTags,
-    links: dop.portfolioLinks,
-    meta: dop.embeddedAt
-      ? `Style vector: ${formatDate(dop.embeddedAt, locale)}`
-      : 'No style vector yet — this profile cannot be matched.',
-  }));
-
-  const pending = rows.filter((row) => row.status === 'PENDING');
-  const rest = rows.filter((row) => row.status !== 'PENDING');
+  const [t, dops, tags] = await Promise.all([
+    getTranslations('admin'),
+    prisma.dop.findMany({ orderBy: { displayName: 'asc' } }),
+    prisma.styleTag.findMany({
+      where: { active: true },
+      orderBy: { sortOrder: 'asc' },
+      select: { slug: true, labelEn: true, labelAr: true },
+    }),
+  ]);
 
   return (
     <div className="space-y-6">
-      <Card title={`${t('pendingApprovals')} · ${pending.length}`} action={<ReembedButton />}>
-        <ApprovalTable kind="DOP" rows={pending} />
-      </Card>
-      <Card title={t('dopsTitle')}>
-        <ApprovalTable kind="DOP" rows={rest} />
+      <h1 className="text-xl font-semibold text-strong">{t('dopsTitle')}</h1>
+      <Card subtitle={t('dopsHint')} action={<ReembedButton />}>
+        <CinematographerManager
+          locale={locale}
+          tags={tags}
+          rows={dops.map((dop) => ({
+            id: dop.id,
+            displayName: dop.displayName,
+            displayNameAr: dop.displayNameAr,
+            bio: dop.bio,
+            city: dop.city,
+            dayRate: dop.dayRate,
+            yearsExperience: dop.yearsExperience,
+            portfolioLinks: dop.portfolioLinks,
+            styleTags: dop.styleTags,
+            active: dop.status === 'APPROVED',
+            matchable: dop.embeddedAt !== null,
+          }))}
+        />
       </Card>
     </div>
   );

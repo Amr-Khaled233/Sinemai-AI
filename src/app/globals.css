@@ -513,6 +513,15 @@
 }
 
 @layer utilities {
+  /* Scrolls sideways without drawing a scrollbar (the mobile menu row). */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+
   /* Scroll-triggered reveal, driven by the Reveal component. */
   .reveal {
     opacity: 0;

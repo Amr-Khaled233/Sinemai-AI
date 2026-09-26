@@ -10,8 +10,8 @@ import {
   DayNightSuitability,
 } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { approvalEmail, sendEmail } from '@/lib/email';
 import { saveSettings, type PlatformSettings } from '@/lib/settings';
+import { dopProfileSchema, rentalCompanySchema } from '@/lib/validation';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
 import { slugify } from '@/lib/utils';
 import { reportError } from '@/lib/observability';
@@ -28,107 +28,146 @@ import {
 } from '@/lib/inventory';
 import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
-function baseUrl() {
-  return process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
-}
+// ---------------------------------------------------------------- rental companies
 
-// ---------------------------------------------------------------- approvals
-
-export async function setVendorStatus(vendorId: string, status: ApprovalStatus, reason?: string) {
-  return runAction('setVendorStatus', async () => {
+/**
+ * Rental companies are records the admin keeps — they have no accounts. A
+ * company that is switched off is kept with its stock but is never matched or
+ * priced from.
+ */
+export async function saveRentalCompany(formData: FormData) {
+  return runAction('saveRentalCompany', async () => {
     await requireAdmin();
-    const approved = status === ApprovalStatus.APPROVED;
-
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: {
-        status,
-        verified: approved,
-        approvedAt: approved ? new Date() : null,
-        notes: reason ?? null,
-      },
-      select: {
-        user: { select: { email: true, name: true, locale: true } },
-        company: { select: { id: true } },
-      },
+    const parsed = rentalCompanySchema.safeParse({
+      id: formData.get('id') || undefined,
+      name: formData.get('name'),
+      city: formData.get('city'),
+      phone: formData.get('phone') ?? '',
+      email: formData.get('email') ?? '',
+      website: formData.get('website') ?? '',
+      crNumber: formData.get('crNumber') ?? '',
     });
+    if (!parsed.success) throw new Error('INVALID_INPUT');
+    const { id, ...fields } = parsed.data;
+    const company = {
+      name: fields.name,
+      city: fields.city,
+      phone: fields.phone || null,
+      email: fields.email || null,
+      website: fields.website || null,
+      crNumber: fields.crNumber || null,
+    };
 
-    await prisma.company.update({ where: { id: vendor.company.id }, data: { verified: approved } });
-
-    await sendEmail({
-      to: vendor.user.email,
-      subject: approved
-        ? 'Your Sinemai AI vendor listing is live'
-        : 'Your Sinemai AI vendor application needs changes',
-      html: approvalEmail({
-        name: vendor.user.name,
-        approved,
-        reason,
-        loginUrl: `${baseUrl()}/${vendor.user.locale}/vendor`,
-      }),
-    });
-
-    revalidate(REVALIDATE.adminVendors, REVALIDATE.adminHome);
+    if (id) {
+      const vendor = await prisma.vendor.findUnique({ where: { id }, select: { companyId: true } });
+      if (!vendor) throw new Error('NOT_FOUND');
+      await prisma.company.update({ where: { id: vendor.companyId }, data: company });
+    } else {
+      const created = await prisma.company.create({ data: { ...company, verified: true }, select: { id: true } });
+      await prisma.vendor.create({
+        data: { companyId: created.id, status: ApprovalStatus.APPROVED, verified: true, approvedAt: new Date() },
+      });
+    }
+    revalidate(REVALIDATE.adminVendors, REVALIDATE.adminRentals, REVALIDATE.adminHome);
   });
 }
 
-export async function setDopStatus(dopId: string, status: ApprovalStatus, reason?: string) {
-  return runAction('setDopStatus', async () => {
+export async function setRentalCompanyActive(vendorId: string, active: boolean) {
+  return runAction('setRentalCompanyActive', async () => {
     await requireAdmin();
-    const approved = status === ApprovalStatus.APPROVED;
-
-    const dop = await prisma.dop.update({
-      where: { id: dopId },
-      data: { status, approvedAt: approved ? new Date() : null },
-      select: {
-        id: true,
-        displayName: true,
-        bio: true,
-        styleTags: true,
-        city: true,
-        yearsExperience: true,
-        embeddedAt: true,
-        user: { select: { email: true, name: true, locale: true } },
-      },
+    await prisma.vendor.update({
+      where: { id: vendorId },
+      data: { status: active ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED },
     });
+    revalidate(REVALIDATE.adminVendors, REVALIDATE.adminRentals, REVALIDATE.adminHome);
+  });
+}
 
-    // An approved profile needs a style vector before it can ever be matched.
-    if (approved && !dop.embeddedAt && process.env.OPENAI_API_KEY) {
+/** Deletes the company with its whole inventory; sheets already generated keep their copy. */
+export async function deleteRentalCompany(vendorId: string) {
+  return runAction('deleteRentalCompany', async () => {
+    await requireAdmin();
+    const vendor = await prisma.vendor.findUnique({ where: { id: vendorId }, select: { companyId: true } });
+    if (!vendor) throw new Error('NOT_FOUND');
+    // The company row owns the vendor row (cascade), which owns the stock.
+    await prisma.company.delete({ where: { id: vendor.companyId } });
+    revalidate(REVALIDATE.adminVendors, REVALIDATE.adminRentals, REVALIDATE.adminHome);
+  });
+}
+
+// ---------------------------------------------------------------- cinematographers
+
+/**
+ * Cinematographer profiles, kept by the admin. Saving re-embeds the profile so
+ * it can be matched; if the embedding call fails (no key, no credit) the save
+ * still succeeds and the nightly job or the re-embed button catches up.
+ */
+export async function saveCinematographer(formData: FormData) {
+  return runAction('saveCinematographer', async () => {
+    await requireAdmin();
+    const parsed = dopProfileSchema.safeParse({
+      displayName: formData.get('displayName'),
+      displayNameAr: formData.get('displayNameAr') ?? '',
+      bio: formData.get('bio'),
+      city: formData.get('city') ?? '',
+      dayRate: formData.get('dayRate') || undefined,
+      yearsExperience: formData.get('yearsExperience') || undefined,
+      portfolioLinks: String(formData.get('portfolioLinks') ?? '')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean),
+      styleTags: formData.getAll('styleTags').map(String),
+    });
+    if (!parsed.success) throw new Error('INVALID_INPUT');
+    const data = parsed.data;
+    const fields = {
+      displayName: data.displayName,
+      displayNameAr: data.displayNameAr || null,
+      bio: data.bio,
+      city: data.city || null,
+      dayRate: data.dayRate ?? null,
+      yearsExperience: data.yearsExperience ?? null,
+      portfolioLinks: data.portfolioLinks,
+      styleTags: data.styleTags,
+    };
+
+    const id = String(formData.get('id') ?? '');
+    const select = { id: true, displayName: true, bio: true, styleTags: true, city: true, yearsExperience: true };
+    const dop = id
+      ? await prisma.dop.update({ where: { id }, data: fields, select })
+      : await prisma.dop.create({
+          data: { ...fields, status: ApprovalStatus.APPROVED, approvedAt: new Date() },
+          select,
+        });
+
+    if (process.env.OPENAI_API_KEY) {
       try {
         const text = buildDopEmbeddingText(dop);
         await writeDopEmbedding(dop.id, text, await embedText(text));
       } catch (error) {
-        reportError(error, { scope: 'admin:approve-dop-embedding', severity: 'warning', extra: { dopId } });
+        reportError(error, { scope: 'admin:dop-embedding', severity: 'warning', extra: { dopId: dop.id } });
       }
     }
-
-    await sendEmail({
-      to: dop.user.email,
-      subject: approved
-        ? 'Your Sinemai AI cinematographer profile is live'
-        : 'Your Sinemai AI profile needs changes',
-      html: approvalEmail({
-        name: dop.user.name,
-        approved,
-        reason,
-        loginUrl: `${baseUrl()}/${dop.user.locale}/dop`,
-      }),
-    });
-
     revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
   });
 }
 
-export async function toggleVendorVerified(vendorId: string, verified: boolean) {
-  return runAction('toggleVendorVerified', async () => {
+export async function setCinematographerActive(dopId: string, active: boolean) {
+  return runAction('setCinematographerActive', async () => {
     await requireAdmin();
-    const vendor = await prisma.vendor.update({
-      where: { id: vendorId },
-      data: { verified },
-      select: { companyId: true },
+    await prisma.dop.update({
+      where: { id: dopId },
+      data: { status: active ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED },
     });
-    await prisma.company.update({ where: { id: vendor.companyId }, data: { verified } });
-    revalidate(REVALIDATE.adminVendors);
+    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
+  });
+}
+
+export async function deleteCinematographer(dopId: string) {
+  return runAction('deleteCinematographer', async () => {
+    await requireAdmin();
+    await prisma.dop.delete({ where: { id: dopId } });
+    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
   });
 }
 
@@ -400,7 +439,7 @@ async function vendorForAdmin(vendorId: string) {
   return { id: vendor.id, city: vendor.company.city };
 }
 
-const RENTAL_PAGES = [REVALIDATE.adminRentals, REVALIDATE.vendorHome, REVALIDATE.vendorInventory] as const;
+const RENTAL_PAGES = [REVALIDATE.adminRentals, REVALIDATE.adminVendors] as const;
 
 export async function adminSaveInventoryItem(vendorId: string, formData: FormData) {
   return runAction('adminSaveInventoryItem', async () => {

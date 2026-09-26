@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { escapeHtml, escapeHtmlMultiline } from '@/lib/security';
+import { escapeHtml } from '@/lib/security';
 import { reportError } from '@/lib/observability';
 
 /**
@@ -36,7 +36,7 @@ export async function sendEmail({ to, subject, html, replyTo }: Mail) {
       ...(replyTo ? { replyTo } : {}),
     });
   } catch (error) {
-    // A bounced approval or inquiry mail is invisible to the user, so it has to
+    // A bounced reset mail is invisible to the user, so it has to
     // be visible to us.
     reportError(error, { scope: 'email:send', severity: 'warning', extra: { subject } });
     return { delivered: false as const };
@@ -54,43 +54,6 @@ function shell(title: string, body: string) {
   </div></body></html>`;
 }
 
-export function inquiryEmail(args: {
-  recipientName: string;
-  producerName: string;
-  projectName?: string | null;
-  subject: string;
-  message: string;
-  contactEmail: string;
-  contactPhone?: string | null;
-}) {
-  // Every field below is attacker-controlled and this is hand-built HTML, so
-  // each one is escaped — React's protection does not extend to mail bodies.
-  return shell(
-    `New inquiry from ${escapeHtml(args.producerName)}`,
-    `<p><strong>${escapeHtml(args.subject)}</strong></p>
-     ${args.projectName ? `<p>Project: ${escapeHtml(args.projectName)}</p>` : ''}
-     <blockquote style="border-inline-start:3px solid #d4a94f;margin:16px 0;padding:4px 16px">${escapeHtmlMultiline(args.message)}</blockquote>
-     <p>Reply to: <a style="color:#4fd1c5" href="mailto:${encodeURIComponent(args.contactEmail)}">${escapeHtml(args.contactEmail)}</a>${
-       args.contactPhone ? ` · ${escapeHtml(args.contactPhone)}` : ''
-     }</p>`,
-  );
-}
-
-export function approvalEmail(args: { name: string; approved: boolean; reason?: string | null; loginUrl: string }) {
-  return args.approved
-    ? shell(
-        `Your account is approved`,
-        `<p>Hi ${escapeHtml(args.name)}, your Sinemai AI listing is live. Producers can now find and contact you.</p>
-         <p><a style="color:#4fd1c5" href="${args.loginUrl}">Open your dashboard</a></p>`,
-      )
-    : shell(
-        `Your application needs changes`,
-        `<p>Hi ${escapeHtml(args.name)}, we could not verify your listing yet.</p>
-         ${args.reason ? `<p>Reviewer note: ${escapeHtml(args.reason)}</p>` : ''}
-         <p><a style="color:#4fd1c5" href="${args.loginUrl}">Update your profile and resubmit</a></p>`,
-      );
-}
-
 export function resetEmail(args: { name: string; locale: string; url: string; ttlMinutes: number }) {
   return args.locale === 'ar'
     ? shell(
@@ -105,20 +68,4 @@ export function resetEmail(args: { name: string; locale: string; url: string; tt
          <p><a style="color:#4fd1c5" href="${args.url}">Choose a new password</a></p>
          <p>The link is valid for ${args.ttlMinutes} minutes and can be used once. If you did not request this, ignore this email — nothing changes.</p>`,
       );
-}
-
-export function inquiryReplyEmail(args: {
-  recipientName: string;
-  senderName: string;
-  subject: string;
-  message: string;
-  projectName?: string | null;
-}) {
-  return shell(
-    `${escapeHtml(args.senderName)} replied`,
-    `<p><strong>${escapeHtml(args.subject)}</strong></p>
-     ${args.projectName ? `<p>Project: ${escapeHtml(args.projectName)}</p>` : ''}
-     <blockquote style="border-inline-start:3px solid #d4a94f;margin:16px 0;padding:4px 16px">${escapeHtmlMultiline(args.message)}</blockquote>
-     <p style="color:#6d7385">Reply from inside Sinemai AI to keep the thread in one place.</p>`,
-  );
 }
