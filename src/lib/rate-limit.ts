@@ -33,6 +33,8 @@ export const LIMITS = {
   register: { limit: 5, windowMs: 60 * 60_000 },
   /** Support messages per user; each one can send the admin an email. */
   support: { limit: 30, windowMs: 60 * 60_000 },
+  /** Assistant messages per user; each is a paid model call with tools. */
+  chat: { limit: 60, windowMs: 60 * 60_000 },
   /** Analysis runs per user. Each one spends real money on model calls. */
   analysis: { limit: 12, windowMs: 60 * 60_000 },
   /** Slices of an in-flight analysis; generous, since one run needs several. */

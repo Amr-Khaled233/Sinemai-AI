@@ -338,6 +338,22 @@
     .grid-table.grid-table-compact tbody tr:last-child td {
       @apply border-b-0;
     }
+
+    /* A real table: a rule between columns, cells centred in their row, and
+       numeric columns actually aligned to the end — the card-mode text-start
+       above would otherwise win over a cell's own text-end. */
+    .grid-table.grid-table-compact th + th,
+    .grid-table.grid-table-compact td + td {
+      border-inline-start: 1px solid rgb(var(--line) / 0.6);
+    }
+
+    .grid-table.grid-table-compact td {
+      align-content: center;
+    }
+
+    .grid-table.grid-table-compact td.text-end {
+      text-align: end;
+    }
   }
 
   @container tablewrap (min-width: 48rem) {
@@ -381,6 +397,22 @@
     .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr:last-child td {
       @apply border-b-0;
     }
+
+    /* A real table: a rule between columns, cells centred in their row, and
+       numeric columns actually aligned to the end — the card-mode text-start
+       above would otherwise win over a cell's own text-end. */
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) th + th,
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) td + td {
+      border-inline-start: 1px solid rgb(var(--line) / 0.6);
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) td {
+      align-content: center;
+    }
+
+    .grid-table:not(.grid-table-compact):not(.grid-table-wide) td.text-end {
+      text-align: end;
+    }
   }
 
   @container tablewrap (min-width: 60rem) {
@@ -423,6 +455,22 @@
 
     .grid-table.grid-table-wide tbody tr:last-child td {
       @apply border-b-0;
+    }
+
+    /* A real table: a rule between columns, cells centred in their row, and
+       numeric columns actually aligned to the end — the card-mode text-start
+       above would otherwise win over a cell's own text-end. */
+    .grid-table.grid-table-wide th + th,
+    .grid-table.grid-table-wide td + td {
+      border-inline-start: 1px solid rgb(var(--line) / 0.6);
+    }
+
+    .grid-table.grid-table-wide td {
+      align-content: center;
+    }
+
+    .grid-table.grid-table-wide td.text-end {
+      text-align: end;
     }
   }
 

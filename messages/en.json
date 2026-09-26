@@ -611,5 +611,28 @@
     "teamName": "Sinemai team",
     "sendFailed": "Could not send. Check the text and try again.",
     "rateLimited": "Too many messages in a short time. Try again later."
+  },
+  "chat": {
+    "title": "Assistant",
+    "subtitle": "Ask about the breakdown, the package or the budget, or ask it to change the package.",
+    "introNoSheet": "Upload your script and run the breakdown — then I can explain every choice on the sheet and change the package for you. Ask me anything meanwhile.",
+    "introWithSheet": "Your sheet is ready. Ask why something was chosen, what a change would cost, or tell me what to add, remove or swap — I will re-price the sheet.",
+    "suggestWhy": "Why this camera?",
+    "suggestCheaper": "How can I bring the budget down?",
+    "suggestSecondCamera": "Add a second camera body",
+    "suggestNight": "What do the night scenes need?",
+    "suggestWhatNeeded": "What do I need to get started?",
+    "suggestHowItWorks": "How does the breakdown work?",
+    "placeholder": "Message the assistant…",
+    "send": "Send",
+    "stop": "Stop",
+    "thinking": "Thinking…",
+    "toolSheet": "Read the sheet",
+    "toolScenes": "Read the scenes",
+    "toolCatalog": "Searched the catalog",
+    "toolUpdate": "Updated the package",
+    "failed": "The assistant could not answer. Try again.",
+    "unavailable": "The AI service is unavailable right now (the account has no credit). Try again later.",
+    "rateLimited": "Too many messages in a short time. Wait a little and try again."
   }
 }
