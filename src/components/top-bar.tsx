@@ -6,6 +6,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
 import { SignOutButton } from '@/components/sign-out-button';
 import { NavLinks, type NavLink } from '@/components/nav-links';
+import { unreadThreadCount } from '@/lib/support';
 
 /** Everyone who is not the admin is a regular user with the same menu. */
 const USER_NAV: NavLink[] = [
@@ -13,11 +14,13 @@ const USER_NAV: NavLink[] = [
   { href: '/producer/projects/new', key: 'newProject' },
   { href: '/producer/equipment', key: 'equipment' },
   { href: '/producer/insights', key: 'insights' },
+  { href: '/producer/support', key: 'support' },
 ];
 
 const ADMIN_NAV: NavLink[] = [
   { href: '/admin', key: 'analytics' },
   { href: '/admin/users', key: 'users' },
+  { href: '/admin/support', key: 'support' },
   { href: '/admin/equipment', key: 'equipment' },
   { href: '/admin/rentals', key: 'rentals' },
   { href: '/admin/vendors', key: 'vendors' },
@@ -29,7 +32,13 @@ const ADMIN_NAV: NavLink[] = [
 export async function TopBar({ locale }: { locale: string }) {
   const [t, session] = await Promise.all([getTranslations('nav'), auth()]);
   const role = session?.user?.role;
-  const links = !role ? [] : role === 'ADMIN' ? ADMIN_NAV : USER_NAV;
+  const isAdmin = role === 'ADMIN';
+  const links = !role ? [] : isAdmin ? ADMIN_NAV : USER_NAV;
+
+  // Conversations waiting on this person, shown on the Support link.
+  const unread = session?.user
+    ? await unreadThreadCount({ id: session.user.id, isAdmin }).catch(() => 0)
+    : 0;
 
   return (
     <header className="sticky top-0 z-40 border-b border-line bg-page/95 backdrop-blur">
@@ -39,7 +48,7 @@ export async function TopBar({ locale }: { locale: string }) {
         </Link>
 
         <nav className="hidden min-w-0 flex-1 items-center gap-0.5 md:flex">
-          <NavLinks links={links} />
+          <NavLinks links={links} badges={{ support: unread }} />
         </nav>
 
         <div className="ms-auto flex shrink-0 items-center gap-1 sm:gap-2">
@@ -62,7 +71,7 @@ export async function TopBar({ locale }: { locale: string }) {
 
       {links.length > 0 && (
         <nav className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-line/60 px-4 py-2 md:hidden">
-          <NavLinks links={links} variant="pills" />
+          <NavLinks links={links} variant="pills" badges={{ support: unread }} />
         </nav>
       )}
     </header>

@@ -16,7 +16,8 @@
     "currency": "العملة",
     "content": "المحتوى",
     "rentals": "الإيجارات",
-    "users": "المستخدمون"
+    "users": "المستخدمون",
+    "support": "الدعم"
   },
   "landing": {
     "heroKicker": "من النص إلى حزمة التصوير",
@@ -585,5 +586,30 @@
     "from": "من {price}",
     "companies": "{count, plural, one {شركة تأجير واحدة} two {شركتا تأجير} few {# شركات تأجير} many {# شركة تأجير} other {# شركة تأجير}}",
     "indicative": "تقديري"
+  },
+  "support": {
+    "title": "الدعم",
+    "userHint": "أسئلة أو مشاكل أو طلبات لفريق سينمائي. نرد هنا وعلى الإيميل.",
+    "adminHint": "المحادثات التي فتحها المستخدمون معك. الرسائل الجديدة تظهر أولًا.",
+    "newConversation": "محادثة جديدة",
+    "yourConversations": "محادثاتك",
+    "allConversations": "كل المحادثات",
+    "subject": "الموضوع",
+    "message": "الرسالة",
+    "send": "إرسال",
+    "replyPlaceholder": "اكتب ردك… (Ctrl+Enter للإرسال)",
+    "from": "من",
+    "messages": "الرسائل",
+    "status": "الحالة",
+    "lastActivity": "آخر نشاط",
+    "new": "جديد",
+    "open": "مفتوحة",
+    "closed": "مغلقة",
+    "close": "إغلاق المحادثة",
+    "reopen": "إعادة فتح",
+    "empty": "لا توجد محادثات بعد.",
+    "teamName": "فريق سينمائي",
+    "sendFailed": "تعذّر الإرسال. راجع النص وحاول مرة أخرى.",
+    "rateLimited": "رسائل كثيرة في وقت قصير. حاول لاحقًا."
   }
 }

@@ -1,5 +1,5 @@
 import nodemailer from 'nodemailer';
-import { escapeHtml } from '@/lib/security';
+import { escapeHtml, escapeHtmlMultiline } from '@/lib/security';
 import { reportError } from '@/lib/observability';
 
 /**
@@ -68,4 +68,17 @@ export function resetEmail(args: { name: string; locale: string; url: string; tt
          <p><a style="color:#4fd1c5" href="${args.url}">Choose a new password</a></p>
          <p>The link is valid for ${args.ttlMinutes} minutes and can be used once. If you did not request this, ignore this email — nothing changes.</p>`,
       );
+}
+
+/**
+ * A new message in a support conversation, to whichever side did not write it.
+ * The subject and body are user text and are escaped like any other.
+ */
+export function supportEmail(args: { fromName: string; subject: string; message: string; url: string }) {
+  return shell(
+    escapeHtml(args.subject),
+    `<p><strong>${escapeHtml(args.fromName)}</strong></p>
+     <blockquote style="border-inline-start:3px solid #E3B823;margin:16px 0;padding:4px 16px">${escapeHtmlMultiline(args.message)}</blockquote>
+     <p><a style="color:#E3B823" href="${args.url}">Open the conversation · افتح المحادثة</a></p>`,
+  );
 }

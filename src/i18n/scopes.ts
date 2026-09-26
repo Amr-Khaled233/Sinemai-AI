@@ -20,10 +20,10 @@ export const SHELL_SCOPE = ['nav', 'theme', 'common'] as const;
 export const SCOPES = {
   /** Sign in, register, forgot and reset password. */
   auth: ['auth', 'common'],
-  /** The user area: project form, upload, analysis runner, sheet editing. */
-  producer: ['project', 'analysis', 'sheet', 'enum', 'common'],
+  /** The user area: project form, upload, analysis runner, sheet editing, support. */
+  producer: ['project', 'analysis', 'sheet', 'support', 'enum', 'common'],
   /** Admin: catalog, rental companies and their stock, cinematographers, content, settings. */
-  admin: ['admin', 'vendor', 'dop', 'enum', 'common'],
+  admin: ['admin', 'vendor', 'dop', 'support', 'enum', 'common'],
   /** A shared read-only sheet: export controls. */
   share: ['sheet', 'common'],
 } as const satisfies Record<string, readonly string[]>;

@@ -16,7 +16,8 @@
     "currency": "Currency",
     "content": "Content",
     "rentals": "Rentals",
-    "users": "Users"
+    "users": "Users",
+    "support": "Support"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -585,5 +586,30 @@
     "from": "from {price}",
     "companies": "{count, plural, one {# rental company} other {# rental companies}}",
     "indicative": "indicative"
+  },
+  "support": {
+    "title": "Support",
+    "userHint": "Questions, problems or requests for the Sinemai team. We reply here and by email.",
+    "adminHint": "Conversations users opened with you. New messages are listed first.",
+    "newConversation": "New conversation",
+    "yourConversations": "Your conversations",
+    "allConversations": "All conversations",
+    "subject": "Subject",
+    "message": "Message",
+    "send": "Send",
+    "replyPlaceholder": "Write a reply… (Ctrl+Enter sends)",
+    "from": "From",
+    "messages": "Messages",
+    "status": "Status",
+    "lastActivity": "Last activity",
+    "new": "New",
+    "open": "Open",
+    "closed": "Closed",
+    "close": "Close conversation",
+    "reopen": "Reopen",
+    "empty": "No conversations yet.",
+    "teamName": "Sinemai team",
+    "sendFailed": "Could not send. Check the text and try again.",
+    "rateLimited": "Too many messages in a short time. Try again later."
   }
 }
