@@ -60,12 +60,14 @@ export function Field({
   );
 }
 
+// dir="auto" lets a field follow its own text: an English bio typed on an
+// Arabic page reads left to right instead of having its punctuation flipped.
 export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={cn('input', className)} />;
+  return <input dir="auto" {...props} className={cn('input', className)} />;
 }
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={cn('input min-h-28 resize-y leading-7', className)} />;
+  return <textarea dir="auto" {...props} className={cn('input min-h-28 resize-y leading-7', className)} />;
 }
 
 export function Select({ className, children, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
@@ -93,19 +95,22 @@ export function Stat({
   value,
   hint,
   icon,
+  highlight,
 }: {
   label: ReactNode;
   value: ReactNode;
   hint?: ReactNode;
   icon?: ReactNode;
+  /** Marks the one figure a reader should take away. */
+  highlight?: boolean;
 }) {
   return (
-    <div className="stat group">
+    <div className={cn('stat', highlight && 'border-accent-soft/70 bg-accent-soft/[0.07]')}>
       <div className="flex items-start justify-between gap-2">
         <div className="stat-label">{label}</div>
-        {icon && <span className="text-accent/70 transition-transform group-hover:scale-110">{icon}</span>}
+        {icon && <span className="text-accent/70">{icon}</span>}
       </div>
-      <div className="stat-value">{value}</div>
+      <div className={cn('stat-value', highlight && 'text-accent')}>{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );

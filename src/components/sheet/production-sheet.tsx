@@ -142,7 +142,7 @@ export async function ProductionSheet({
             <h2 className="text-xs font-semibold uppercase tracking-wider text-muted">
               {t('summary')}
             </h2>
-            <p className="mt-2 max-w-4xl text-sm leading-7 text-body/90">
+            <p dir="auto" className="mt-2 max-w-4xl text-sm leading-7 text-body/90">
               {recommendation.rationaleText}
             </p>
           </div>
@@ -170,7 +170,8 @@ export async function ProductionSheet({
               return (
                 <li key={index} className="flex gap-2 text-sm leading-6 text-muted">
                   <Badge tone={tone as 'red' | 'amber' | 'neutral'}>{tEnum(`severity.${severity}`)}</Badge>
-                  <span>{note.replace(/^\[\w+\]\s*/, '')}</span>
+                  {/* Stored as "[severity] AGENT: problem → fix"; the agent code is for the logs. */}
+                  <span dir="auto">{note.replace(/^\[\w+\]\s*/, '').replace(/^[A-Z_]+:\s*/, '')}</span>
                 </li>
               );
             })}
@@ -224,7 +225,7 @@ export async function ProductionSheet({
           </div>
 
           <div className="table-wrap mt-5">
-            <table className="grid-table grid-table-wide [--grid-cols:3rem_minmax(11rem,2.4fr)_6rem_6rem_7rem_8.5rem_4.5rem_minmax(7rem,1fr)]">
+            <table className="grid-table grid-table-wide [--grid-cols:3rem_minmax(11rem,2.4fr)_7.5rem_6rem_7rem_8.5rem_4.5rem_minmax(7rem,1fr)]">
               <thead>
                 <tr>
                   <th>{t('sceneNumber')}</th>
@@ -332,7 +333,7 @@ export async function ProductionSheet({
         {recommendation.equipmentRationale && (
           <div className="mt-4 rounded-lg border border-line/60 bg-surface-sunken p-4">
             <p className="label">{t('equipmentRationale')}</p>
-            <p className="prose-sheet">{recommendation.equipmentRationale}</p>
+            <p dir="auto" className="prose-sheet">{recommendation.equipmentRationale}</p>
           </div>
         )}
       </Card>
@@ -372,7 +373,7 @@ export async function ProductionSheet({
                   />
                 </div>
 
-                <p className="mt-3 text-sm leading-6 text-muted">{dop.reason}</p>
+                <p dir="auto" className="mt-3 text-sm leading-6 text-muted">{dop.reason}</p>
 
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {dop.styleTags.slice(0, 5).map((tag) => (
@@ -499,7 +500,7 @@ export async function ProductionSheet({
         <Card title={t('budgetTitle')}>
           <div className="grid gap-3 sm:grid-cols-3">
             <Stat label={t('budgetLow')} value={money(recommendation.estimatedBudgetLow)} />
-            <Stat label={t('budgetMid')} value={money(recommendation.estimatedBudgetMid)} />
+            <Stat label={t('budgetMid')} value={money(recommendation.estimatedBudgetMid)} highlight />
             <Stat label={t('budgetHigh')} value={money(recommendation.estimatedBudgetHigh)} />
           </div>
 

@@ -94,11 +94,13 @@
     letter-spacing: 0.01em;
   }
 
-  /* Letter-spacing pulls Arabic letters apart and breaks their joins. */
+  /* Letter-spacing pulls Arabic letters apart and breaks their joins, and
+     Cairo's semibold reads light next to Oswald, so Arabic headings go bold. */
   [dir='rtl'] h1,
   [dir='rtl'] h2,
   [dir='rtl'] h3 {
     letter-spacing: 0;
+    font-weight: 700;
   }
 
   ::selection {

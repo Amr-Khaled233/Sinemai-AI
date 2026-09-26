@@ -23,8 +23,14 @@ export function NavLinks({
   const t = useTranslations('nav');
   const pathname = usePathname();
 
-  const isActive = (href: string) =>
+  const matches = (href: string) =>
     href === pathname || (href !== '/' && pathname.startsWith(`${href}/`));
+  // `/producer` is a prefix of `/producer/projects/new`, so only the most
+  // specific matching link is marked, never two at once.
+  const current = links
+    .filter((link) => matches(link.href))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const isActive = (href: string) => href === current;
 
   if (variant === 'pills') {
     return (

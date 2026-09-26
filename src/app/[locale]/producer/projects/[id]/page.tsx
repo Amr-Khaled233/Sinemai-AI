@@ -73,6 +73,50 @@ export default async function ProjectPage({
     project.analysisState.stage !== 'DONE' &&
     project.analysisState.stage !== 'FAILED';
 
+  // The upload and run controls lead until there is a sheet, or while a run is
+  // in flight; once a sheet exists it is what the page is for, so they follow it.
+  const workspaceFirst = !ready || inFlight;
+  const workspace = (
+    <div className="grid gap-6 lg:grid-cols-3">
+      <Card
+        className="lg:col-span-2"
+        title={t('scriptTitle')}
+        subtitle={
+          project.script
+            ? [
+                project.script.fileName ?? project.script.parsedFormat,
+                t('scenesParsed', { count: project.script.sceneCount }),
+                project.script.pageCount ? t('pages', { count: project.script.pageCount }) : null,
+              ]
+                .filter(Boolean)
+                .join(' · ')
+            : t('noScript')
+        }
+      >
+        <ScriptUpload projectId={project.id} hasScript={hasScript} />
+      </Card>
+
+      <Card title={t('analyze')}>
+        {hasScript ? (
+          <>
+            <div className="mb-4 grid grid-cols-2 gap-3">
+              <Stat label={tSheet('scenes')} value={project.script!.sceneCount} />
+              <Stat label={tSheet('pages')} value={project.script!.pageCount ?? '—'} />
+            </div>
+            <AnalysisRunner
+              projectId={project.id}
+              label={ready ? t('reanalyze') : t('analyze')}
+              disabled={!hasScript}
+              inFlight={inFlight}
+            />
+          </>
+        ) : (
+          <p className="prose-sheet">{t('noScript')}</p>
+        )}
+      </Card>
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {!ready && (
@@ -102,44 +146,7 @@ export default async function ProjectPage({
         </header>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <Card
-          className="lg:col-span-2"
-          title={t('scriptTitle')}
-          subtitle={
-            project.script
-              ? [
-                  project.script.fileName ?? project.script.parsedFormat,
-                  t('scenesParsed', { count: project.script.sceneCount }),
-                  project.script.pageCount ? t('pages', { count: project.script.pageCount }) : null,
-                ]
-                  .filter(Boolean)
-                  .join(' · ')
-              : t('noScript')
-          }
-        >
-          <ScriptUpload projectId={project.id} hasScript={hasScript} />
-        </Card>
-
-        <Card title={t('analyze')}>
-          {hasScript ? (
-            <>
-              <div className="mb-4 grid grid-cols-2 gap-3">
-                <Stat label={tSheet('scenes')} value={project.script!.sceneCount} />
-                <Stat label={tSheet('pages')} value={project.script!.pageCount ?? '—'} />
-              </div>
-              <AnalysisRunner
-                projectId={project.id}
-                label={ready ? t('reanalyze') : t('analyze')}
-                disabled={!hasScript}
-                inFlight={inFlight}
-              />
-            </>
-          ) : (
-            <p className="prose-sheet">{t('noScript')}</p>
-          )}
-        </Card>
-      </div>
+      {workspaceFirst && workspace}
 
       {ready && project.recommendation && (
         <ProductionSheet
@@ -160,7 +167,7 @@ export default async function ProjectPage({
           }))}
           scenes={project.script?.scenes ?? []}
           tierWindow={tierWindow}
-      shootDayHours={settings.shootDayHours}
+          shootDayHours={settings.shootDayHours}
           actions={
             <ShareControls
               projectId={project.id}
@@ -170,6 +177,8 @@ export default async function ProjectPage({
           }
         />
       )}
+
+      {!workspaceFirst && workspace}
 
       {ready && <VersionHistory projectId={project.id} versions={versions} locale={locale} />}
 
