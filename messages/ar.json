@@ -17,7 +17,8 @@
     "analytics": "الإحصائيات",
     "language": "English",
     "insights": "التحليلات",
-    "currency": "العملة"
+    "currency": "العملة",
+    "content": "محتوى الموقع"
   },
   "landing": {
     "heroKicker": "من النص إلى حزمة التصوير",
@@ -403,7 +404,20 @@
     "currencyBase": "العملة الأساسية",
     "addCurrency": "إضافة عملة",
     "saved": "تم الحفظ.",
-    "saveFailed": "تعذّر الحفظ. راجع القيم وحاول مرة أخرى."
+    "saveFailed": "تعذّر الحفظ. راجع القيم وحاول مرة أخرى.",
+    "contentTitle": "محتوى الموقع",
+    "contentHint": "كل نص في الموقع بالعربية والإنجليزية. التعديل يظهر فور الحفظ، و«استعادة» ترجع النص الأصلي. المتغيرات بين الأقواس مثل '{count}' يملؤها الموقع، ويجب إبقاؤها كما هي.",
+    "contentSection": "القسم",
+    "contentSearch": "ابحث في كل النصوص",
+    "contentKey": "المفتاح",
+    "contentEdited": "معدّل",
+    "contentReset": "استعادة",
+    "contentNoMatch": "لا توجد نتائج مطابقة.",
+    "contentEditedCount": "{count, plural, =0 {لا توجد تعديلات بعد} one {نص واحد معدّل} two {نصان معدّلان} few {# نصوص معدّلة} many {# نصًا معدّلًا} other {# نص معدّل}}",
+    "copyEmpty": "لا يمكن أن يكون النص فارغًا.",
+    "copyTooLong": "النص طويل جدًا.",
+    "copySyntax": "الأقواس غير متطابقة. تأكد أن لكل '{' قوسًا يغلقه '}'.",
+    "copyUnknownVariables": "الموقع لا يوفّر {names} في هذا المكان."
   },
   "enum": {
     "type": {

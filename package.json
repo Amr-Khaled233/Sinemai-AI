@@ -25,6 +25,7 @@
   },
   "dependencies": {
     "@ai-sdk/openai": "2.0.128",
+    "@formatjs/icu-messageformat-parser": "3.5.20",
     "@prisma/client": "6.19.3",
     "@react-pdf/renderer": "4.9.0",
     "@vercel/blob": "2.8.0",

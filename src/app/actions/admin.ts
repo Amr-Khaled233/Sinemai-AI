@@ -1,6 +1,6 @@
 'use server';
 
-import { revalidatePath } from 'next/cache';
+import { revalidatePath, revalidateTag } from 'next/cache';
 import { z } from 'zod';
 import {
   ApprovalStatus,
@@ -17,6 +17,8 @@ import { slugify } from '@/lib/utils';
 import { reportError } from '@/lib/observability';
 import { BASE_CURRENCY, isCurrencyCode, type CurrencyConfig } from '@/lib/currency';
 import { saveCurrencyConfig } from '@/lib/currency-server';
+import { checkOverride, flattenMessages, type Messages } from '@/lib/site-copy';
+import { SITE_COPY_TAG, writeCopyOverride } from '@/lib/site-copy-server';
 import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
 function baseUrl() {
@@ -330,6 +332,47 @@ export async function saveCurrencies(input: CurrencyConfig) {
 
     await saveCurrencyConfig({ defaultCode, rates });
     // Every page that prints money reads these rates.
+    revalidatePath('/', 'layout');
+  });
+}
+
+// ---------------------------------------------------------------- site copy
+
+async function shippedMessages(locale: 'en' | 'ar') {
+  return flattenMessages((await import(`../../../messages/${locale}.json`)).default as Messages);
+}
+
+/**
+ * Saves one message in both languages. A value equal to the shipped text
+ * removes the override instead of storing a copy of it, so the file stays the
+ * source of truth for anything the admin has not actually changed.
+ */
+export async function saveSiteCopy(key: string, values: { en: string; ar: string }) {
+  return runAction('saveSiteCopy', async () => {
+    await requireAdmin();
+    for (const locale of ['en', 'ar'] as const) {
+      const original = (await shippedMessages(locale))[key];
+      if (original === undefined) throw new Error('NOT_FOUND');
+      const text = values[locale];
+      if (text === original) {
+        await writeCopyOverride(locale, key, null);
+        continue;
+      }
+      if (checkOverride(original, text)) throw new Error('INVALID_INPUT');
+      await writeCopyOverride(locale, key, text);
+    }
+    revalidateTag(SITE_COPY_TAG);
+    revalidatePath('/', 'layout');
+  });
+}
+
+/** Puts a message back to the shipped text in both languages. */
+export async function resetSiteCopy(key: string) {
+  return runAction('resetSiteCopy', async () => {
+    await requireAdmin();
+    await writeCopyOverride('en', key, null);
+    await writeCopyOverride('ar', key, null);
+    revalidateTag(SITE_COPY_TAG);
     revalidatePath('/', 'layout');
   });
 }

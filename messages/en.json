@@ -17,7 +17,8 @@
     "analytics": "Analytics",
     "language": "العربية",
     "insights": "Insights",
-    "currency": "Currency"
+    "currency": "Currency",
+    "content": "Site content"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -403,7 +404,20 @@
     "currencyBase": "Base currency",
     "addCurrency": "Add currency",
     "saved": "Saved.",
-    "saveFailed": "Could not save. Check the values and try again."
+    "saveFailed": "Could not save. Check the values and try again.",
+    "contentTitle": "Site content",
+    "contentHint": "Every piece of text on the site, in English and Arabic. Edits go live on save; Reset brings back the original. Variables in braces, like '{count}', are filled in by the site and must be kept as they are.",
+    "contentSection": "Section",
+    "contentSearch": "Search all text",
+    "contentKey": "Key",
+    "contentEdited": "Edited",
+    "contentReset": "Reset",
+    "contentNoMatch": "Nothing matches that search.",
+    "contentEditedCount": "{count, plural, =0 {No edits yet} one {# edited text} other {# edited texts}}",
+    "copyEmpty": "Text cannot be empty.",
+    "copyTooLong": "Too long.",
+    "copySyntax": "Braces do not match. Check every '{' has its '}'.",
+    "copyUnknownVariables": "The site does not provide {names} here."
   },
   "enum": {
     "type": {

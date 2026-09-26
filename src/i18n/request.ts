@@ -1,4 +1,6 @@
 import { getRequestConfig } from 'next-intl/server';
+import { applyOverrides, type Messages } from '@/lib/site-copy';
+import { getCopyOverrides } from '@/lib/site-copy-server';
 import { routing, type AppLocale } from './routing';
 
 export default getRequestConfig(async ({ requestLocale }) => {
@@ -7,9 +9,15 @@ export default getRequestConfig(async ({ requestLocale }) => {
     ? (requested as AppLocale)
     : routing.defaultLocale;
 
+  // The shipped messages, with whatever the admin has edited on top.
+  const [base, overrides] = await Promise.all([
+    import(`../../messages/${locale}.json`).then((module) => module.default as Messages),
+    getCopyOverrides(),
+  ]);
+
   return {
     locale,
-    messages: (await import(`../../messages/${locale}.json`)).default,
+    messages: applyOverrides(base, overrides[locale]),
     timeZone: 'Asia/Riyadh',
     now: new Date(),
   };

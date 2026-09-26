@@ -32,6 +32,7 @@ const NAV_BY_ROLE: Record<Role, NavLink[]> = {
     { href: '/admin/equipment', key: 'equipment' },
     { href: '/admin/vendors', key: 'vendors' },
     { href: '/admin/dops', key: 'dops' },
+    { href: '/admin/content', key: 'content' },
     { href: '/admin/settings', key: 'settings' },
   ],
 };
