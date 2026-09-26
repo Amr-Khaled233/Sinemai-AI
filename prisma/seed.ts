@@ -1068,7 +1068,12 @@ async function main() {
     },
   ];
 
-  const canEmbed = Boolean(process.env.OPENAI_API_KEY);
+  // Embeddings are optional: without them the profiles exist but cannot be
+  // matched until the admin re-embed job runs. So a failing API (no key, no
+  // credit, rate limited) skips the rest of the embeddings instead of leaving
+  // the seed half-done.
+  let canEmbed = Boolean(process.env.OPENAI_API_KEY);
+  let embedFailure: string | null = null;
   for (const seed of dopSeeds) {
     const user = await prisma.user.upsert({
       where: { email: seed.email },
@@ -1113,13 +1118,22 @@ async function main() {
         city: dop.city,
         yearsExperience: dop.yearsExperience,
       });
-      const vector = await embedText(text);
-      await writeDopEmbedding(dop.id, text, vector);
-      console.log(`  embedded ${dop.displayName}`);
+      try {
+        const vector = await embedText(text);
+        await writeDopEmbedding(dop.id, text, vector);
+        console.log(`  embedded ${dop.displayName}`);
+      } catch (error) {
+        canEmbed = false;
+        embedFailure = error instanceof Error ? error.message : String(error);
+      }
     }
   }
 
-  if (!canEmbed) {
+  if (embedFailure) {
+    console.warn(
+      `  ! OpenAI refused the embedding request, so the remaining profiles were saved without one:\n    ${embedFailure.slice(0, 200)}\n    Fix the key or its credit, then run \`npm run db:seed\` again or use the admin re-embed job.`,
+    );
+  } else if (!process.env.OPENAI_API_KEY) {
     console.warn(
       '  ! OPENAI_API_KEY not set — DOP embeddings were skipped. Run `npm run db:seed` again with the key, or use the admin re-embed job.',
     );
