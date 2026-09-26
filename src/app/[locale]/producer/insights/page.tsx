@@ -69,7 +69,7 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
         <EmptyState
           title={t('empty')}
           action={
-            <Link href="/producer/projects/new" className="btn-primary">
+            <Link href="/producer" className="btn-primary">
               {t('startProject')}
             </Link>
           }

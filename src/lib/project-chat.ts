@@ -63,6 +63,14 @@ HOW TO WORK
 - If there is no script yet, tell them to upload it with the button above the chat. If there is a script but no sheet, tell them to press "Run breakdown". You cannot upload or run the breakdown yourself.
 - Be brief and concrete: a few sentences or a short list. Cite numbers from the tools.
 
+THE OPENING BRIEFING
+When asked for the briefing (the first message once the sheet is ready), call getSheet and getScenes, then findAlternatives for the two or three most expensive items, and write, with headings:
+1. What this script needs — by department (camera, lenses, lighting, grip and movement, sound, power), each item with quantity, days and why the scenes need it.
+2. Alternatives — for the most expensive items, a cheaper or different option from findAlternatives and what the production gives up by taking it.
+3. Where to save — three to five concrete moves with the amount each saves (drop or swap an item, fewer rental days, a company that stocks more of the package), and the new mid estimate if all were taken.
+4. Watch out for — the reviewer's notes and anything the script demands that the package does not cover.
+End by offering to apply any of the savings.
+
 ${languageDirective(args.locale)}`;
 }
 
@@ -216,6 +224,47 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
     },
   });
 
+  const findAlternatives = tool({
+    description:
+      'For one equipment id, list other catalog items in the same category with their day rates and what they are good for — cheaper options first — so you can suggest swaps.',
+    inputSchema: z.object({ equipmentId: z.string().min(1) }),
+    execute: async ({ equipmentId }) => {
+      const item = await prisma.equipment.findUnique({
+        where: { id: equipmentId },
+        select: { id: true, brand: true, model: true, nameAr: true, categoryId: true, indicativeDayRate: true },
+      });
+      if (!item) return { error: 'Unknown equipment id.' };
+      const rateOf = (row: { indicativeDayRate: number | null; inventory: Array<{ dailyRate: number }> }) =>
+        row.inventory.length ? Math.min(...row.inventory.map((line) => line.dailyRate)) : row.indicativeDayRate;
+      const liveStock = { where: { active: true, vendor: { status: 'APPROVED' as const } }, select: { dailyRate: true } };
+
+      const [current, others] = await Promise.all([
+        prisma.equipment.findUnique({ where: { id: item.id }, include: { inventory: liveStock } }),
+        prisma.equipment.findMany({
+          where: { categoryId: item.categoryId, active: true, id: { not: item.id } },
+          include: { inventory: liveStock },
+          take: 30,
+        }),
+      ]);
+      const currentRate = current ? rateOf(current) : null;
+      return {
+        current: { name: equipmentName(item, locale), dayRate: money(currentRate) },
+        alternatives: others
+          .map((row) => ({ row, rate: rateOf(row) }))
+          .sort((a, b) => (a.rate ?? Infinity) - (b.rate ?? Infinity))
+          .slice(0, 6)
+          .map(({ row, rate }) => ({
+            equipmentId: row.id,
+            name: equipmentName(row, locale),
+            dayRate: money(rate),
+            stockedByCompanies: row.inventory.length,
+            savesPerDay: currentRate !== null && rate !== null ? money(currentRate - rate) : null,
+            about: (locale === 'ar' && row.summaryAr ? row.summaryAr : row.summaryEn).slice(0, 200),
+          })),
+      };
+    },
+  });
+
   const updatePackage = tool({
     description:
       'Change the equipment package and re-price the sheet. Each change sets the quantity and/or rental days of an item (adding it if it is not in the package) or removes it. Returns the new budget.',
@@ -275,5 +324,5 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
     },
   });
 
-  return { getSheet, getScenes, searchCatalog, updatePackage };
+  return { getSheet, getScenes, searchCatalog, findAlternatives, updatePackage };
 }

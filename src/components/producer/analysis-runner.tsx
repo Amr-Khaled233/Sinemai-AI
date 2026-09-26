@@ -60,11 +60,14 @@ export function AnalysisRunner({
   disabled,
   /** True when the server already has a run in flight for this project. */
   inFlight = false,
+  autoStart = false,
 }: {
   projectId: string;
   label: string;
   disabled?: boolean;
   inFlight?: boolean;
+  /** Start a run as soon as the page opens — right after a script was dropped in. */
+  autoStart?: boolean;
 }) {
   const t = useTranslations('analysis');
   const locale = useLocale();
@@ -191,6 +194,15 @@ export function AnalysisRunner({
 
   /** Starts a fresh analysis. */
   const run = useCallback(() => drive(true), [drive]);
+
+  // Arriving straight from a new script: begin without waiting for a click.
+  // A run already in flight is rejoined by the effect below instead.
+  const autoStarted = useRef(false);
+  useEffect(() => {
+    if (!autoStart || inFlight || disabled || autoStarted.current) return;
+    autoStarted.current = true;
+    void drive(true);
+  }, [autoStart, inFlight, disabled, drive]);
 
   /** Releases a paused run; blank answers mean "go with the assumption". */
   const answer = useCallback((answers: Record<string, string>) => drive(false, answers), [drive]);
@@ -385,7 +397,12 @@ export function AnalysisRunner({
 
           {state.error && (
             <div className="mt-3">
-              <p className="text-xs text-red-500">{t('failed', { message: state.error })}</p>
+              <p className="text-xs text-danger">
+                {/* A provider failure (no credit, quota) is named as such, not shown as raw provider text. */}
+                {/credit|quota|insufficient|billing/i.test(state.error)
+                  ? t('aiUnavailable')
+                  : t('failed', { message: state.error })}
+              </p>
               <button type="button" className="btn-secondary mt-3 text-xs" onClick={run}>
                 {t('retry')}
               </button>

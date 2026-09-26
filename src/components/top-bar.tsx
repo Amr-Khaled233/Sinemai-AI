@@ -11,7 +11,6 @@ import { unreadThreadCount } from '@/lib/support';
 /** Everyone who is not the admin is a regular user with the same menu. */
 const USER_NAV: NavLink[] = [
   { href: '/producer', key: 'projects' },
-  { href: '/producer/projects/new', key: 'newProject' },
   { href: '/producer/equipment', key: 'equipment' },
   { href: '/producer/insights', key: 'insights' },
   { href: '/producer/support', key: 'support' },

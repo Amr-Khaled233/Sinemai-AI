@@ -4,8 +4,7 @@
     "login": "Sign in",
     "register": "Create account",
     "logout": "Sign out",
-    "projects": "Projects",
-    "newProject": "New project",
+    "projects": "My scripts",
     "equipment": "Catalog",
     "vendors": "Vendors",
     "dops": "DOPs",
@@ -80,17 +79,10 @@
     "backToSignIn": "Back to sign in"
   },
   "project": {
-    "newTitle": "New project",
     "name": "Project name",
     "type": "Project type",
     "budgetTier": "Budget tier",
     "city": "Shooting city",
-    "shootStart": "Shoot start",
-    "shootEnd": "Shoot end",
-    "synopsis": "Logline or brief (optional)",
-    "visualStyle": "Visual style",
-    "visualStyleHint": "Pick the references that describe the look. These drive cinematographer matching.",
-    "create": "Create project",
     "scriptTitle": "Script",
     "uploadFile": "Upload a file",
     "uploadHint": "Fountain (.fountain), Final Draft (.fdx), PDF or plain text, up to 8 MB.",
@@ -103,8 +95,6 @@
     "noScript": "Upload or paste a script to run the breakdown.",
     "scenesParsed": "{count} scenes parsed",
     "pages": "{count} pages",
-    "empty": "No projects yet.",
-    "createFirst": "Create your first project",
     "status": {
       "DRAFT": "Draft",
       "SCRIPT_UPLOADED": "Script ready",
@@ -117,7 +107,21 @@
     "deleteWarning": "This removes the script, the scene breakdown, the generated sheet and every share link. It cannot be undone.",
     "deleteConfirmLabel": "Type {name} to confirm",
     "deleteConfirm": "Delete permanently",
-    "midEstimate": "Mid estimate"
+    "midEstimate": "Mid estimate",
+    "startKicker": "Start here",
+    "startTitle": "Drop your script",
+    "startBody": "Upload or paste a screenplay or an ad brief. It is broken down scene by scene, and the assistant tells you what you will need, the alternatives and where you can save.",
+    "dropHere": "Drop the file here, or click to choose",
+    "startButton": "Analyze my script",
+    "starting": "Reading the script…",
+    "startFailed": "That did not work. Try again, or paste the text instead.",
+    "myScripts": "My scripts",
+    "noScriptsYet": "Nothing yet — your scripts will appear here.",
+    "statusLabel": "Status",
+    "scenes": "Scenes",
+    "updated": "Updated",
+    "fullSheet": "Full sheet",
+    "views": "Views"
   },
   "analysis": {
     "title": "Building your production sheet",
@@ -148,7 +152,8 @@
       "assumption": "If left blank: {assumption}",
       "submit": "Continue with these answers",
       "skip": "Skip — use the assumptions"
-    }
+    },
+    "aiUnavailable": "The AI service is unavailable right now (the OpenAI account has no credit). Add credit and try again."
   },
   "sheet": {
     "title": "Production & Equipment Sheet",
@@ -637,6 +642,8 @@
     "toolUpdate": "Updated the package",
     "failed": "The assistant could not answer. Try again.",
     "unavailable": "The AI service is unavailable right now (the account has no credit). Try again later.",
-    "rateLimited": "Too many messages in a short time. Wait a little and try again."
+    "rateLimited": "Too many messages in a short time. Wait a little and try again.",
+    "kickoff": "Give me the briefing: what this script needs, the alternatives, and where I can save.",
+    "toolAlternatives": "Looked for alternatives"
   }
 }

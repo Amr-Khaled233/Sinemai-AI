@@ -1,11 +1,12 @@
 'use server';
 
 import { redirect } from 'next/navigation';
-import { ParsedFormat, ProjectStatus } from '@prisma/client';
+import { z } from 'zod';
+import { BudgetTier, ProjectType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { projectSchema } from '@/lib/validation';
-import { detectFormat, parseScriptSource } from '@/lib/script/parse';
-import { uploadFile, deleteFile } from '@/lib/blob';
+import { deleteFile } from '@/lib/blob';
+import { getSettings } from '@/lib/settings';
+import { storeScript } from '@/lib/script-store';
 import { randomToken } from '@/lib/utils';
 import {
   REVALIDATE,
@@ -16,40 +17,73 @@ import {
   type Failed,
 } from './shared';
 
-export async function createProject(locale: string, formData: FormData) {
-  const user = await requireProducer();
+const startSchema = z.object({
+  type: z.nativeEnum(ProjectType),
+  budgetTier: z.nativeEnum(BudgetTier),
+  city: z.string().trim().max(80),
+});
 
-  const parsed = projectSchema.safeParse({
-    name: formData.get('name'),
-    type: formData.get('type'),
-    budgetTier: formData.get('budgetTier'),
-    city: formData.get('city'),
-    visualStyleTags: formData.getAll('visualStyleTags').map(String),
-    shootStartDate: formData.get('shootStartDate') ?? '',
-    shootEndDate: formData.get('shootEndDate') ?? '',
-    synopsis: formData.get('synopsis') ?? '',
+/** A readable name from the file name, or the first line of pasted text. */
+function nameFromScript(fileName: string | null, pasted: string) {
+  // "night-delivery.fountain" → "Night Delivery"
+  const fromFile = fileName
+    ?.replace(/\.[^.]+$/, '')
+    .replace(/[-_]+/g, ' ')
+    .trim()
+    .replace(/(^|\s)\p{Ll}/gu, (letter) => letter.toUpperCase());
+  const fromText = pasted
+    .split('\n')
+    .map((line) => line.trim())
+    .find(Boolean);
+  return (fromFile || fromText || 'Untitled script').slice(0, 120);
+}
+
+/**
+ * Starts everything from a script: the project is created behind the scenes
+ * with the few choices the user made, the script is stored and segmented, and
+ * the caller goes straight to the analysis. What the brief leaves open is
+ * asked later, in the conversation, by the clarify step.
+ */
+export async function startFromScript(formData: FormData) {
+  return runAction('startFromScript', async () => {
+    const user = await requireProducer();
+    const settings = await getSettings();
+
+    const parsed = startSchema.safeParse({
+      type: formData.get('type'),
+      budgetTier: formData.get('budgetTier'),
+      city: formData.get('city') ?? '',
+    });
+    if (!parsed.success) throw new Error('INVALID_INPUT');
+
+    const file = formData.get('file');
+    const pasted = String(formData.get('pasted') ?? '').trim();
+    const fileName = file instanceof File && file.size > 0 ? file.name : null;
+    if (!fileName && !pasted) throw new Error('NO_SCRIPT');
+
+    const project = await prisma.project.create({
+      data: {
+        ownerId: user.id,
+        name: nameFromScript(fileName, pasted),
+        type: parsed.data.type,
+        budgetTier: parsed.data.budgetTier,
+        city: parsed.data.city || settings.defaultCity,
+        visualStyleTags: [],
+      },
+      select: { id: true },
+    });
+
+    try {
+      await storeScript({ id: project.id, script: null }, formData);
+    } catch (error) {
+      // A script that cannot be read leaves nothing behind.
+      await prisma.project.delete({ where: { id: project.id } }).catch(() => undefined);
+      throw error;
+    }
+
+    revalidate(REVALIDATE.producerProjects);
+    return { projectId: project.id };
   });
-
-  if (!parsed.success) return { ok: false as const, error: 'INVALID_INPUT' };
-  const data = parsed.data;
-
-  const project = await prisma.project.create({
-    data: {
-      ownerId: user.id,
-      name: data.name,
-      type: data.type,
-      budgetTier: data.budgetTier,
-      city: data.city,
-      visualStyleTags: data.visualStyleTags,
-      shootStartDate: data.shootStartDate ? new Date(data.shootStartDate) : null,
-      shootEndDate: data.shootEndDate ? new Date(data.shootEndDate) : null,
-      synopsis: data.synopsis || null,
-    },
-    select: { id: true },
-  });
-
-  revalidate(REVALIDATE.producerProjects);
-  redirect(`/${locale}/producer/projects/${project.id}`);
 }
 
 /**
@@ -61,86 +95,9 @@ export async function saveScript(projectId: string, formData: FormData) {
   return runAction('saveScript', async () => {
     const { project } = await requireOwnedProject(projectId);
 
-    const file = formData.get('file');
-    const pasted = String(formData.get('pasted') ?? '').trim();
-
-    let format: ParsedFormat;
-    let rawText = '';
-    let buffer: ArrayBuffer | undefined;
-    let fileName: string | null = null;
-    let fileUrl: string | null = null;
-
-    if (file instanceof File && file.size > 0) {
-      fileName = file.name;
-      format = detectFormat(file.name, file.type);
-      buffer = await file.arrayBuffer();
-      if (format !== ParsedFormat.PDF) rawText = new TextDecoder('utf-8').decode(buffer);
-      const stored = await uploadFile(file, `scripts/${projectId}`, 'script');
-      fileUrl = stored.url;
-    } else if (pasted) {
-      format = ParsedFormat.PASTED;
-      rawText = pasted;
-    } else {
-      throw new Error('NO_SCRIPT');
-    }
-
-    const parsed = await parseScriptSource({ format, text: rawText, buffer });
-
-    // Replacing a script invalidates the scenes and the sheet built on them.
-    if (project.script?.fileUrl && project.script.fileUrl !== fileUrl) {
-      await deleteFile(project.script.fileUrl);
-    }
-
-    await prisma.$transaction(async (tx) => {
-      const script = await tx.script.upsert({
-        where: { projectId },
-        create: {
-          projectId,
-          fileUrl,
-          fileName,
-          parsedFormat: format,
-          rawText: parsed.rawText,
-          pageCount: parsed.pageCount,
-          sceneCount: parsed.scenes.length,
-          parsedAt: new Date(),
-        },
-        update: {
-          fileUrl,
-          fileName,
-          parsedFormat: format,
-          rawText: parsed.rawText,
-          pageCount: parsed.pageCount,
-          sceneCount: parsed.scenes.length,
-          parsedAt: new Date(),
-        },
-        select: { id: true },
-      });
-
-      await tx.scene.deleteMany({ where: { scriptId: script.id } });
-      await tx.scene.createMany({
-        data: parsed.scenes.map((scene) => ({
-          scriptId: script.id,
-          order: scene.order,
-          heading: scene.heading,
-          slug: scene.slug,
-          bodyExcerpt: scene.bodyExcerpt,
-          intExt: scene.intExt,
-          timeOfDay: scene.timeOfDay,
-          pageEighths: scene.pageEighths,
-        })),
-      });
-
-      // A new script invalidates the sheet and any half-finished run.
-      await tx.projectRecommendation.deleteMany({ where: { projectId } });
-      await tx.analysisState.deleteMany({ where: { projectId } });
-      await tx.project.update({
-        where: { id: projectId },
-        data: { status: ProjectStatus.SCRIPT_UPLOADED },
-      });
-    });
-
+    const result = await storeScript(project, formData);
     revalidate(REVALIDATE.producerProject, REVALIDATE.producerProjects);
-    return { sceneCount: parsed.scenes.length };
+    return { sceneCount: result.sceneCount };
   });
 }
 

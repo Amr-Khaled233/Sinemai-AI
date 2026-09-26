@@ -25,7 +25,7 @@ export function NavLinks({
 
   const matches = (href: string) =>
     href === pathname || (href !== '/' && pathname.startsWith(`${href}/`));
-  // `/producer` is a prefix of `/producer/projects/new`, so only the most
+  // `/producer` is a prefix of `/producer/equipment`, so only the most
   // specific matching link is marked, never two at once.
   const current = links
     .filter((link) => matches(link.href))

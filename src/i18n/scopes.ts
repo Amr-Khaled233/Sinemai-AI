@@ -21,7 +21,7 @@ export const SCOPES = {
   /** Sign in, register, forgot and reset password. */
   auth: ['auth', 'common'],
   /** The user area: project form, upload, analysis runner, sheet editing, the assistant chat, support. */
-  producer: ['project', 'analysis', 'sheet', 'chat', 'support', 'enum', 'common'],
+  producer: ['project', 'analysis', 'sheet', 'chat', 'support', 'common'],
   /** Admin: catalog, rental companies and their stock, cinematographers, content, settings. */
   admin: ['admin', 'vendor', 'dop', 'support', 'enum', 'common'],
   /** A shared read-only sheet: export controls. */

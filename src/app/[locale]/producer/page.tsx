@@ -1,11 +1,13 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
+import { BudgetTier, ProjectType } from '@prisma/client';
 import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { Badge, Card, EmptyState, SectionTitle } from '@/components/ui';
-import { Reveal } from '@/components/motion';
+import { Badge, Card } from '@/components/ui';
+import { StartFromScript } from '@/components/producer/start-from-script';
 import { formatDate } from '@/lib/utils';
 import { moneyFormatter } from '@/lib/currency-server';
+import { getBudgetTierConfigs, getSettings } from '@/lib/settings';
 import { cityName } from '@/lib/city-name';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -17,101 +19,114 @@ const STATUS_TONE = {
   FAILED: 'red',
 } as const;
 
+/**
+ * Home for a user: drop a script to start, and every script so far below.
+ */
 export default async function ProducerHome({ params }: { params: Promise<{ locale: string }> }) {
   const { locale } = await params;
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, tNav, money] = await Promise.all([
+  const [t, tEnum, money, tiers, settings, projects] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
-    getTranslations('nav'),
     moneyFormatter(locale),
+    getBudgetTierConfigs(),
+    getSettings(),
+    prisma.project.findMany({
+      where: { ownerId: session.user.id },
+      orderBy: { updatedAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        budgetTier: true,
+        city: true,
+        status: true,
+        updatedAt: true,
+        script: { select: { sceneCount: true } },
+        recommendation: { select: { estimatedBudgetMid: true, currency: true } },
+      },
+    }),
   ]);
 
-  const projects = await prisma.project.findMany({
-    where: { ownerId: session.user.id },
-    orderBy: { updatedAt: 'desc' },
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      budgetTier: true,
-      city: true,
-      status: true,
-      updatedAt: true,
-      script: { select: { sceneCount: true, pageCount: true } },
-      recommendation: { select: { estimatedBudgetMid: true, currency: true, criticPassed: true } },
-    },
-  });
+  const tierByKey = new Map(tiers.map((tier) => [tier.tier, tier]));
 
   return (
-    <div>
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
-        <SectionTitle>{tNav('projects')}</SectionTitle>
-        <Link href="/producer/projects/new" className="btn-primary">
-          {t('create')}
-        </Link>
-      </div>
+    <div className="space-y-10">
+      <StartFromScript
+        defaultCity={cityName(settings.defaultCity, locale)}
+        types={Object.values(ProjectType).map((value) => ({ value, label: tEnum(`type.${value}`) }))}
+        tiers={Object.values(BudgetTier).map((value) => {
+          const tier = tierByKey.get(value);
+          return {
+            value,
+            label: tEnum(`tier.${value}`),
+            hint: tier ? `${money(tier.minTotal, tier.currency)} – ${money(tier.maxTotal, tier.currency)}` : undefined,
+          };
+        })}
+      />
 
-      {projects.length === 0 ? (
-        <EmptyState
-          title={t('empty')}
-          action={
-            <Link href="/producer/projects/new" className="btn-primary">
-              {t('createFirst')}
-            </Link>
-          }
-        />
-      ) : (
-        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {projects.map((project, index) => (
-            <Reveal as="li" key={project.id} delay={index * 60}>
-              <Link href={`/producer/projects/${project.id}`} className="block h-full">
-                <Card interactive className="h-full">
-                  <div className="flex items-start justify-between gap-3">
-                    <h3 className="text-sm font-semibold text-strong">{project.name}</h3>
-                    <Badge tone={STATUS_TONE[project.status]} pulse={project.status === 'ANALYZING'}>
-                      {t(`status.${project.status}`)}
-                    </Badge>
-                  </div>
-
-                  <p className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
-                    <span>{tEnum(`type.${project.type}`)}</span>
-                    <span>·</span>
-                    <span>{tEnum(`tier.${project.budgetTier}`)}</span>
-                    <span>·</span>
-                    <span>{cityName(project.city, locale)}</span>
-                  </p>
-
-                  <dl className="mt-4 space-y-1 text-xs text-muted">
-                    {project.script && (
-                      <div className="flex justify-between">
-                        <dt>{t('scenesParsed', { count: project.script.sceneCount })}</dt>
-                        <dd>{project.script.pageCount ? t('pages', { count: project.script.pageCount }) : ''}</dd>
-                      </div>
-                    )}
-                    {project.recommendation && (
-                      <div className="flex justify-between text-accent">
-                        <dt>{t('midEstimate')}</dt>
-                        <dd className="tabular-nums">
-                          {money(project.recommendation.estimatedBudgetMid, project.recommendation.currency)}
-                        </dd>
-                      </div>
-                    )}
-                    <div className="flex justify-between text-muted/70">
-                      <dt>{formatDate(project.updatedAt, locale)}</dt>
-                      {project.recommendation && !project.recommendation.criticPassed && (
-                        <dd className="text-warning">reviewer flags</dd>
-                      )}
-                    </div>
-                  </dl>
-                </Card>
-              </Link>
-            </Reveal>
-          ))}
-        </ul>
-      )}
+      <section>
+        <h2 className="mb-4 text-xl font-semibold text-strong">{t('myScripts')}</h2>
+        {projects.length === 0 ? (
+          <p className="prose-sheet">{t('noScriptsYet')}</p>
+        ) : (
+          <Card className="p-0 sm:p-0">
+            <div className="table-wrap border-0">
+              <table className="grid-table [--grid-cols:minmax(12rem,2fr)_minmax(8rem,1fr)_7rem_6rem_9rem_7.5rem]">
+                <thead>
+                  <tr>
+                    <th>{t('name')}</th>
+                    <th>{t('type')}</th>
+                    <th>{t('statusLabel')}</th>
+                    <th className="text-end">{t('scenes')}</th>
+                    <th className="text-end">{t('midEstimate')}</th>
+                    <th>{t('updated')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projects.map((project) => (
+                    <tr key={project.id}>
+                      <td data-label={t('name')}>
+                        <Link
+                          href={`/producer/projects/${project.id}`}
+                          className="font-medium text-strong hover:text-accent"
+                          dir="auto"
+                        >
+                          {project.name}
+                        </Link>
+                        <span className="block text-[11px] text-muted">
+                          {tEnum(`tier.${project.budgetTier}`)} · {cityName(project.city, locale)}
+                        </span>
+                      </td>
+                      <td data-label={t('type')} className="text-muted">
+                        {tEnum(`type.${project.type}`)}
+                      </td>
+                      <td data-label={t('statusLabel')}>
+                        <Badge tone={STATUS_TONE[project.status]} pulse={project.status === 'ANALYZING'}>
+                          {t(`status.${project.status}`)}
+                        </Badge>
+                      </td>
+                      <td data-label={t('scenes')} className="text-end tabular-nums">
+                        {project.script?.sceneCount ?? '—'}
+                      </td>
+                      <td data-label={t('midEstimate')} className="text-end tabular-nums text-accent">
+                        {project.recommendation
+                          ? money(project.recommendation.estimatedBudgetMid, project.recommendation.currency)
+                          : '—'}
+                      </td>
+                      <td data-label={t('updated')} className="text-xs text-muted">
+                        {formatDate(project.updatedAt, locale)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        )}
+      </section>
     </div>
   );
 }

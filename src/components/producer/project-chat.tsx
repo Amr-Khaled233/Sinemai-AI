@@ -13,6 +13,7 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-getSheet': 'toolSheet',
   'tool-getScenes': 'toolScenes',
   'tool-searchCatalog': 'toolCatalog',
+  'tool-findAlternatives': 'toolAlternatives',
   'tool-updatePackage': 'toolUpdate',
 };
 
@@ -25,10 +26,12 @@ export function ProjectChat({
   projectId,
   initialMessages,
   hasSheet,
+  className,
 }: {
   projectId: string;
   initialMessages: UIMessage[];
   hasSheet: boolean;
+  className?: string;
 }) {
   const t = useTranslations('chat');
   const locale = useLocale();
@@ -59,6 +62,15 @@ export function ProjectChat({
 
   const busy = status === 'submitted' || status === 'streaming';
 
+  // When a sheet is ready and nothing has been said yet, the assistant opens the
+  // conversation itself: what the script needs, the alternatives and where to save.
+  const kickedOff = useRef(false);
+  useEffect(() => {
+    if (!hasSheet || initialMessages.length > 0 || kickedOff.current) return;
+    kickedOff.current = true;
+    void sendMessage({ text: t('kickoff') });
+  }, [hasSheet, initialMessages.length, sendMessage, t]);
+
   useEffect(() => {
     const node = scrollRef.current;
     if (node) node.scrollTop = node.scrollHeight;
@@ -84,7 +96,7 @@ export function ProjectChat({
     : null;
 
   return (
-    <div className="flex h-full min-h-[28rem] flex-col">
+    <div className={cn('flex h-full min-h-[28rem] flex-col', className)}>
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto p-4" aria-live="polite">
         {messages.length === 0 && (
           <div className="space-y-4 py-2">
