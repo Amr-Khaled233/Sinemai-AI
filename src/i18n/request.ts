@@ -1,7 +1,7 @@
 import { getRequestConfig } from 'next-intl/server';
 import { applyOverrides, type Messages } from '@/lib/site-copy';
 import { getCopyOverrides } from '@/lib/site-copy-server';
-import { routing, type AppLocale } from './routing';
+import { routing, type AppLocale } from './config';
 
 export default getRequestConfig(async ({ requestLocale }) => {
   const requested = await requestLocale;
