@@ -12,7 +12,7 @@ export const registerSchema = z.object({
   email: z.string().email().max(160),
   password: z.string().min(8).max(200),
   phone: z.string().max(40).optional().or(z.literal('')),
-  locale: z.enum(['ar', 'en']).default('ar'),
+  locale: z.enum(['ar', 'en']).default('en'),
 });
 
 export const projectSchema = z.object({

@@ -525,7 +525,7 @@ export async function answerClarifications(projectId: string, raw: Record<string
 export async function runProductionAnalysis(
   projectId: string,
   report: ProgressReporter,
-  locale = 'ar',
+  locale = 'en',
 ): Promise<ProductionSheet> {
   await beginAnalysis(projectId, locale);
 

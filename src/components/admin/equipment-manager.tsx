@@ -149,7 +149,7 @@ export function EquipmentManager({
             />
           </Field>
 
-          <Field label={t('capabilities')} hint="Comma separated, matched against scene special requirements.">
+          <Field label={t('capabilities')} hint={t('capabilitiesHint')}>
             <Input name="capabilities" defaultValue={(editing?.capabilities ?? []).join(', ')} />
           </Field>
 
@@ -162,7 +162,7 @@ export function EquipmentManager({
             </Field>
           </div>
 
-          <Field label={t('specs')} hint='e.g. {"sensor":"Super 35","dynamicRange":"17 stops"}'>
+          <Field label={t('specs')} hint={t('specsHint')}>
             <Textarea
               name="specs"
               rows={4}

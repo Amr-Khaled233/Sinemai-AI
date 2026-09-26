@@ -96,17 +96,17 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
         <Stat
           label={t('vendorsApproved')}
           value={<AnimatedNumber value={vendorsApproved} />}
-          hint={`${vendorsPending} pending`}
+          hint={t('pendingCount', { count: vendorsPending })}
         />
         <Stat
           label={t('dopsApproved')}
           value={<AnimatedNumber value={dopsApproved} />}
-          hint={`${dopsPending} pending`}
+          hint={t('pendingCount', { count: dopsPending })}
         />
         <Stat
-          label="Style vectors"
+          label={t('styleVectors')}
           value={<AnimatedNumber value={embedded} />}
-          hint={`${dopsApproved - embedded} missing`}
+          hint={t('missingCount', { count: dopsApproved - embedded })}
         />
       </div>
 
@@ -132,14 +132,26 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
           {topEquipmentIds.length === 0 ? (
             <p className="prose-sheet">—</p>
           ) : (
-            <ul className="space-y-2">
-              {topEquipmentIds.map(([id, count]) => (
-                <li key={id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-strong">{equipmentNames.get(id) ?? id}</span>
-                  <span className="tabular-nums text-accent">{count}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="table-wrap">
+              <table className="grid-table grid-table-compact [--grid-cols:2.5rem_minmax(10rem,1fr)_6rem]">
+                <thead>
+                  <tr>
+                    <th>{t('rank')}</th>
+                    <th>{t('item')}</th>
+                    <th className="text-end">{t('sheets')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topEquipmentIds.map(([id, count], index) => (
+                    <tr key={id}>
+                      <td data-label={t('rank')} className="tabular-nums text-muted">{index + 1}</td>
+                      <td data-label={t('item')} className="text-strong">{equipmentNames.get(id) ?? id}</td>
+                      <td data-label={t('sheets')} className="text-end tabular-nums text-accent">{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
@@ -147,49 +159,65 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
           {topDopIds.length === 0 ? (
             <p className="prose-sheet">—</p>
           ) : (
-            <ul className="space-y-2">
-              {topDopIds.map(([id, count]) => (
-                <li key={id} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="text-strong">{dopNames.get(id) ?? id}</span>
-                  <span className="tabular-nums text-accent">{count}</span>
-                </li>
-              ))}
-            </ul>
+            <div className="table-wrap">
+              <table className="grid-table grid-table-compact [--grid-cols:2.5rem_minmax(10rem,1fr)_6rem]">
+                <thead>
+                  <tr>
+                    <th>{t('rank')}</th>
+                    <th>{t('cinematographer')}</th>
+                    <th className="text-end">{t('matches')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topDopIds.map(([id, count], index) => (
+                    <tr key={id}>
+                      <td data-label={t('rank')} className="tabular-nums text-muted">{index + 1}</td>
+                      <td data-label={t('cinematographer')} className="text-strong">{dopNames.get(id) ?? id}</td>
+                      <td data-label={t('matches')} className="text-end tabular-nums text-accent">{count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
       </div>
 
-      <Card title={t('recentRuns')} subtitle="Every agent invocation, with tool calls, is stored for debugging.">
-        <div className="table-wrap">
-          <table className="grid-table grid-table-wide [--grid-cols:9rem_minmax(8rem,1.6fr)_6.5rem_5rem_6.5rem_7rem_7rem]">
-            <thead>
-              <tr>
-                <th>{t('agent')}</th>
-                <th>{t('project')}</th>
-                <th>{t('status')}</th>
-                <th className="text-end">{t('attempt')}</th>
-                <th className="text-end">{t('latency')}</th>
-                <th>Model</th>
-                <th />
-              </tr>
-            </thead>
-            <tbody>
-              {recentRuns.map((run) => (
-                <tr key={run.id}>
-                  <td data-label={t('agent')} className="text-strong">{tEnum(`agent.${run.agent}`)}</td>
-                  <td data-label={t('project')} className="text-muted">{run.project.name}</td>
-                  <td data-label={t('status')}>
-                    <Badge tone={RUN_TONE[run.status]}>{run.status}</Badge>
-                  </td>
-                  <td data-label={t('attempt')} className="text-end tabular-nums">{run.attempt}</td>
-                  <td data-label={t('latency')} className="text-end tabular-nums">{run.latencyMs ? `${run.latencyMs} ms` : '—'}</td>
-                  <td data-label="Model" className="text-xs text-muted">{run.model ?? '—'}</td>
-                  <td data-label="Date" className="text-xs text-muted/70">{formatDate(run.startedAt, locale)}</td>
+      <Card title={t('recentRuns')} subtitle={t('recentRunsHint')}>
+        {recentRuns.length === 0 ? (
+          <p className="prose-sheet">{t('noRuns')}</p>
+        ) : (
+          <div className="table-wrap">
+            <table className="grid-table grid-table-wide [--grid-cols:9rem_minmax(8rem,1.6fr)_6.5rem_5rem_6.5rem_7rem_7rem]">
+              <thead>
+                <tr>
+                  <th>{t('agent')}</th>
+                  <th>{t('project')}</th>
+                  <th>{t('status')}</th>
+                  <th className="text-end">{t('attempt')}</th>
+                  <th className="text-end">{t('latency')}</th>
+                  <th>{t('model')}</th>
+                  <th>{t('date')}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {recentRuns.map((run) => (
+                  <tr key={run.id}>
+                    <td data-label={t('agent')} className="text-strong">{tEnum(`agent.${run.agent}`)}</td>
+                    <td data-label={t('project')} className="text-muted">{run.project.name}</td>
+                    <td data-label={t('status')}>
+                      <Badge tone={RUN_TONE[run.status]}>{run.status}</Badge>
+                    </td>
+                    <td data-label={t('attempt')} className="text-end tabular-nums">{run.attempt}</td>
+                    <td data-label={t('latency')} className="text-end tabular-nums">{run.latencyMs ? `${run.latencyMs} ms` : '—'}</td>
+                    <td data-label={t('model')} className="text-xs text-muted">{run.model ?? '—'}</td>
+                    <td data-label={t('date')} className="text-xs text-muted/70">{formatDate(run.startedAt, locale)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { Fragment, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { setDopStatus, setVendorStatus, toggleVendorVerified } from '@/app/actions/admin';
@@ -41,110 +41,139 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
   if (rows.length === 0) return <p className="prose-sheet">—</p>;
 
   return (
-    <ul className="space-y-3">
-      {rows.map((row) => (
-        <li key={row.id} className="rounded-md border border-line bg-surface-sunken p-4">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">
-                {row.title}
-                <Badge tone={row.status === 'APPROVED' ? 'green' : row.status === 'REJECTED' ? 'red' : 'amber'}>
-                  {tEnum(`approval.${row.status}`)}
-                </Badge>
-                {row.verified && <Badge tone="teal">{t('verified')}</Badge>}
-              </h3>
-              <p className="mt-1 text-xs text-muted">{row.subtitle}</p>
-              {row.detail && (
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-muted">{row.detail}</p>
-              )}
-
-              {row.tags && row.tags.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-1.5">
-                  {row.tags.map((tag) => (
-                    <span key={tag} className="chip text-[11px]">
-                      {tag}
+    <div className="table-wrap">
+      <table className="grid-table grid-table-wide [--grid-cols:minmax(11rem,1.2fr)_7rem_minmax(14rem,2fr)_minmax(8rem,1fr)_minmax(11rem,auto)]">
+        <thead>
+          <tr>
+            <th>{t('applicant')}</th>
+            <th>{t('status')}</th>
+            <th>{t('details')}</th>
+            <th>{t('links')}</th>
+            <th className="text-end">{t('actions')}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <Fragment key={row.id}>
+              <tr>
+                <td data-label={t('applicant')}>
+                  <span className="block font-medium text-strong">{row.title}</span>
+                  <span className="mt-0.5 block text-xs text-muted">{row.subtitle}</span>
+                  {row.meta && <span className="mt-1 block text-[11px] text-muted/70">{row.meta}</span>}
+                </td>
+                <td data-label={t('status')}>
+                  <span className="flex flex-wrap gap-1.5">
+                    <Badge tone={row.status === 'APPROVED' ? 'green' : row.status === 'REJECTED' ? 'red' : 'amber'}>
+                      {tEnum(`approval.${row.status}`)}
+                    </Badge>
+                    {row.verified && <Badge tone="teal">{t('verified')}</Badge>}
+                  </span>
+                </td>
+                <td data-label={t('details')}>
+                  {row.detail ? (
+                    <span dir="auto" className="block text-sm leading-6 text-muted">
+                      {row.detail}
                     </span>
-                  ))}
-                </div>
-              )}
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                  {row.tags && row.tags.length > 0 && (
+                    <span className="mt-2 flex flex-wrap gap-1.5">
+                      {row.tags.map((tag) => (
+                        <span key={tag} className="chip text-[11px]">
+                          {tag}
+                        </span>
+                      ))}
+                    </span>
+                  )}
+                </td>
+                <td data-label={t('links')}>
+                  {row.links && row.links.length > 0 ? (
+                    <span className="flex flex-col gap-1 text-xs">
+                      {safeHttpUrls(row.links).map((link) => (
+                        <a
+                          key={link}
+                          href={link}
+                          target="_blank"
+                          rel="noreferrer noopener"
+                          className="tap-link truncate text-info hover:underline"
+                          dir="ltr"
+                        >
+                          {link.replace(/^https?:\/\//, '').slice(0, 40)} ↗
+                        </a>
+                      ))}
+                    </span>
+                  ) : (
+                    <span className="text-muted">—</span>
+                  )}
+                </td>
+                <td>
+                  <span className="flex flex-wrap items-center gap-2 lg:justify-end">
+                    {row.status !== 'APPROVED' && (
+                      <button
+                        type="button"
+                        className="btn-primary px-4 text-xs"
+                        disabled={pendingId === row.id}
+                        onClick={() => act(row.id, 'APPROVED')}
+                      >
+                        {t('approve')}
+                      </button>
+                    )}
+                    {row.status !== 'REJECTED' && (
+                      <button
+                        type="button"
+                        className="btn-danger px-4 text-xs"
+                        disabled={pendingId === row.id}
+                        onClick={() => setReasonFor(reasonFor === row.id ? null : row.id)}
+                      >
+                        {t('reject')}
+                      </button>
+                    )}
+                    {kind === 'VENDOR' && row.status === 'APPROVED' && (
+                      <button
+                        type="button"
+                        className="btn-ghost text-xs"
+                        disabled={pendingId === row.id}
+                        onClick={async () => {
+                          setPendingId(row.id);
+                          await toggleVendorVerified(row.id, !row.verified);
+                          setPendingId(null);
+                          router.refresh();
+                        }}
+                      >
+                        {row.verified ? t('unverify') : t('verify')}
+                      </button>
+                    )}
+                  </span>
+                </td>
+              </tr>
 
-              {row.links && row.links.length > 0 && (
-                <div className="mt-2 flex flex-wrap gap-3 text-xs">
-                  {safeHttpUrls(row.links).map((link) => (
-                    <a
-                      key={link}
-                      href={link}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="tap-link text-info hover:underline"
-                      dir="ltr"
-                    >
-                      {link.replace(/^https?:\/\//, '').slice(0, 48)} ↗
-                    </a>
-                  ))}
-                </div>
+              {/* The rejection note spans the whole row, under the applicant it is about. */}
+              {reasonFor === row.id && (
+                <tr>
+                  <td className="[grid-column:1/-1]">
+                    <span className="flex flex-wrap items-center gap-2">
+                      <input
+                        className="input max-w-md"
+                        placeholder={t('rejectReason')}
+                        aria-label={t('rejectReason')}
+                        value={reason}
+                        onChange={(event) => setReason(event.target.value)}
+                      />
+                      <button type="button" className="btn-danger text-xs" onClick={() => act(row.id, 'REJECTED', reason)}>
+                        {t('reject')}
+                      </button>
+                      <button type="button" className="btn-ghost text-xs" onClick={() => setReasonFor(null)}>
+                        {tc('cancel')}
+                      </button>
+                    </span>
+                  </td>
+                </tr>
               )}
-
-              {row.meta && <p className="mt-2 text-[11px] text-muted/70">{row.meta}</p>}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {row.status !== 'APPROVED' && (
-                <button
-                  type="button"
-                  className="btn-primary text-xs"
-                  disabled={pendingId === row.id}
-                  onClick={() => act(row.id, 'APPROVED')}
-                >
-                  {t('approve')}
-                </button>
-              )}
-              {row.status !== 'REJECTED' && (
-                <button
-                  type="button"
-                  className="btn-danger text-xs"
-                  disabled={pendingId === row.id}
-                  onClick={() => setReasonFor(reasonFor === row.id ? null : row.id)}
-                >
-                  {t('reject')}
-                </button>
-              )}
-              {kind === 'VENDOR' && row.status === 'APPROVED' && (
-                <button
-                  type="button"
-                  className="btn-ghost text-xs"
-                  disabled={pendingId === row.id}
-                  onClick={async () => {
-                    setPendingId(row.id);
-                    await toggleVendorVerified(row.id, !row.verified);
-                    setPendingId(null);
-                    router.refresh();
-                  }}
-                >
-                  {row.verified ? t('unverify') : t('verify')}
-                </button>
-              )}
-            </div>
-          </div>
-
-          {reasonFor === row.id && (
-            <div className="mt-3 flex flex-wrap items-end gap-2 border-t border-line pt-3">
-              <input
-                className="input max-w-md"
-                placeholder="Reviewer note sent to the applicant"
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-              />
-              <button type="button" className="btn-danger text-xs" onClick={() => act(row.id, 'REJECTED', reason)}>
-                {t('reject')}
-              </button>
-              <button type="button" className="btn-ghost text-xs" onClick={() => setReasonFor(null)}>
-                {tc('cancel')}
-              </button>
-            </div>
-          )}
-        </li>
-      ))}
-    </ul>
+            </Fragment>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }

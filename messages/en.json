@@ -367,7 +367,31 @@
     "labelEn": "Label (English)",
     "labelAr": "Label (Arabic)",
     "reembed": "Re-embed cinematographers",
-    "reembedDone": "Queued {count} profiles for re-embedding."
+    "reembedDone": "Queued {count} profiles for re-embedding.",
+    "pendingCount": "{count} pending",
+    "styleVectors": "Style vectors",
+    "missingCount": "{count} missing",
+    "recentRunsHint": "Every agent invocation, with its tool calls, is stored for debugging.",
+    "noRuns": "No agent runs yet.",
+    "date": "Date",
+    "rank": "#",
+    "item": "Item",
+    "sheets": "Sheets",
+    "cinematographer": "Cinematographer",
+    "matches": "Matches",
+    "applicant": "Applicant",
+    "details": "Details",
+    "links": "Links",
+    "actions": "Actions",
+    "rejectReason": "Reviewer note sent to the applicant",
+    "settingsHint": "These values feed the budget agent and the matching thresholds.",
+    "crewRatesHint": "The only source of crew cost in every generated budget. Each cell is the day rate and the headcount.",
+    "role": "Role",
+    "dayRateField": "Day rate",
+    "headcountField": "Headcount",
+    "styleTagsHint": "Offered to producers and used as the cinematographer style vocabulary.",
+    "capabilitiesHint": "Comma separated, matched against scene special requirements.",
+    "specsHint": "For example '{\"sensor\":\"Super 35\",\"dynamicRange\":\"17 stops\"}'"
   },
   "enum": {
     "type": {
@@ -507,8 +531,6 @@
     "nightShare": "Night scenes",
     "topEquipment": "Most recommended equipment",
     "topEquipmentHint": "Tallied across every costed sheet",
-    "projectCount": "{count, plural, one {# project} other {# projects}}",
-    "rentalDays": "{days, plural, one {# rental day} other {# rental days}}",
     "projectMix": "Project mix",
     "topDops": "Most matched cinematographers",
     "byProject": "Budget by project",
@@ -519,6 +541,11 @@
     "mid": "Mid",
     "high": "High",
     "note": "Figures come from each project’s current sheet, so a package edit shows up here straight away.",
-    "capped": "Showing your {count} most recent projects."
+    "capped": "Showing your {count} most recent projects.",
+    "colEquipment": "Equipment",
+    "colProjects": "Projects",
+    "colRentalDays": "Rental days",
+    "colCinematographer": "Cinematographer",
+    "colBestMatch": "Best match"
   }
 }

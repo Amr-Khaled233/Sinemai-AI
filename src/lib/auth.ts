@@ -54,7 +54,7 @@ export const authOptions: NextAuthOptions = {
       if (user) {
         token.id = user.id;
         token.role = (user as { role: Role }).role;
-        token.locale = (user as { locale?: string }).locale ?? 'ar';
+        token.locale = (user as { locale?: string }).locale ?? 'en';
         token.authAt = Math.floor(Date.now() / 1000);
       } else if (trigger === 'update' && token.id) {
         // Role can change when an admin approves a vendor/DOP application.
@@ -88,7 +88,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id as string;
         session.user.role = token.role as Role;
-        session.user.locale = (token.locale as string) ?? 'ar';
+        session.user.locale = (token.locale as string) ?? 'en';
       }
       return session;
     },
@@ -104,13 +104,13 @@ export type AppSession = Session & {
 };
 
 /** Server-side guard: redirects to login (or the user's own home) on mismatch. */
-export async function requireUser(locale = 'ar') {
+export async function requireUser(locale = 'en') {
   const session = (await auth()) as AppSession | null;
   if (!session?.user) redirect(`/${locale}/login`);
   return session;
 }
 
-export async function requireRole(role: Role | Role[], locale = 'ar') {
+export async function requireRole(role: Role | Role[], locale = 'en') {
   const session = await requireUser(locale);
   const allowed = Array.isArray(role) ? role : [role];
   if (!allowed.includes(session.user.role)) redirect(`/${locale}${homeForRole(session.user.role)}`);

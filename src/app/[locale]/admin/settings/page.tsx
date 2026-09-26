@@ -33,7 +33,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-strong">{t('settingsTitle')}</h1>
 
-      <Card title={t('settingsTitle')} subtitle="These values feed the budget agent and the matching thresholds.">
+      <Card title={t('settingsTitle')} subtitle={t('settingsHint')}>
         <form action={savePlatformSettingsForm}>
           <div className="grid gap-x-4 sm:grid-cols-3">
             <Field label={t('defaultCity')}>
@@ -105,12 +105,12 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
         </form>
       </Card>
 
-      <Card title={t('crewRates')} subtitle="The only source of crew cost in every generated budget.">
+      <Card title={t('crewRates')} subtitle={t('crewRatesHint')}>
         <div className="table-wrap">
           <table className="grid-table [--grid-cols:minmax(10rem,1.4fr)_repeat(3,minmax(10rem,1fr))]">
             <thead>
               <tr>
-                <th>Role</th>
+                <th>{t('role')}</th>
                 {Object.values(BudgetTier).map((tier) => (
                   <th key={tier} className="text-end">
                     {tEnum(`tier.${tier}`)}
@@ -121,7 +121,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
             <tbody>
               {[...ratesByRole.entries()].map(([roleSlug, rates]) => (
                 <tr key={roleSlug}>
-                  <td data-label="Role" className="text-strong">
+                  <td data-label={t('role')} className="text-strong">
                     {locale === 'ar' ? rates[0].labelAr : rates[0].labelEn}
                     <span className="ms-2 text-[11px] text-muted">{roleSlug}</span>
                   </td>
@@ -136,6 +136,8 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
                           <input
                             className="input w-24 py-1 text-end text-xs tabular-nums"
                             name="dayRate"
+                            aria-label={t('dayRateField')}
+                            title={t('dayRateField')}
                             type="number"
                             min={0}
                             dir="ltr"
@@ -144,6 +146,8 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
                           <input
                             className="input w-14 py-1 text-end text-xs tabular-nums"
                             name="headcount"
+                            aria-label={t('headcountField')}
+                            title={t('headcountField')}
                             type="number"
                             min={1}
                             dir="ltr"
@@ -163,7 +167,7 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
         </div>
       </Card>
 
-      <Card title={t('styleTags')} subtitle="Offered to producers and used as the cinematographer style vocabulary.">
+      <Card title={t('styleTags')} subtitle={t('styleTagsHint')}>
         <form action={saveStyleTagForm} className="mb-5 grid items-end gap-x-4 sm:grid-cols-2 lg:grid-cols-3">
           <Field label={t('labelEn')}>
             <Input name="labelEn" required />

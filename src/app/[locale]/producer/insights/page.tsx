@@ -146,16 +146,26 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
           {topEquipment.length === 0 ? (
             <p className="prose-sheet">—</p>
           ) : (
-            <ul className="space-y-2.5">
-              {topEquipment.map((entry) => (
-                <li key={entry.label} className="flex items-center justify-between gap-3 text-sm">
-                  <span className="min-w-0 truncate text-strong">{entry.label}</span>
-                  <span className="shrink-0 text-xs text-muted">
-                    {t('projectCount', { count: entry.count })} · {t('rentalDays', { days: entry.days })}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="table-wrap">
+              <table className="grid-table grid-table-compact [--grid-cols:minmax(10rem,1fr)_6rem_7rem]">
+                <thead>
+                  <tr>
+                    <th>{t('colEquipment')}</th>
+                    <th className="text-end">{t('colProjects')}</th>
+                    <th className="text-end">{t('colRentalDays')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {topEquipment.map((entry) => (
+                    <tr key={entry.label}>
+                      <td data-label={t('colEquipment')} className="text-strong">{entry.label}</td>
+                      <td data-label={t('colProjects')} className="text-end tabular-nums">{entry.count}</td>
+                      <td data-label={t('colRentalDays')} className="text-end tabular-nums">{entry.days}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           )}
         </Card>
 
@@ -168,16 +178,28 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
             {topDops.length === 0 ? (
               <p className="prose-sheet">—</p>
             ) : (
-              <ul className="space-y-2.5">
-                {topDops.map((entry) => (
-                  <li key={entry.name} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="min-w-0 truncate text-strong">{entry.name}</span>
-                    <span className="shrink-0 text-xs text-muted">
-                      {t('projectCount', { count: entry.count })} · {Math.round(entry.bestScore * 100)}%
-                    </span>
-                  </li>
-                ))}
-              </ul>
+              <div className="table-wrap">
+                <table className="grid-table grid-table-compact [--grid-cols:minmax(10rem,1fr)_6rem_7rem]">
+                  <thead>
+                    <tr>
+                      <th>{t('colCinematographer')}</th>
+                      <th className="text-end">{t('colProjects')}</th>
+                      <th className="text-end">{t('colBestMatch')}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {topDops.map((entry) => (
+                      <tr key={entry.name}>
+                        <td data-label={t('colCinematographer')} className="text-strong">{entry.name}</td>
+                        <td data-label={t('colProjects')} className="text-end tabular-nums">{entry.count}</td>
+                        <td data-label={t('colBestMatch')} className="text-end tabular-nums text-accent">
+                          {Math.round(entry.bestScore * 100)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Card>
         </div>

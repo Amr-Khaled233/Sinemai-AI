@@ -11,7 +11,7 @@
 export type SupportedLocale = 'ar' | 'en';
 
 export function normaliseLocale(locale: string | null | undefined): SupportedLocale {
-  return locale === 'en' ? 'en' : 'ar';
+  return locale === 'ar' ? 'ar' : 'en';
 }
 
 export function languageName(locale: string) {
