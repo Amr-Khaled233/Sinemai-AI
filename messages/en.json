@@ -267,7 +267,9 @@
     "noBlocks": "No blocked dates.",
     "photos": "Photos",
     "uploadPhoto": "Upload photo",
-    "itemCount": "{count, plural, =0 {No items yet} one {# item} other {# items}}"
+    "itemCount": "{count, plural, =0 {No items yet} one {# item} other {# items}}",
+    "hideItem": "Hide",
+    "showItem": "Show"
   },
   "dop": {
     "title": "Cinematographer profile",

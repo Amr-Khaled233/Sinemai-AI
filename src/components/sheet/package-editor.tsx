@@ -24,11 +24,14 @@ export type CatalogOption = {
 export function PackageEditor({
   projectId,
   items,
+  names,
   catalog,
   categoryLabel,
 }: {
   projectId: string;
   items: PackageItem[];
+  /** Display names in the reader's language, keyed by equipment id. */
+  names: Record<string, string>;
   catalog: CatalogOption[];
   /** Localised category names, keyed by slug. */
   categoryLabel: Record<string, string>;
@@ -38,6 +41,9 @@ export function PackageEditor({
   const router = useRouter();
 
   const [draft, setDraft] = useState<PackageItem[]>(items);
+  const catalogLabel = new Map(catalog.map((option) => [option.id, option.label]));
+  const nameOf = (line: PackageItem) =>
+    names[line.equipmentId] ?? catalogLabel.get(line.equipmentId) ?? `${line.brand} ${line.model}`;
   const [adding, setAdding] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -82,7 +88,7 @@ export function PackageEditor({
   return (
     <div>
       <div className="table-wrap">
-        <table className="grid-table [--grid-cols:7rem_minmax(10rem,1.5fr)_5.5rem_5.5rem_minmax(8rem,1.6fr)_3rem]">
+        <table className="grid-table grid-table-compact [--grid-cols:6.5rem_minmax(9rem,1.5fr)_5rem_5rem_minmax(8rem,1.6fr)_2.5rem]">
           <thead>
             <tr>
               <th>{t('category')}</th>
@@ -103,7 +109,7 @@ export function PackageEditor({
                   {categoryLabel[line.categorySlug] ?? line.categorySlug}
                 </td>
                 <td data-label={t('item')} className="font-medium text-strong">
-                  {line.brand} {line.model}
+                  {nameOf(line)}
                 </td>
                 <td data-label={t('quantity')} className="text-end">
                   <input
@@ -133,7 +139,7 @@ export function PackageEditor({
                     }
                   />
                 </td>
-                <td data-label={t('reason')} className="text-muted">
+                <td data-label={t('reason')} className="text-muted" dir="auto">
                   {line.reason}
                 </td>
                 <td>

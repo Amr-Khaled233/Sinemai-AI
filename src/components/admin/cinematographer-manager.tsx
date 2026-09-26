@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { deleteCinematographer, saveCinematographer, setCinematographerActive } from '@/app/actions/admin';
 import { Badge, Field, Input, Spinner, Textarea } from '@/components/ui';
+import { cityName } from '@/lib/city-name';
 import { StyleTagPicker } from '@/components/style-tag-picker';
 
 type StyleTag = { slug: string; labelEn: string; labelAr: string };
@@ -156,7 +157,7 @@ export function CinematographerManager({
                       <span className="text-xs text-muted">{td('yearsShort', { count: row.yearsExperience })}</span>
                     )}
                   </td>
-                  <td data-label={td('city')}>{row.city ?? '—'}</td>
+                  <td data-label={td('city')}>{cityName(row.city, locale) || '—'}</td>
                   <td data-label={td('dayRate')} className="text-end tabular-nums">
                     {row.dayRate ?? '—'}
                   </td>

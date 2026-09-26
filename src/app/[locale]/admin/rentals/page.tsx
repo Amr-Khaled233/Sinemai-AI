@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { equipmentName } from '@/lib/equipment-name';
 import { Card, EmptyState } from '@/components/ui';
 import { InventoryManager } from '@/components/vendor/inventory-manager';
 import {
@@ -11,6 +12,7 @@ import {
   adminToggleInventoryActive,
 } from '@/app/actions/admin';
 import type { AppLocale } from '@/i18n/routing';
+import { cityName } from '@/lib/city-name';
 
 /**
  * Every vendor's rental stock and prices, editable by the admin with the same
@@ -57,7 +59,7 @@ export default async function AdminRentalsPage({
         inventory: {
           orderBy: { createdAt: 'desc' },
           include: {
-            equipment: { select: { brand: true, model: true } },
+            equipment: { select: { brand: true, model: true, nameAr: true } },
             blocks: { orderBy: { startDate: 'asc' } },
           },
         },
@@ -66,7 +68,14 @@ export default async function AdminRentalsPage({
     prisma.equipment.findMany({
       where: { active: true },
       orderBy: [{ category: { sortOrder: 'asc' } }, { brand: 'asc' }],
-      select: { id: true, brand: true, model: true, indicativeDayRate: true, category: { select: { slug: true } } },
+      select: {
+        id: true,
+        brand: true,
+        model: true,
+        nameAr: true,
+        indicativeDayRate: true,
+        category: { select: { slug: true } },
+      },
     }),
   ]);
 
@@ -84,7 +93,7 @@ export default async function AdminRentalsPage({
             <select id="rentals-vendor" name="vendor" defaultValue={selected.id} className="input">
               {vendors.map((option) => (
                 <option key={option.id} value={option.id}>
-                  {option.company.name} · {option.company.city} ({option._count.inventory})
+                  {option.company.name} · {cityName(option.company.city, locale)} ({option._count.inventory})
                 </option>
               ))}
             </select>
@@ -108,14 +117,14 @@ export default async function AdminRentalsPage({
         }}
         catalog={catalog.map((item) => ({
           id: item.id,
-          label: `${item.brand} ${item.model}`,
+          label: equipmentName(item, locale),
           categorySlug: item.category.slug,
           indicativeDayRate: item.indicativeDayRate,
         }))}
         items={vendor.inventory.map((item) => ({
           id: item.id,
           equipmentId: item.equipmentId,
-          label: `${item.equipment.brand} ${item.equipment.model}`,
+          label: equipmentName(item.equipment, locale),
           dailyRate: item.dailyRate,
           weeklyRate: item.weeklyRate,
           monthlyRate: item.monthlyRate,

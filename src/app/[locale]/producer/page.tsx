@@ -6,6 +6,7 @@ import { Badge, Card, EmptyState, SectionTitle } from '@/components/ui';
 import { Reveal } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
 import { moneyFormatter } from '@/lib/currency-server';
+import { cityName } from '@/lib/city-name';
 import type { AppLocale } from '@/i18n/routing';
 
 const STATUS_TONE = {
@@ -80,7 +81,7 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
                     <span>·</span>
                     <span>{tEnum(`tier.${project.budgetTier}`)}</span>
                     <span>·</span>
-                    <span>{project.city}</span>
+                    <span>{cityName(project.city, locale)}</span>
                   </p>
 
                   <dl className="mt-4 space-y-1 text-xs text-muted">

@@ -267,7 +267,9 @@
     "noBlocks": "لا توجد تواريخ محجوزة.",
     "photos": "الصور",
     "uploadPhoto": "رفع صورة",
-    "itemCount": "{count, plural, =0 {لا توجد معدات بعد} one {معدّة واحدة} two {معدّتان} few {# معدات} many {# معدّة} other {# معدّة}}"
+    "itemCount": "{count, plural, =0 {لا توجد معدات بعد} one {معدّة واحدة} two {معدّتان} few {# معدات} many {# معدّة} other {# معدّة}}",
+    "hideItem": "إخفاء",
+    "showItem": "إظهار"
   },
   "dop": {
     "title": "ملف مدير التصوير",

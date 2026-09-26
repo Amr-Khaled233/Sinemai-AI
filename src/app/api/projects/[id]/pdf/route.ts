@@ -11,6 +11,7 @@ import {
 } from '@/lib/sheet-export';
 import { convertSheet } from '@/lib/currency';
 import { displayFx } from '@/lib/currency-server';
+import { equipmentNamer } from '@/lib/equipment-name-server';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 export const runtime = 'nodejs';
@@ -41,6 +42,17 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const recommendation = convertSheet(sheet.recommendation, await displayFx());
   const locale = exportLocale(url, recommendation.locale);
 
+  // Equipment named in the export's language; the file prints brand + model,
+  // so a localised name travels as the brand with an empty model.
+  const pkgForNames = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
+  const vendorsForNames = (recommendation.matchedVendors as unknown as VendorMatch[]) ?? [];
+  const nameOf = await equipmentNamer(
+    [...pkgForNames, ...vendorsForNames.flatMap((vendor) => vendor.items)].map((item) => item.equipmentId),
+    locale,
+  );
+  const named = <T extends { equipmentId: string; brand: string; model: string }>(items: T[]) =>
+    items.map((item) => ({ ...item, brand: nameOf(item), model: '' }));
+
   const data: SheetPdfData = {
     locale,
     labels: pdfLabels(locale),
@@ -64,10 +76,13 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
       cameraMovement: scene.cameraMovement ? pdfEnum(locale, 'movement', scene.cameraMovement) : null,
       estimatedHours: scene.estimatedHours,
     })),
-    equipment: (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [],
+    equipment: named((recommendation.equipmentPackage as unknown as PackageItem[]) ?? []),
     equipmentRationale: recommendation.equipmentRationale,
     dops: (recommendation.matchedDops as unknown as DopMatch[]) ?? [],
-    vendors: (recommendation.matchedVendors as unknown as VendorMatch[]) ?? [],
+    vendors: ((recommendation.matchedVendors as unknown as VendorMatch[]) ?? []).map((vendor) => ({
+      ...vendor,
+      items: named(vendor.items),
+    })),
     budget: (recommendation.budgetBreakdown as unknown as BudgetBreakdown) ?? null,
     low: recommendation.estimatedBudgetLow,
     mid: recommendation.estimatedBudgetMid,

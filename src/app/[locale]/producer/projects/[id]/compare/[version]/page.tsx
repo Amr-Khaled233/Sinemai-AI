@@ -30,7 +30,7 @@ export default async function ComparePage({
 
   const [t, comparison] = await Promise.all([
     getTranslations('versions'),
-    displayFx().then((fx) => loadComparison(id, versionNumber, fx)),
+    displayFx().then((fx) => loadComparison(id, versionNumber, fx, locale)),
   ]);
   if (!comparison) notFound();
 

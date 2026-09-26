@@ -1,6 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { safeHttpUrls } from '@/lib/security';
 import { fontsFor, registerPdfFonts } from './fonts';
+import { cityName } from '@/lib/city-name';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 /**
@@ -239,7 +240,7 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
               <View key={dop.dopId} style={{ marginBottom: 7 }} wrap={false}>
                 <Text style={styles.bold}>
                   {dop.name} — {L.matchScore} {Math.round(dop.score * 100)}%
-                  {dop.city ? ` · ${dop.city}` : ''}
+                  {dop.city ? ` · ${cityName(dop.city, data.locale)}` : ''}
                   {dop.dayRate ? ` · ${L.dayRate} ${money(dop.dayRate, cur)}` : ''}
                 </Text>
                 <Text style={styles.body}>{dop.reason}</Text>
@@ -259,7 +260,7 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
             data.vendors.map((vendor) => (
               <View key={vendor.vendorId} style={{ marginBottom: 8 }} wrap={false}>
                 <Text style={styles.bold}>
-                  {vendor.companyName} — {vendor.city} · {L.coverage} {vendor.coveragePct}% ·{' '}
+                  {vendor.companyName} — {cityName(vendor.city, data.locale)} · {L.coverage} {vendor.coveragePct}% ·{' '}
                   {money(vendor.subtotal, cur)}
                 </Text>
                 {vendor.items.map((line) => (

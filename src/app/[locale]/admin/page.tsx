@@ -1,6 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { equipmentName } from '@/lib/equipment-name';
 import { countEmbeddableDops } from '@/lib/embeddings';
 import { Badge, Card, Stat } from '@/components/ui';
 import { AnimatedNumber } from '@/components/motion';
@@ -72,16 +73,18 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
   const [topEquipment, topDops] = await Promise.all([
     prisma.equipment.findMany({
       where: { id: { in: topEquipmentIds.map(([id]) => id) } },
-      select: { id: true, brand: true, model: true },
+      select: { id: true, brand: true, model: true, nameAr: true },
     }),
     prisma.dop.findMany({
       where: { id: { in: topDopIds.map(([id]) => id) } },
-      select: { id: true, displayName: true },
+      select: { id: true, displayName: true, displayNameAr: true },
     }),
   ]);
 
-  const equipmentNames = new Map(topEquipment.map((item) => [item.id, `${item.brand} ${item.model}`]));
-  const dopNames = new Map(topDops.map((item) => [item.id, item.displayName]));
+  const equipmentNames = new Map(topEquipment.map((item) => [item.id, equipmentName(item, locale)]));
+  const dopNames = new Map(
+    topDops.map((item) => [item.id, locale === 'ar' && item.displayNameAr ? item.displayNameAr : item.displayName]),
+  );
 
   return (
     <div className="space-y-6">

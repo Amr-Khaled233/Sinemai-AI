@@ -15,9 +15,11 @@ import { listVersions } from '@/lib/versions';
 import { convert, convertSheet } from '@/lib/currency';
 import { displayFx } from '@/lib/currency-server';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
+import { equipmentName } from '@/lib/equipment-name';
 import { ProjectChat } from '@/components/producer/project-chat';
 import { CHAT_MAX_HISTORY } from '@/lib/project-chat';
 import type { UIMessage } from 'ai';
+import { cityName } from '@/lib/city-name';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function ProjectPage({
@@ -66,7 +68,7 @@ export default async function ProjectPage({
       ? prisma.equipment.findMany({
           where: { active: true },
           orderBy: [{ category: { sortOrder: 'asc' } }, { brand: 'asc' }],
-          select: { id: true, brand: true, model: true, category: { select: { slug: true } } },
+          select: { id: true, brand: true, model: true, nameAr: true, category: { select: { slug: true } } },
         })
       : Promise.resolve([]),
     prisma.projectChatMessage.findMany({
@@ -146,7 +148,7 @@ export default async function ProjectPage({
   );
 
   return (
-    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_25rem]">
+    <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22rem] 2xl:grid-cols-[minmax(0,1fr)_25rem]">
       <div className="min-w-0 space-y-6">
         {!ready && (
           <header className="card p-5">
@@ -156,7 +158,7 @@ export default async function ProjectPage({
                 <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
                   <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
                   <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
-                  <span>{project.city}</span>
+                  <span>{cityName(project.city, locale)}</span>
                   <Badge tone={project.status === 'FAILED' ? 'red' : 'teal'}>
                     {t(`status.${project.status}`)}
                   </Badge>
@@ -191,7 +193,7 @@ export default async function ProjectPage({
             recommendation={recommendation}
             catalog={catalogRows.map((row) => ({
               id: row.id,
-              label: `${row.brand} ${row.model}`,
+              label: equipmentName(row, locale),
               categorySlug: row.category.slug,
             }))}
             scenes={project.script?.scenes ?? []}

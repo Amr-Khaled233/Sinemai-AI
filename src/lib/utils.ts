@@ -5,8 +5,15 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * Arabic pages use Western digits and the Gregorian calendar, as Saudi
+ * business documents do; plain ar-SA would switch to Eastern Arabic digits
+ * and, for dates, the Hijri calendar, mixing with the numbers around them.
+ */
+export const ARABIC_FORMAT_LOCALE = 'ar-SA-u-nu-latn-ca-gregory';
+
 export function formatMoney(amount: number, locale: string, currency = 'SAR') {
-  return new Intl.NumberFormat(locale === 'ar' ? 'ar-SA' : 'en-US', {
+  return new Intl.NumberFormat(locale === 'ar' ? ARABIC_FORMAT_LOCALE : 'en-US', {
     style: 'currency',
     currency,
     maximumFractionDigits: 0,
@@ -15,7 +22,7 @@ export function formatMoney(amount: number, locale: string, currency = 'SAR') {
 
 export function formatDate(date: Date | string, locale: string) {
   const d = typeof date === 'string' ? new Date(date) : date;
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA' : 'en-GB', {
+  return new Intl.DateTimeFormat(locale === 'ar' ? ARABIC_FORMAT_LOCALE : 'en-GB', {
     dateStyle: 'medium',
   }).format(d);
 }

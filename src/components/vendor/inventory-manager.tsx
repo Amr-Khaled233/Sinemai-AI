@@ -1,9 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { Badge, Card, Field, Input, Select, Textarea } from '@/components/ui';
+import { cityName } from '@/lib/city-name';
+import { Card, Field, Input, Select, Textarea } from '@/components/ui';
 
 export type CatalogOption = {
   id: string;
@@ -53,6 +54,7 @@ export function InventoryManager({
   title?: string;
 }) {
   const t = useTranslations('vendor');
+  const locale = useLocale();
   const tc = useTranslations('common');
   const router = useRouter();
   const [editing, setEditing] = useState<InventoryRow | null>(null);
@@ -248,7 +250,7 @@ export function InventoryManager({
                     <td data-label={t('quantity')} className="text-end tabular-nums">
                       {item.quantityAvailable}/{item.quantityTotal}
                     </td>
-                    <td data-label={t('city')}>{item.city}</td>
+                    <td data-label={t('city')}>{cityName(item.city, locale)}</td>
                     <td>
                       <div className="flex flex-wrap justify-end gap-1.5 max-sm:justify-start">
                         <button type="button" className="btn-ghost text-[11px]" onClick={() => setEditing(item)}>
@@ -262,7 +264,8 @@ export function InventoryManager({
                             router.refresh();
                           }}
                         >
-                          {item.active ? <Badge tone="green">on</Badge> : <Badge>off</Badge>}
+                          {/* The row is dimmed while hidden; the button says what a click does. */}
+                          {item.active ? t('hideItem') : t('showItem')}
                         </button>
                         <button
                           type="button"

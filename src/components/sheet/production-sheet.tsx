@@ -6,9 +6,11 @@ import { PackageEditor, type CatalogOption } from '@/components/sheet/package-ed
 import { ScheduleView } from '@/components/sheet/schedule-view';
 import { CurrencySwitcher } from '@/components/currency-switcher';
 import { getDisplayCurrency } from '@/lib/currency-server';
+import { equipmentNamer } from '@/lib/equipment-name-server';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';
+import { cityName } from '@/lib/city-name';
 import type {
   BudgetBreakdown,
   DopMatch,
@@ -112,6 +114,15 @@ export async function ProductionSheet({
   const models = Object.values((recommendation.modelVersions as Record<string, string>) ?? {});
   const money = (value: number) => formatMoney(value, locale, recommendation.currency);
   const schedule = buildSchedule(scenes as ScheduleScene[], { shootDayHours });
+  // Equipment is named in the reader's language (Arabic names from the catalog).
+  const nameOf = await equipmentNamer(
+    [
+      ...pkg.map((item) => item.equipmentId),
+      ...vendors.flatMap((vendor) => vendor.items.map((line) => line.equipmentId)),
+      ...(budget?.uncoveredEquipment ?? []).map((item) => item.equipmentId),
+    ],
+    locale,
+  );
   const categoryLabel = (slug: string) =>
     locale === 'ar' ? CATEGORY_LABELS[slug]?.ar ?? slug : CATEGORY_LABELS[slug]?.en ?? slug;
 
@@ -130,7 +141,7 @@ export async function ProductionSheet({
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
               <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
-              <span>{project.city}</span>
+              <span>{cityName(project.city, locale)}</span>
               <span>·</span>
               <span>{t('generated', { date: formatDate(recommendation.generatedAt, locale) })}</span>
               {readOnly && <Badge tone="teal">{t('readOnly')}</Badge>}
@@ -230,7 +241,7 @@ export async function ProductionSheet({
           </div>
 
           <div className="table-wrap mt-5">
-            <table className="grid-table grid-table-wide [--grid-cols:3rem_minmax(11rem,2.4fr)_7.5rem_6rem_7rem_8.5rem_4.5rem_minmax(7rem,1fr)]">
+            <table className="grid-table [--grid-cols:2.5rem_minmax(10rem,2fr)_6rem_5.5rem_6rem_7.5rem_4rem_minmax(6rem,1fr)]">
               <thead>
                 <tr>
                   <th>{t('sceneNumber')}</th>
@@ -299,6 +310,7 @@ export async function ProductionSheet({
           <PackageEditor
             projectId={project.id}
             items={pkg}
+            names={Object.fromEntries(pkg.map((item) => [item.equipmentId, nameOf(item)]))}
             catalog={catalog}
             categoryLabel={Object.fromEntries(
               Object.keys(CATEGORY_LABELS).map((slug) => [slug, categoryLabel(slug)]),
@@ -306,7 +318,7 @@ export async function ProductionSheet({
           />
         ) : (
         <div className="table-wrap">
-          <table className="grid-table [--grid-cols:7rem_minmax(10rem,1.5fr)_4rem_4.5rem_minmax(12rem,2.2fr)]">
+          <table className="grid-table grid-table-compact [--grid-cols:6.5rem_minmax(10rem,1.5fr)_4rem_4.5rem_minmax(10rem,2fr)]">
             <thead>
               <tr>
                 <th>{t('category')}</th>
@@ -323,11 +335,11 @@ export async function ProductionSheet({
                     {categoryLabel(item.categorySlug)}
                   </td>
                   <td data-label={t('item')} className="font-medium text-strong">
-                    {item.brand} {item.model}
+                    {nameOf(item)}
                   </td>
                   <td data-label={t('quantity')} className="text-end tabular-nums">{item.quantity}</td>
                   <td data-label={t('days')} className="text-end tabular-nums">{item.rentalDays}</td>
-                  <td data-label={t('reason')} className="text-muted">{item.reason}</td>
+                  <td data-label={t('reason')} className="text-muted" dir="auto">{item.reason}</td>
                 </tr>
               ))}
             </tbody>
@@ -358,7 +370,7 @@ export async function ProductionSheet({
                   <div>
                     <h3 className="text-sm font-semibold text-strong">{dop.name}</h3>
                     <p className="mt-0.5 text-xs text-muted">
-                      {[dop.city, dop.yearsExperience ? t('years', { count: dop.yearsExperience }) : null]
+                      {[cityName(dop.city, locale), dop.yearsExperience ? t('years', { count: dop.yearsExperience }) : null]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>
@@ -428,7 +440,7 @@ export async function ProductionSheet({
                       {vendor.verified && <Badge tone="teal">✓</Badge>}
                     </h3>
                     <p className="mt-0.5 text-xs text-muted">
-                      {vendor.city} · {t('coverage')} {vendor.coveragePct}%
+                      {cityName(vendor.city, locale)} · {t('coverage')} {vendor.coveragePct}%
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
@@ -469,7 +481,7 @@ export async function ProductionSheet({
                       {vendor.items.map((line) => (
                         <tr key={line.equipmentId}>
                           <td data-label={t('item')} className="text-strong">
-                            {line.brand} {line.model}
+                            {nameOf(line)}
                             {!line.available && (
                               <span className="ms-2 text-[11px] text-warning">{t('unavailableOnDates')}</span>
                             )}
@@ -491,7 +503,7 @@ export async function ProductionSheet({
         {budget?.uncoveredEquipment && budget.uncoveredEquipment.length > 0 && (
           <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
             {t('uncovered')}:{' '}
-            {budget.uncoveredEquipment.map((item) => `${item.brand} ${item.model}`).join(' · ')}
+            {budget.uncoveredEquipment.map((item) => nameOf(item)).join(' · ')}
           </p>
         )}
       </Card>

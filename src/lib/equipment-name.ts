@@ -11,3 +11,4 @@ export function equipmentName(
   if (locale === 'ar' && item.nameAr) return item.nameAr;
   return `${item.brand} ${item.model}`;
 }
+

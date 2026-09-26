@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { Link, useRouter } from '@/i18n/routing';
 import { deleteRentalCompany, saveRentalCompany, setRentalCompanyActive } from '@/app/actions/admin';
+import { cityName } from '@/lib/city-name';
 import { Badge, Field, Input, Spinner } from '@/components/ui';
 
 export type CompanyRow = {
@@ -21,6 +22,7 @@ export type CompanyRow = {
 /** Rental companies: add, edit, switch off, delete. Their stock lives on the Rentals page. */
 export function CompanyManager({ rows }: { rows: CompanyRow[] }) {
   const t = useTranslations('admin');
+  const locale = useLocale();
   const tc = useTranslations('common');
   const router = useRouter();
   const [editing, setEditing] = useState<CompanyRow | 'new' | null>(null);
@@ -108,7 +110,7 @@ export function CompanyManager({ rows }: { rows: CompanyRow[] }) {
                   <td data-label={t('companyName')} className="font-medium text-strong">
                     {row.name}
                   </td>
-                  <td data-label={t('city')}>{row.city}</td>
+                  <td data-label={t('city')}>{cityName(row.city, locale)}</td>
                   <td data-label={t('contact')} className="text-xs text-muted" dir="ltr">
                     {[row.phone, row.email].filter(Boolean).join(' · ') || '—'}
                   </td>

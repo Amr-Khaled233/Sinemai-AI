@@ -148,7 +148,7 @@ export async function buildWorkbook(data: WorkbookData) {
     header([L.category, L.item, L.quantity, L.days, L.reason]),
     ...data.equipment.map((item) => [
       text(item.categorySlug),
-      text(`${item.brand} ${item.model}`),
+      text(`${item.brand} ${item.model}`.trim()),
       num(item.quantity),
       num(item.rentalDays),
       text(item.reason),
@@ -164,7 +164,7 @@ export async function buildWorkbook(data: WorkbookData) {
         index === 0 ? text(vendor.companyName) : text(''),
         index === 0 ? text(vendor.city) : text(''),
         index === 0 ? num(vendor.coveragePct) : text(''),
-        text(`${line.brand} ${line.model}`),
+        text(`${line.brand} ${line.model}`.trim()),
         num(line.quantity),
         num(line.rentalDays),
         money(line.dailyRate),

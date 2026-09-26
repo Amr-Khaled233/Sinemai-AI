@@ -2,14 +2,14 @@ import { getTranslations } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { Badge, Card, EmptyState } from '@/components/ui';
 import { CloseThreadButton, ReplyForm } from '@/components/support/support-forms';
-import { cn, formatDate } from '@/lib/utils';
+import { ARABIC_FORMAT_LOCALE, cn, formatDate } from '@/lib/utils';
 import type { listThreads, openThread } from '@/lib/support';
 
 type ThreadRow = Awaited<ReturnType<typeof listThreads>>[number];
 type OpenThread = NonNullable<Awaited<ReturnType<typeof openThread>>>;
 
 function when(date: Date, locale: string) {
-  return new Intl.DateTimeFormat(locale === 'ar' ? 'ar-SA-u-nu-latn' : 'en-GB', {
+  return new Intl.DateTimeFormat(locale === 'ar' ? ARABIC_FORMAT_LOCALE : 'en-GB', {
     dateStyle: 'medium',
     timeStyle: 'short',
   }).format(date);

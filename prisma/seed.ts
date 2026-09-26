@@ -76,6 +76,47 @@ const CATEGORIES = [
   { slug: 'power', nameEn: 'Power & distribution', nameAr: 'طاقة وتوزيع', sortOrder: 7 },
 ];
 
+/**
+ * Arabic names: an Arabic descriptor with the model kept in Latin script, the
+ * way crews say it. Shown on Arabic pages; English pages use brand + model.
+ */
+const EQUIPMENT_NAMES_AR: Record<string, string> = {
+  'ARRI|ALEXA 35': 'كاميرا ARRI ALEXA 35',
+  'ARRI|ALEXA Mini LF': 'كاميرا ARRI ALEXA Mini LF',
+  'ARRI|ALEXA Mini': 'كاميرا ARRI ALEXA Mini',
+  'RED|V-RAPTOR 8K VV': 'كاميرا RED V-RAPTOR 8K VV',
+  'RED|KOMODO 6K': 'كاميرا RED KOMODO 6K',
+  'Sony|VENICE 2': 'كاميرا Sony VENICE 2',
+  'Sony|FX9': 'كاميرا Sony FX9',
+  'Sony|FX6': 'كاميرا Sony FX6',
+  'Canon|EOS C70': 'كاميرا Canon EOS C70',
+  'Blackmagic Design|Pocket Cinema Camera 6K Pro': 'كاميرا Blackmagic Pocket Cinema 6K Pro',
+  'ARRI|Signature Prime set (5 lenses)': 'طقم عدسات ARRI Signature Prime (5 عدسات)',
+  'Cooke|S4/i Prime set (6 lenses)': 'طقم عدسات Cooke S4/i Prime (6 عدسات)',
+  'ZEISS|Supreme Prime set (5 lenses)': 'طقم عدسات ZEISS Supreme Prime (5 عدسات)',
+  'Atlas Lens Co.|Orion Anamorphic 2x set (4 lenses)': 'طقم عدسات أنامورفيك Atlas Orion 2x (4 عدسات)',
+  'Sigma|Cine FF High Speed Prime set (5 lenses)': 'طقم عدسات Sigma Cine FF High Speed (5 عدسات)',
+  'Fujinon|MK 18-55 T2.9 zoom': 'عدسة زوم Fujinon MK 18-55 T2.9',
+  'ARRI|SkyPanel S60-C': 'كشاف ARRI SkyPanel S60-C',
+  'ARRI|M18 HMI': 'كشاف ARRI M18 HMI',
+  'Aputure|LS 600d Pro': 'كشاف Aputure LS 600d Pro',
+  'Aputure|amaran 200x bi-colour': 'كشاف Aputure amaran 200x ثنائي الحرارة',
+  'Astera|Titan Tube set (8 tubes)': 'طقم أنابيب إضاءة Astera Titan (8 أنابيب)',
+  'Nanlux|Evoke 1200B': 'كشاف Nanlux Evoke 1200B',
+  'Kino Flo|Diva-Lite 20 LED kit (2 heads)': 'طقم إضاءة Kino Flo Diva-Lite 20 LED (رأسان)',
+  'Matthews|Standard grip package (stands, flags, clamps)': 'طقم تجهيزات Matthews أساسي (حوامل وأعلام ومشابك)',
+  'Matthews|12x12 butterfly kit (diffusion + solid)': 'إطار Matthews ‏12×12 (ناشر وحاجب)',
+  'DJI|RS 4 Pro gimbal': 'جيمبال DJI RS 4 Pro',
+  'Tiffen|Steadicam M-2 with operator vest': 'ستيدي كام Tiffen M-2 مع سترة المشغّل',
+  'Dana Dolly|Dana Dolly kit with track': 'دولي Dana Dolly مع السكة',
+  'DJI|Inspire 3 aerial platform': 'طائرة تصوير DJI Inspire 3',
+  'Easyrig|Vario 5 with Flowcine Serene arm': 'حامل Easyrig Vario 5 مع ذراع Flowcine Serene',
+  'Sound Devices|MixPre-10 II recorder': 'مسجّل صوت Sound Devices MixPre-10 II',
+  'Sennheiser|MKH 8060 shotgun + boom kit': 'ميكروفون Sennheiser MKH 8060 مع ذراع بوم',
+  'Anton/Bauer|Gold Mount battery package (6 batteries + chargers)': 'طقم بطاريات Anton/Bauer Gold Mount (6 بطاريات وشواحن)',
+  'Honda|EU70is generator (7 kVA, silenced)': 'مولّد Honda EU70is (7 كيلو فولت أمبير، صامت)'
+};
+
 type EquipmentSeed = {
   category: string;
   brand: string;
@@ -99,7 +140,6 @@ const EQUIPMENT: EquipmentSeed[] = [
     category: 'camera-body',
     brand: 'ARRI',
     model: 'ALEXA 35',
-    nameAr: 'أليكسا ٣٥',
     specs: {
       sensor: 'Super 35 ALEV 4 CMOS, 4608 x 3164',
       dynamicRange: '17 stops (manufacturer stated)',
@@ -245,7 +285,6 @@ const EQUIPMENT: EquipmentSeed[] = [
     category: 'camera-body',
     brand: 'Sony',
     model: 'FX6',
-    nameAr: 'سوني FX6',
     specs: {
       sensor: 'Full-frame 10.2MP CMOS',
       mount: 'E-mount',
@@ -422,7 +461,6 @@ const EQUIPMENT: EquipmentSeed[] = [
     category: 'lighting',
     brand: 'ARRI',
     model: 'SkyPanel S60-C',
-    nameAr: 'أري سكاي بانل S60-C',
     specs: {
       type: 'LED soft panel, RGB+W',
       power: '450 W',
@@ -806,7 +844,7 @@ async function main() {
       categoryId,
       brand: item.brand,
       model: item.model,
-      nameAr: item.nameAr ?? null,
+      nameAr: EQUIPMENT_NAMES_AR[`${item.brand}|${item.model}`] ?? item.nameAr ?? null,
       specs: item.specs,
       summaryEn: item.summaryEn,
       summaryAr: item.summaryAr,

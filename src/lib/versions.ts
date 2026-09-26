@@ -3,6 +3,7 @@ import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { BudgetBreakdown, DopMatch, PackageItem } from '@/agents/types';
 import { BASE_CURRENCY, convertSheet, type Fx } from '@/lib/currency';
+import { equipmentNamer } from '@/lib/equipment-name-server';
 
 /**
  * Sheet history.
@@ -203,6 +204,7 @@ export async function loadComparison(
   projectId: string,
   versionNumber: number,
   fx: Fx = { code: BASE_CURRENCY, factor: 1 },
+  locale = 'en',
 ) {
   const [storedVersion, storedCurrent] = await Promise.all([
     prisma.recommendationVersion.findUnique({
@@ -215,7 +217,7 @@ export async function loadComparison(
   const version = convertSheet(storedVersion, fx);
   const current = convertSheet(storedCurrent, fx);
 
-  return compareSheets(
+  const comparison = compareSheets(
     {
       label: `v${version.version}`,
       version: version.version,
@@ -241,6 +243,16 @@ export async function loadComparison(
       budgetBreakdown: current.budgetBreakdown,
     },
   );
+
+  // Rows are named in the reader's language once, after the diff is worked out.
+  const nameOf = await equipmentNamer(comparison.packageRows.map((row) => row.equipmentId), locale);
+  return {
+    ...comparison,
+    packageRows: comparison.packageRows.map((row) => {
+      const [brand, ...rest] = row.label.split(' ');
+      return { ...row, label: nameOf({ equipmentId: row.equipmentId, brand, model: rest.join(' ') }) };
+    }),
+  };
 }
 
 export async function listVersions(projectId: string) {

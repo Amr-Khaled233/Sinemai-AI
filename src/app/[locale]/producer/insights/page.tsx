@@ -2,6 +2,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { equipmentNamer } from '@/lib/equipment-name-server';
 import { Badge, Card, EmptyState, MeterBar, SectionTitle, Stat } from '@/components/ui';
 import { AnimatedNumber } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
@@ -84,7 +85,10 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
 
   // Equipment and cinematographers are tallied across every costed sheet, so
   // "what do I actually keep hiring" has an answer.
-  const equipmentTally = new Map<string, { label: string; count: number; days: number }>();
+  const equipmentTally = new Map<
+    string,
+    { equipmentId: string; brand: string; model: string; count: number; days: number }
+  >();
   const dopTally = new Map<string, { name: string; count: number; bestScore: number }>();
   const typeTally = new Map<string, number>();
   let shootDays = 0;
@@ -96,7 +100,9 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
     for (const item of (recommendation.equipmentPackage as unknown as PackageItem[]) ?? []) {
       const key = item.equipmentId;
       const existing = equipmentTally.get(key) ?? {
-        label: `${item.brand} ${item.model}`,
+        equipmentId: item.equipmentId,
+        brand: item.brand,
+        model: item.model,
         count: 0,
         days: 0,
       };
@@ -124,7 +130,9 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
     typeTally.set(project.type, (typeTally.get(project.type) ?? 0) + 1);
   }
 
-  const topEquipment = [...equipmentTally.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  const topTally = [...equipmentTally.values()].sort((a, b) => b.count - a.count).slice(0, 8);
+  const nameOf = await equipmentNamer(topTally.map((entry) => entry.equipmentId), locale);
+  const topEquipment = topTally.map((entry) => ({ ...entry, label: nameOf(entry) }));
   const topDops = [...dopTally.values()].sort((a, b) => b.count - a.count).slice(0, 6);
   const nightShare = sceneCount > 0 ? Math.round((nightWeighted / sceneCount) * 100) : 0;
 
