@@ -136,6 +136,8 @@
       "queued": "Starting up",
       "parsing": "Parsing the script",
       "analyzing_scenes": "Analyzing scenes",
+      "clarifying": "Checking what is unclear",
+      "awaiting_input": "Waiting for your answers",
       "matching_equipment": "Matching equipment",
       "matching_dops": "Finding cinematographers",
       "pricing": "Pricing with vendors",
@@ -149,7 +151,15 @@
     "failed": "The breakdown failed: {message}",
     "retry": "Try again",
     "watching": "This analysis is already running — following its progress.",
-    "resumed": "Rejoined a run that was already in progress."
+    "resumed": "Rejoined a run that was already in progress.",
+    "clarify": {
+      "title": "A few questions before we price this",
+      "intro": "The script and the brief leave these open, and each one changes the package or the budget. Answer what you can — anything left blank uses the assumption shown under it.",
+      "placeholder": "Your answer",
+      "assumption": "If left blank: {assumption}",
+      "submit": "Continue with these answers",
+      "skip": "Skip — use the assumptions"
+    }
   },
   "sheet": {
     "title": "Production & Equipment Sheet",

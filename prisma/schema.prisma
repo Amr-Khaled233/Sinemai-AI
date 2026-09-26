@@ -642,6 +642,10 @@ model Setting {
 enum AnalysisStage {
   PARSE
   SCENES
+  /// One pass that decides whether anything must be asked before pricing.
+  CLARIFY
+  /// Paused on the questions in AnalysisState.questions until the producer answers.
+  AWAITING_INPUT
   EQUIPMENT
   DOPS
   VENDOR_BUDGET
@@ -669,6 +673,10 @@ model AnalysisState {
   dops          Json?
   vendorBudget  Json?
   critic        Json?
+  /// Questions the run paused on (ClarifyQuestion[]), and what the producer
+  /// answered (ClarifyAnswer[]). Every agent after the pause reads the answers.
+  questions     Json?
+  answers       Json?
   /// Agents already retried once, so the one-retry-per-agent cap survives resumes.
   retriedAgents String[]      @default([])
   criticRound   Int           @default(0)

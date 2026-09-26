@@ -17,8 +17,13 @@ export async function GET(request: Request) {
   const { count } = await prisma.availabilityBlock.deleteMany({ where: { endDate: { lt: cutoff } } });
 
   // Projects that were left mid-analysis by a crashed or timed-out function.
+  // A run paused on the producer's questions is waiting, not stuck.
   const stuck = await prisma.project.updateMany({
-    where: { status: 'ANALYZING', updatedAt: { lt: new Date(Date.now() - 2 * 3_600_000) } },
+    where: {
+      status: 'ANALYZING',
+      updatedAt: { lt: new Date(Date.now() - 2 * 3_600_000) },
+      NOT: { analysisState: { is: { stage: 'AWAITING_INPUT' } } },
+    },
     data: { status: 'FAILED' },
   });
 

@@ -6,6 +6,7 @@ import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './
 import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/vendor-tools';
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
 import { withLanguage } from './language';
+import { describeClarifications } from './clarifications';
 import type {
   CrewLine,
   EquipmentResult,
@@ -74,6 +75,7 @@ export async function runVendorBudgetAgent(
           brief.shootStartDate
             ? `Shoot dates: ${iso(brief.shootStartDate)} to ${iso(brief.shootEndDate ?? brief.shootStartDate)}.`
             : 'Shoot dates are not fixed yet; check general availability.',
+          describeClarifications(brief.clarifications),
           '',
           'Recommended package:',
           ...equipment.package.map(
@@ -113,6 +115,7 @@ export async function runVendorBudgetAgent(
         temperature: 0.3,
         prompt: [
           `Production: ${brief.type}, ${summary.shootDays} shoot day(s) in ${brief.city}, budget tier ${brief.budgetTier}.`,
+          describeClarifications(brief.clarifications),
           `Night/dawn scenes: ${summary.nightScenePct}%. Exteriors: ${summary.exteriorScenePct}%. Movement: gimbal ${summary.movementMix.STEADICAM_GIMBAL}, crane/dolly ${summary.movementMix.CRANE_DOLLY}, drone ${summary.movementMix.DRONE}.`,
           '',
           'Vendor coverage returned by the tool:',

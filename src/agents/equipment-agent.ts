@@ -4,6 +4,7 @@ import { AgentName, AgentRunStatus } from '@prisma/client';
 import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { makeEquipmentTools, queryEquipmentCatalog } from './tools/equipment-tools';
 import { withLanguage } from './language';
+import { describeClarifications } from './clarifications';
 import type { CatalogItem, EquipmentResult, PackageItem, ProjectBrief, SceneSummary } from './types';
 
 export const EQUIPMENT_SYSTEM = `You are a camera and lighting department head building a rental package for a production in Saudi Arabia.
@@ -149,6 +150,7 @@ function buildRetrievalPrompt(brief: ProjectBrief, summary: SceneSummary, critic
   return [
     `Production: "${brief.name}" — ${brief.type}. Budget tier: ${brief.budgetTier}. Shooting in ${brief.city}.`,
     brief.visualStyleTags.length ? `Visual style: ${brief.visualStyleTags.join(', ')}.` : '',
+    describeClarifications(brief.clarifications),
     '',
     'Scene breakdown statistics:',
     describeSummary(summary),
@@ -192,6 +194,7 @@ function buildSelectionPrompt(
   return [
     `Production: "${brief.name}" — ${brief.type}, budget tier ${brief.budgetTier}, ${summary.shootDays} shoot day(s) in ${brief.city}.`,
     brief.visualStyleTags.length ? `Visual style: ${brief.visualStyleTags.join(', ')}.` : '',
+    describeClarifications(brief.clarifications),
     '',
     'Scene breakdown statistics:',
     describeSummary(summary),

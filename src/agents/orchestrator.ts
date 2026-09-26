@@ -7,9 +7,13 @@ import { runEquipmentAgent } from './equipment-agent';
 import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
+import { runClarifyAgent } from './clarify-agent';
+import { describeClarifications, resolveAnswers } from './clarifications';
 import { languageDirective, languageName } from './language';
 import { snapshotRecommendation } from '@/lib/versions';
 import type {
+  ClarifyAnswer,
+  ClarifyQuestion,
   CriticIssue,
   CriticResult,
   DopResult,
@@ -43,6 +47,8 @@ Write 3–5 sentences for the director/producer who will act on this sheet. Lead
 const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage }> = {
   PARSE: { pct: 8, stage: 'parsing' },
   SCENES: { pct: 20, stage: 'analyzing_scenes' },
+  CLARIFY: { pct: 48, stage: 'clarifying' },
+  AWAITING_INPUT: { pct: 48, stage: 'awaiting_input' },
   EQUIPMENT: { pct: 50, stage: 'matching_equipment' },
   DOPS: { pct: 60, stage: 'matching_dops' },
   VENDOR_BUDGET: { pct: 70, stage: 'pricing' },
@@ -60,6 +66,8 @@ export type StepOutcome = {
   failed?: boolean;
   /** Another client already holds the lease and is advancing this run. */
   busy?: boolean;
+  /** Paused on questions for the producer; nothing advances until they answer. */
+  awaiting?: boolean;
 };
 
 /**
@@ -112,6 +120,8 @@ export async function beginAnalysis(projectId: string, locale: string) {
     dops: Prisma.DbNull,
     vendorBudget: Prisma.DbNull,
     critic: Prisma.DbNull,
+    questions: Prisma.DbNull,
+    answers: Prisma.DbNull,
     retriedAgents: [],
     criticRound: 0,
     errorText: null,
@@ -146,12 +156,16 @@ export async function advanceAnalysis(
 
   const state = await prisma.analysisState.findUnique({
     where: { projectId },
-    select: { stage: true, sceneCursor: true, sceneTotal: true },
+    select: { stage: true, sceneCursor: true, sceneTotal: true, questions: true },
   });
   if (!state) throw new Error('ANALYSIS_NOT_STARTED');
   if (state.stage === AnalysisStage.DONE) return { done: true, stage: state.stage, pct: 100 };
   if (state.stage === AnalysisStage.FAILED) {
     return { done: true, stage: state.stage, pct: 100, failed: true };
+  }
+  // Paused: hand the questions back (a reloaded page needs them) and do no work.
+  if (state.stage === AnalysisStage.AWAITING_INPUT) {
+    return reportAwaiting(report, readJson<ClarifyQuestion[]>(state.questions) ?? []);
   }
 
   // Someone else is driving: report where the run is and let the caller watch.
@@ -165,7 +179,7 @@ export async function advanceAnalysis(
     let outcome: StepOutcome = { done: false, stage: state.stage, pct: 0 };
     do {
       outcome = await runSingleStep(projectId, report);
-      if (outcome.done || outcome.failed) break;
+      if (outcome.done || outcome.failed || outcome.awaiting) break;
       // Renew while we are still making progress, so a long run keeps its lease.
       await claimLease(projectId, owner);
       // Leave room for one more step of the size we have been seeing.
@@ -186,7 +200,7 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
     return { done: true, stage: state.stage, pct: 100, failed: true };
   }
 
-  const brief = await loadBrief(projectId, state.locale);
+  const brief = await loadBrief(projectId, state.locale, readJson<ClarifyAnswer[]>(state.answers) ?? []);
   const ctx = createRunContext(projectId, report);
   const progress = STAGE_PROGRESS[state.stage];
 
@@ -226,12 +240,34 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         if (requirements.length === 0) throw new Error('NO_SCENES_ANALYSED');
         const summary = await summariseScenes(projectId, requirements);
         await save(projectId, {
-          stage: AnalysisStage.EQUIPMENT,
+          stage: AnalysisStage.CLARIFY,
           sceneCursor: batch.sceneTotal,
           summary: summary as unknown as Prisma.InputJsonValue,
         });
-        return { done: false, stage: AnalysisStage.EQUIPMENT, pct: STAGE_PROGRESS.EQUIPMENT.pct };
+        return { done: false, stage: AnalysisStage.CLARIFY, pct: STAGE_PROGRESS.CLARIFY.pct };
       }
+
+      // ---- 2b. ask the producer what the brief leaves open, before anything is priced
+      case AnalysisStage.CLARIFY: {
+        const summary = readJson<SceneSummary>(state.summary);
+        if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
+
+        const questions = await runClarifyAgent(ctx, brief, summary);
+        if (questions.length === 0) {
+          await save(projectId, { stage: AnalysisStage.EQUIPMENT });
+          return { done: false, stage: AnalysisStage.EQUIPMENT, pct: STAGE_PROGRESS.EQUIPMENT.pct };
+        }
+
+        await save(projectId, {
+          stage: AnalysisStage.AWAITING_INPUT,
+          questions: questions as unknown as Prisma.InputJsonValue,
+        });
+        return reportAwaiting(report, questions);
+      }
+
+      // Nothing to do until answerClarifications moves the run on.
+      case AnalysisStage.AWAITING_INPUT:
+        return reportAwaiting(report, readJson<ClarifyQuestion[]>(state.questions) ?? []);
 
       // ---- 3. equipment and DOP matching, concurrently
       case AnalysisStage.EQUIPMENT: {
@@ -457,6 +493,31 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
 }
 
 /**
+ * Records the producer's answers and releases a paused run. Blank answers fall
+ * back to each question's stated assumption, so skipping is always allowed.
+ *
+ * The stage condition makes this idempotent: a double submit, or answers
+ * arriving for a run that has since restarted, changes nothing.
+ */
+export async function answerClarifications(projectId: string, raw: Record<string, unknown>) {
+  const state = await prisma.analysisState.findUnique({
+    where: { projectId },
+    select: { stage: true, questions: true },
+  });
+  if (!state || state.stage !== AnalysisStage.AWAITING_INPUT) return false;
+
+  const answers = resolveAnswers(readJson<ClarifyQuestion[]>(state.questions) ?? [], raw);
+  const { count } = await prisma.analysisState.updateMany({
+    where: { projectId, stage: AnalysisStage.AWAITING_INPUT },
+    data: {
+      stage: AnalysisStage.EQUIPMENT,
+      answers: answers as unknown as Prisma.InputJsonValue,
+    },
+  });
+  return count > 0;
+}
+
+/**
  * Runs a whole analysis in one call. Used by the smoke script and by any
  * deployment with a long enough function duration; the UI uses the stepwise
  * path above.
@@ -470,6 +531,11 @@ export async function runProductionAnalysis(
 
   for (;;) {
     const outcome = await advanceAnalysis(projectId, report, { budgetMs: 10 * 60_000 });
+    // Nobody is there to answer in a one-shot run: go with every stated assumption.
+    if (outcome.awaiting) {
+      await answerClarifications(projectId, {});
+      continue;
+    }
     if (outcome.failed) {
       const state = await prisma.analysisState.findUnique({ where: { projectId } });
       throw new Error(state?.errorText ?? 'ANALYSIS_FAILED');
@@ -521,6 +587,13 @@ function readJson<T>(value: Prisma.JsonValue | null): T | null {
   return value === null || value === undefined ? null : (value as unknown as T);
 }
 
+function reportAwaiting(report: ProgressReporter, questions: ClarifyQuestion[]): StepOutcome {
+  const progress = STAGE_PROGRESS.AWAITING_INPUT;
+  report({ type: 'stage', stage: progress.stage, pct: progress.pct });
+  report({ type: 'questions', questions });
+  return { done: false, stage: AnalysisStage.AWAITING_INPUT, pct: progress.pct, awaiting: true };
+}
+
 function readParts(state: StateRow) {
   const summary = readJson<SceneSummary>(state.summary);
   const equipment = readJson<EquipmentResult>(state.equipment);
@@ -552,6 +625,7 @@ async function writeExecutiveSummary(
       prompt: [
         `Project "${brief.name}" — ${brief.type}, ${brief.budgetTier} tier, ${brief.city}.`,
         brief.visualStyleTags.length ? `Requested look: ${brief.visualStyleTags.join(', ')}.` : '',
+        describeClarifications(brief.clarifications),
         `${parts.summary.sceneCount} scenes, ${parts.summary.shootDays} shoot day(s), ${parts.summary.nightScenePct}% night/dawn, ${parts.summary.exteriorScenePct}% exterior, ${parts.summary.highComplexityPct}% high lighting complexity.`,
         `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}`).join(', ')}.`,
         `Department rationale: ${parts.equipment.rationale}`,
@@ -617,7 +691,11 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
   ]);
 }
 
-async function loadBrief(projectId: string, locale: string): Promise<ProjectBrief> {
+async function loadBrief(
+  projectId: string,
+  locale: string,
+  clarifications: ClarifyAnswer[],
+): Promise<ProjectBrief> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
     include: { owner: { select: { locale: true } }, script: { select: { id: true } } },
@@ -638,5 +716,6 @@ async function loadBrief(projectId: string, locale: string): Promise<ProjectBrie
     // The language the run was started in wins over the account default, so the
     // sheet comes back in whatever language the producer is using right now.
     locale: locale || project.owner.locale,
+    clarifications,
   };
 }

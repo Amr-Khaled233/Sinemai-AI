@@ -2,7 +2,7 @@ import { AnalysisStage } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { mayReadProject } from '@/lib/authz';
 import { auth } from '@/lib/auth';
-import { advanceAnalysis, beginAnalysis } from '@/agents/orchestrator';
+import { advanceAnalysis, answerClarifications, beginAnalysis } from '@/agents/orchestrator';
 import { normaliseLocale } from '@/agents/language';
 import { consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
 import { crossOriginRejected, isSameOrigin } from '@/lib/security';
@@ -18,7 +18,8 @@ import type { ProgressEvent } from '@/agents/types';
  * a 60s plan without changing any agent.
  *
  * `start: true` begins a fresh run; without it the request continues the
- * existing checkpoint.
+ * existing checkpoint. `answers` releases a run paused on the producer's
+ * questions — keyed by question id, blank meaning "go with the assumption".
  */
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -48,7 +49,11 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
   }
   if (!project.script) return Response.json({ error: 'NO_SCRIPT' }, { status: 400 });
 
-  const body = (await request.json().catch(() => ({}))) as { start?: boolean; locale?: string };
+  const body = (await request.json().catch(() => ({}))) as {
+    start?: boolean;
+    locale?: string;
+    answers?: unknown;
+  };
   const locale = normaliseLocale(body.locale);
 
   // Every run spends money on model calls, so starting one is capped per user;
@@ -61,6 +66,9 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   if (body.start) {
     await beginAnalysis(id, locale);
+  } else if (body.answers && typeof body.answers === 'object' && !Array.isArray(body.answers)) {
+    // A stale submit (the run already moved on or restarted) is simply ignored.
+    await answerClarifications(id, body.answers as Record<string, unknown>);
   } else {
     const state = await prisma.analysisState.findUnique({
       where: { projectId: id },
@@ -93,6 +101,7 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
           stage: outcome.stage,
           pct: outcome.pct,
           busy: Boolean(outcome.busy),
+          awaiting: Boolean(outcome.awaiting),
         });
       } catch (error) {
         send({
@@ -140,6 +149,9 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     running,
     // A live lease means another client is actively advancing the run.
     driven: Boolean(state?.leaseUntil && state.leaseUntil > new Date()),
+    // Paused on the producer: the page shows these instead of a progress bar.
+    awaiting: state?.stage === AnalysisStage.AWAITING_INPUT,
+    questions: state?.stage === AnalysisStage.AWAITING_INPUT ? (state.questions ?? []) : [],
     sceneCursor: state?.sceneCursor ?? 0,
     sceneTotal: state?.sceneTotal ?? 0,
     errorText: state?.errorText ?? null,

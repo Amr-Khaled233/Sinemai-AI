@@ -21,6 +21,30 @@ export type ProjectBrief = {
   shootEndDate: Date | null;
   synopsis: string | null;
   locale: string;
+  /** What the producer answered when the run paused to ask — empty until then. */
+  clarifications: ClarifyAnswer[];
+};
+
+// ------------------------------------------------------------ clarification
+
+/** One thing the brief and the script leave open that would change the sheet. */
+export type ClarifyQuestion = {
+  id: string;
+  question: string;
+  /** What the answer changes — equipment, crew, budget — in one line. */
+  why: string;
+  /** Suggested answers; the producer can still write their own. */
+  options: string[];
+  /** What the run goes with if the producer skips the question. */
+  assumption: string;
+};
+
+export type ClarifyAnswer = {
+  id: string;
+  question: string;
+  answer: string;
+  /** True when the producer skipped it and the assumption was used instead. */
+  assumed: boolean;
 };
 
 // ------------------------------------------------------------ script analyst
@@ -204,6 +228,8 @@ export type ProgressStage =
   | 'queued'
   | 'parsing'
   | 'analyzing_scenes'
+  | 'clarifying'
+  | 'awaiting_input'
   | 'matching_equipment'
   | 'matching_dops'
   | 'pricing'
@@ -222,10 +248,13 @@ export type ProgressEvent =
       pct: number;
       /** Another client holds the lease; watch rather than drive. */
       busy?: boolean;
+      /** The run is paused on questions only the producer can answer. */
+      awaiting?: boolean;
     }
   | { type: 'stage'; stage: ProgressStage; detail?: string; pct: number }
   | { type: 'log'; message: string }
   | { type: 'scenes'; count: number }
+  | { type: 'questions'; questions: ClarifyQuestion[] }
   | { type: 'done'; projectId: string }
   | { type: 'error'; message: string };
 

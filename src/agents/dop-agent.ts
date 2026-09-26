@@ -6,6 +6,7 @@ import type { DopSearchHit } from '@/lib/embeddings';
 import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { makeDopTools } from './tools/dop-tools';
 import { withLanguage } from './language';
+import { describeClarifications } from './clarifications';
 import type { DopMatch, DopResult, ProjectBrief, SceneSummary } from './types';
 
 export const DOP_SYSTEM = `You match cinematographers to productions by visual style.
@@ -66,6 +67,7 @@ export async function runDopAgent(
           brief.visualStyleTags.length
             ? `Director's visual style tags: ${brief.visualStyleTags.join(', ')}.`
             : 'No visual style tags were selected; derive the look from the lighting notes.',
+          describeClarifications(brief.clarifications),
           summary.dominantLightingNotes.length
             ? `Recurring lighting notes from the breakdown: ${summary.dominantLightingNotes.join(' / ')}.`
             : '',

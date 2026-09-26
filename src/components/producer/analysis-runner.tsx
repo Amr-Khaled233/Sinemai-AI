@@ -5,12 +5,13 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { CheckIcon, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import type { ProgressEvent, ProgressStage } from '@/agents/types';
+import type { ClarifyQuestion, ProgressEvent, ProgressStage } from '@/agents/types';
 
 const STAGE_ORDER: ProgressStage[] = [
   'queued',
   'parsing',
   'analyzing_scenes',
+  'clarifying',
   'matching_equipment',
   'matching_dops',
   'pricing',
@@ -35,6 +36,8 @@ type State = {
   requests: number;
   /** Another tab or device is advancing this run; we watch instead of driving. */
   watching: boolean;
+  /** The run is paused until the producer answers these. */
+  questions: ClarifyQuestion[];
 };
 
 const INITIAL: State = {
@@ -45,6 +48,7 @@ const INITIAL: State = {
   error: null,
   requests: 0,
   watching: false,
+  questions: [],
 };
 
 /** How often to re-check a run that another client is driving. */
@@ -70,12 +74,16 @@ export function AnalysisRunner({
 
   /** Runs one slice of the graph; returns true when the whole run is finished. */
   const runSlice = useCallback(
-    async (start: boolean, signal: AbortSignal): Promise<boolean> => {
+    async (
+      start: boolean,
+      signal: AbortSignal,
+      answers?: Record<string, string>,
+    ): Promise<boolean> => {
       const response = await fetch(`/api/projects/${projectId}/analyze`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         // The run answers in whatever language the producer is reading right now.
-        body: JSON.stringify({ start, locale }),
+        body: JSON.stringify({ start, locale, answers }),
         signal,
       });
 
@@ -115,6 +123,8 @@ export function AnalysisRunner({
                 return { ...current, stage: event.stage, pct: event.pct, detail: event.detail };
               case 'scenes':
                 return { ...current, logs: [...current.logs, `${event.count} scenes`] };
+              case 'questions':
+                return { ...current, questions: event.questions };
               case 'log':
                 return { ...current, logs: [...current.logs, event.message] };
               case 'error':
@@ -129,7 +139,8 @@ export function AnalysisRunner({
           });
 
           if (event.type === 'checkpoint') {
-            finished = event.done || event.failed;
+            // A pause is a stopping point too: nothing moves until the producer answers.
+            finished = event.done || event.failed || Boolean(event.awaiting);
             if (event.busy) {
               // Someone else holds the lease. Stop driving and watch instead,
               // so the same step is never executed — and billed — twice.
@@ -148,7 +159,7 @@ export function AnalysisRunner({
   );
 
   const drive = useCallback(
-    async (start: boolean) => {
+    async (start: boolean, answers?: Record<string, string>) => {
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
@@ -159,12 +170,14 @@ export function AnalysisRunner({
         // back a resume point — so no single function call has to be long.
         for (let request = 0; request < MAX_REQUESTS; request += 1) {
           setState((s) => ({ ...s, requests: request + 1 }));
-          const finished = await runSlice(start && request === 0, controller.signal);
+          const first = request === 0;
+          const finished = await runSlice(start && first, controller.signal, first ? answers : undefined);
           if (finished) break;
         }
 
         setState((s) => {
           if (s.error || s.watching) return { ...s, running: s.watching };
+          if (s.stage === 'awaiting_input') return { ...s, running: false };
           return { ...s, running: false, stage: 'done', pct: 100 };
         });
         router.refresh();
@@ -179,6 +192,11 @@ export function AnalysisRunner({
   /** Starts a fresh analysis. */
   const run = useCallback(() => drive(true), [drive]);
 
+  /** Releases a paused run; blank answers mean "go with the assumption". */
+  const answer = useCallback((answers: Record<string, string>) => drive(false, answers), [drive]);
+
+  const awaiting = state.stage === 'awaiting_input' && state.questions.length > 0 && !state.running;
+
   /**
    * The run continues on the server whether or not this page is open, so a
    * producer who closed the tab or reloaded mid-run should rejoin it rather
@@ -191,8 +209,19 @@ export function AnalysisRunner({
     (async () => {
       const response = await fetch(`/api/projects/${projectId}/analyze`);
       if (!response.ok || cancelled) return;
-      const status = (await response.json()) as { running?: boolean; driven?: boolean };
+      const status = (await response.json()) as {
+        running?: boolean;
+        driven?: boolean;
+        awaiting?: boolean;
+        questions?: ClarifyQuestion[];
+      };
       if (cancelled || !status.running) return;
+
+      // Paused on questions: show them, and spend no request until they are answered.
+      if (status.awaiting) {
+        setState({ ...INITIAL, stage: 'awaiting_input', pct: 48, questions: status.questions ?? [] });
+        return;
+      }
 
       // Another client is already advancing it: watch. Otherwise pick it up.
       if (status.driven) setState((s) => ({ ...s, running: true, watching: true }));
@@ -222,8 +251,15 @@ export function AnalysisRunner({
         sceneCursor?: number;
         sceneTotal?: number;
         errorText?: string | null;
+        awaiting?: boolean;
+        questions?: ClarifyQuestion[];
       };
       if (cancelled) return;
+
+      if (status.awaiting) {
+        setState({ ...INITIAL, stage: 'awaiting_input', pct: 48, questions: status.questions ?? [] });
+        return;
+      }
 
       if (!status.running) {
         setState((s) => ({
@@ -254,7 +290,8 @@ export function AnalysisRunner({
     };
   }, [state.watching, projectId, router, drive]);
 
-  const currentIndex = STAGE_ORDER.indexOf(state.stage);
+  // A pause sits on the clarifying step of the list.
+  const currentIndex = STAGE_ORDER.indexOf(state.stage === 'awaiting_input' ? 'clarifying' : state.stage);
 
   return (
     <div>
@@ -262,7 +299,7 @@ export function AnalysisRunner({
         type="button"
         className="btn-primary w-full sm:w-auto"
         onClick={run}
-        disabled={disabled || state.running}
+        disabled={disabled || state.running || awaiting}
       >
         {state.running ? (
           <>
@@ -287,6 +324,8 @@ export function AnalysisRunner({
           </>
         )}
       </button>
+
+      {awaiting && <ClarifyForm questions={state.questions} onSubmit={answer} />}
 
       {(state.running || state.stage === 'done' || state.error) && (
         <div className="mt-5 animate-scale-in rounded-2xl border border-line bg-surface-sunken/70 p-4">
@@ -325,7 +364,9 @@ export function AnalysisRunner({
                       <span className="size-1.5 rounded-full bg-line-strong" />
                     )}
                   </span>
-                  <span className={cn(active && 'font-medium')}>{t(`stage.${stage}`)}</span>
+                  <span className={cn(active && 'font-medium')}>
+                    {t(`stage.${active && state.stage === 'awaiting_input' ? 'awaiting_input' : stage}`)}
+                  </span>
                   {active && state.detail && (
                     <span className="animate-fade-in text-muted">· {state.detail}</span>
                   )}
@@ -353,5 +394,81 @@ export function AnalysisRunner({
         </div>
       )}
     </div>
+  );
+}
+
+/**
+ * The questions a paused run is waiting on. Every field may be left blank: the
+ * run then goes with the assumption shown under it, so answering is never a
+ * gate the producer cannot get past.
+ */
+function ClarifyForm({
+  questions,
+  onSubmit,
+}: {
+  questions: ClarifyQuestion[];
+  onSubmit: (answers: Record<string, string>) => void;
+}) {
+  const t = useTranslations('analysis.clarify');
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const set = (id: string, value: string) => setAnswers((current) => ({ ...current, [id]: value }));
+
+  return (
+    <form
+      className="mt-5 animate-scale-in rounded-2xl border border-accent/40 bg-surface-sunken/70 p-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit(answers);
+      }}
+    >
+      <h3 className="text-sm font-semibold text-strong">{t('title')}</h3>
+      <p className="mt-1 text-xs text-muted">{t('intro')}</p>
+
+      <ol className="mt-4 space-y-5">
+        {questions.map((q, index) => (
+          <li key={q.id}>
+            <label htmlFor={`clarify-${q.id}`} className="text-sm font-medium text-strong">
+              {index + 1}. {q.question}
+            </label>
+            {q.why && <p className="mt-0.5 text-[11px] text-muted">{q.why}</p>}
+
+            {q.options.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {q.options.map((option) => (
+                  <button
+                    key={option}
+                    type="button"
+                    className={cn('chip text-[11px]', answers[q.id] === option && 'chip-on')}
+                    aria-pressed={answers[q.id] === option}
+                    onClick={() => set(q.id, answers[q.id] === option ? '' : option)}
+                  >
+                    {option}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <input
+              id={`clarify-${q.id}`}
+              className="input mt-2 w-full text-sm"
+              value={answers[q.id] ?? ''}
+              maxLength={500}
+              onChange={(event) => set(q.id, event.target.value)}
+              placeholder={t('placeholder')}
+            />
+            <p className="mt-1 text-[11px] text-muted/70">{t('assumption', { assumption: q.assumption })}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="mt-5 flex flex-wrap gap-2">
+        <button type="submit" className="btn-primary text-xs">
+          {t('submit')}
+        </button>
+        <button type="button" className="btn-secondary text-xs" onClick={() => onSubmit({})}>
+          {t('skip')}
+        </button>
+      </div>
+    </form>
   );
 }

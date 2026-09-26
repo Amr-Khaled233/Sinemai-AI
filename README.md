@@ -103,6 +103,9 @@ Orchestrator Agent ......... no database tools; owns order + final assembly
         ▼
 Script Analyst Agent ....... parseScriptFile, segmentScenes
         │                    → per-scene requirements, batched 12 at a time
+        ▼
+Clarify step ............... askProducer → pauses the run until the producer
+        │                    answers (or skips) what the brief leaves open
         ├──────────────┬─────────────────────┐
         ▼              ▼                     │  Equipment and DOP matching
 Equipment Agent   DOP Matching Agent         │  run concurrently
@@ -143,6 +146,26 @@ The hallucination surface is closed structurally, not by asking the model nicely
 - **Everything is logged.** `AgentRun` (per invocation, retries included, with prompt, input,
   output, latency, token counts) and `AgentToolCall` (args + results) — visible in the admin
   dashboard and the basis for tuning the matching rules later.
+
+### Asking before guessing
+
+Once the script is broken down and before anything is priced, the run checks whether the brief
+leaves something open that would change the sheet: no shoot dates, a shoot window shorter than
+the breakdown needs, drone scenes, special requirements, no visual direction at all. Code spots
+those candidates ([`detectGaps`](src/agents/clarifications.ts)); a model decides which actually
+matter for this production and, if any do, calls the `askProducer` tool
+([`clarify-agent.ts`](src/agents/clarify-agent.ts)) with at most four questions.
+
+The run then pauses at `AWAITING_INPUT` and the project page shows the questions, with
+suggested answers where it is a choice. Every question carries the assumption the run will use
+if it is left blank, so "skip" is always an option and a producer is never stuck. The answers go
+into every agent after the pause — equipment, cinematographers, vendors, the reviewer and the
+executive summary — as facts about the production.
+
+A pause costs nothing while it waits: no request is made until the producer answers, the
+nightly cleanup does not fail a paused run, and a failure in the clarify step itself just skips
+it. The one-shot path (`runProductionAnalysis`, used by the smoke script) has nobody to ask, so it
+goes with the assumptions.
 
 ### Answering in the reader's language
 
@@ -290,12 +313,15 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
    connection string for `DATABASE_URL`.
 2. Set the environment variables from `.env.example`, including `NEXTAUTH_URL` (your production
    URL), `NEXTAUTH_SECRET` (`openssl rand -base64 32`) and `CRON_SECRET`.
-3. Run the database steps once against production:
-   `npm run db:extensions && npm run db:push && npm run db:index && npm run db:seed`.
+3. Apply the migrations and seed once against production, from your machine. Use the
+   **direct** (non-pooled) connection string here — migrations take locks a pooler does not hold:
+   `DATABASE_URL="<direct url>" npm run db:deploy`, then the same with `npm run db:seed`.
+   Every later schema change is one more `npm run db:deploy` before (or right after) the push that
+   ships it.
 4. Deploy. `vercel.json` registers two cron jobs:
    - `/api/cron/reembed-dops` daily at 03:00 — re-embeds profiles edited since their last vector.
    - `/api/cron/availability-cleanup` at 03:30 — prunes old availability blocks and fails
-     analyses left hanging by a timed-out function.
+     analyses left hanging by a timed-out function (a run paused on questions is left alone).
 5. No plan upgrade is needed: the analyze route declares `maxDuration = 60` and the run is
    split across as many short requests as it takes. On a plan with longer durations it simply
    finishes in fewer round trips.

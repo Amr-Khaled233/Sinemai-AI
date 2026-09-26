@@ -5,6 +5,7 @@ import { getBudgetTierConfig } from '@/lib/settings';
 import { model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { describeSummary } from './equipment-agent';
 import { withLanguage } from './language';
+import { describeClarifications } from './clarifications';
 import type {
   CriticIssue,
   CriticResult,
@@ -79,6 +80,7 @@ export async function runCriticAgent(
         prompt: [
           `PROJECT: "${brief.name}" — ${brief.type}, declared budget tier ${brief.budgetTier} (${tierConfig.minTotal}–${tierConfig.maxTotal} ${tierConfig.currency}), ${brief.city}.`,
           brief.visualStyleTags.length ? `Requested visual style: ${brief.visualStyleTags.join(', ')}.` : '',
+          describeClarifications(brief.clarifications),
           '',
           'SCENE BREAKDOWN:',
           describeSummary(parts.summary),
