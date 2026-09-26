@@ -3,7 +3,7 @@ import { requireRole } from '@/lib/auth';
 import { getBudgetTierConfigs, getSettings, getStyleTags } from '@/lib/settings';
 import { Card } from '@/components/ui';
 import { ProjectForm } from '@/components/producer/project-form';
-import { formatMoney } from '@/lib/utils';
+import { moneyFormatter } from '@/lib/currency-server';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function NewProjectPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -11,8 +11,10 @@ export default async function NewProjectPage({ params }: { params: Promise<{ loc
   setRequestLocale(locale as AppLocale);
   await requireRole(['PRODUCER', 'ADMIN'], locale);
 
-  const [t, tags, tiers, settings] = await Promise.all([
+  const [t, tEnum, money, tags, tiers, settings] = await Promise.all([
     getTranslations('project'),
+    getTranslations('enum'),
+    moneyFormatter(locale),
     getStyleTags(),
     getBudgetTierConfigs(),
     getSettings(),
@@ -21,11 +23,7 @@ export default async function NewProjectPage({ params }: { params: Promise<{ loc
   const tierLabels = Object.fromEntries(
     tiers.map((tier) => [
       tier.tier,
-      `${locale === 'ar' ? tier.labelAr : tier.labelEn} · ${formatMoney(tier.minTotal, locale, tier.currency)}–${formatMoney(
-        tier.maxTotal,
-        locale,
-        tier.currency,
-      )}`,
+      `${tEnum(`tier.${tier.tier}`)} · ${money(tier.minTotal, tier.currency)} – ${money(tier.maxTotal, tier.currency)}`,
     ]),
   );
 

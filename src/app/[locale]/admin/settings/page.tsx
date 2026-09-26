@@ -6,6 +6,8 @@ import { getBudgetTierConfigs, getSettings } from '@/lib/settings';
 import { saveCrewRateForm, savePlatformSettingsForm, saveStyleTagForm } from '@/app/actions/admin';
 import { Card, Field, Input } from '@/components/ui';
 import { StyleTagToggles } from '@/components/admin/style-tag-toggles';
+import { CurrencyManager } from '@/components/admin/currency-manager';
+import { getCurrencyConfig } from '@/lib/currency-server';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function AdminSettingsPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -13,13 +15,14 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
   setRequestLocale(locale as AppLocale);
   await requireRole('ADMIN', locale);
 
-  const [t, tEnum, settings, tiers, crewRates, styleTags] = await Promise.all([
+  const [t, tEnum, settings, tiers, crewRates, styleTags, currencies] = await Promise.all([
     getTranslations('admin'),
     getTranslations('enum'),
     getSettings(),
     getBudgetTierConfigs(),
     prisma.crewRate.findMany({ orderBy: [{ dayRate: 'desc' }, { roleSlug: 'asc' }] }),
     prisma.styleTag.findMany({ orderBy: { sortOrder: 'asc' } }),
+    getCurrencyConfig(),
   ]);
 
   const ratesByRole = new Map<string, typeof crewRates>();
@@ -103,6 +106,10 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
             {t('save')}
           </button>
         </form>
+      </Card>
+
+      <Card title={t('currencies')} subtitle={t('currenciesHint')}>
+        <CurrencyManager initial={currencies} />
       </Card>
 
       <Card title={t('crewRates')} subtitle={t('crewRatesHint')}>

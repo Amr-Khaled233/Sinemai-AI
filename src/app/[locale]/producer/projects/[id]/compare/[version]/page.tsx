@@ -3,6 +3,7 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
+import { displayFx } from '@/lib/currency-server';
 import { mayReadProject } from '@/lib/authz';
 import { loadComparison } from '@/lib/versions';
 import { VersionComparison } from '@/components/sheet/version-compare';
@@ -29,7 +30,7 @@ export default async function ComparePage({
 
   const [t, comparison] = await Promise.all([
     getTranslations('versions'),
-    loadComparison(id, versionNumber),
+    displayFx().then((fx) => loadComparison(id, versionNumber, fx)),
   ]);
   if (!comparison) notFound();
 

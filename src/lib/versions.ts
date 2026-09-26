@@ -2,6 +2,7 @@ import 'server-only';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import type { BudgetBreakdown, DopMatch, PackageItem } from '@/agents/types';
+import { BASE_CURRENCY, convertSheet, type Fx } from '@/lib/currency';
 
 /**
  * Sheet history.
@@ -198,14 +199,21 @@ export function compareSheets(left: Side, right: Side): SheetComparison {
 }
 
 /** Loads a stored version and the live sheet, ready for comparison. */
-export async function loadComparison(projectId: string, versionNumber: number) {
-  const [version, current] = await Promise.all([
+export async function loadComparison(
+  projectId: string,
+  versionNumber: number,
+  fx: Fx = { code: BASE_CURRENCY, factor: 1 },
+) {
+  const [storedVersion, storedCurrent] = await Promise.all([
     prisma.recommendationVersion.findUnique({
       where: { projectId_version: { projectId, version: versionNumber } },
     }),
     prisma.projectRecommendation.findUnique({ where: { projectId } }),
   ]);
-  if (!version || !current) return null;
+  if (!storedVersion || !storedCurrent) return null;
+  // Both sides in the viewer's currency, so the deltas are too.
+  const version = convertSheet(storedVersion, fx);
+  const current = convertSheet(storedCurrent, fx);
 
   return compareSheets(
     {

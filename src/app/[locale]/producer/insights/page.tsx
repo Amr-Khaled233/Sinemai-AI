@@ -4,7 +4,8 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Badge, Card, EmptyState, MeterBar, SectionTitle, Stat } from '@/components/ui';
 import { AnimatedNumber } from '@/components/motion';
-import { formatDate, formatMoney } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { moneyFormatter } from '@/lib/currency-server';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary } from '@/agents/types';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -22,7 +23,11 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum] = await Promise.all([getTranslations('insights'), getTranslations('enum')]);
+  const [t, tEnum, money] = await Promise.all([
+    getTranslations('insights'),
+    getTranslations('enum'),
+    moneyFormatter(locale),
+  ]);
 
   const projects = await prisma.project.findMany({
     where: { ownerId: session.user.id },
@@ -135,8 +140,8 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
 
       <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
         <Stat label={t('projectsCosted')} value={<AnimatedNumber value={costed.length} />} />
-        <Stat label={t('totalValue')} value={formatMoney(totalMid, locale, currency)} />
-        <Stat label={t('averageBudget')} value={formatMoney(averageMid, locale, currency)} />
+        <Stat label={t('totalValue')} value={money(totalMid, currency)} />
+        <Stat label={t('averageBudget')} value={money(averageMid, currency)} />
         <Stat label={t('shootDays')} value={<AnimatedNumber value={shootDays} />} />
         <Stat label={t('nightShare')} value={`${nightShare}%`} />
       </div>
@@ -239,13 +244,13 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
                       <Badge tone="gold">{tEnum(`tier.${project.budgetTier}`)}</Badge>
                     </td>
                     <td data-label={t('low')} className="text-end tabular-nums">
-                      {formatMoney(recommendation.estimatedBudgetLow, locale, recommendation.currency)}
+                      {money(recommendation.estimatedBudgetLow, recommendation.currency)}
                     </td>
                     <td data-label={t('mid')} className="text-end tabular-nums text-strong">
-                      {formatMoney(recommendation.estimatedBudgetMid, locale, recommendation.currency)}
+                      {money(recommendation.estimatedBudgetMid, recommendation.currency)}
                     </td>
                     <td data-label={t('high')} className="text-end tabular-nums">
-                      {formatMoney(recommendation.estimatedBudgetHigh, locale, recommendation.currency)}
+                      {money(recommendation.estimatedBudgetHigh, recommendation.currency)}
                     </td>
                   </tr>
                 );

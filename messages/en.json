@@ -16,7 +16,8 @@
     "settings": "Settings",
     "analytics": "Analytics",
     "language": "العربية",
-    "insights": "Insights"
+    "insights": "Insights",
+    "currency": "Currency"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -115,7 +116,8 @@
     "deleteTitle": "Delete this project?",
     "deleteWarning": "This removes the script, the scene breakdown, the generated sheet and every share link. It cannot be undone.",
     "deleteConfirmLabel": "Type {name} to confirm",
-    "deleteConfirm": "Delete permanently"
+    "deleteConfirm": "Delete permanently",
+    "midEstimate": "Mid estimate"
   },
   "analysis": {
     "title": "Building your production sheet",
@@ -391,7 +393,17 @@
     "headcountField": "Headcount",
     "styleTagsHint": "Offered to producers and used as the cinematographer style vocabulary.",
     "capabilitiesHint": "Comma separated, matched against scene special requirements.",
-    "specsHint": "For example '{\"sensor\":\"Super 35\",\"dynamicRange\":\"17 stops\"}'"
+    "specsHint": "For example '{\"sensor\":\"Super 35\",\"dynamicRange\":\"17 stops\"}'",
+    "currencies": "Currencies",
+    "currenciesHint": "Every price is stored in SAR. Set how much of each currency one SAR buys; viewers pick their currency from the header.",
+    "defaultCurrency": "Default currency",
+    "currencyCode": "Code",
+    "currencyRate": "Units per 1 {base}",
+    "currencyShown": "Offered",
+    "currencyBase": "Base currency",
+    "addCurrency": "Add currency",
+    "saved": "Saved.",
+    "saveFailed": "Could not save. Check the values and try again."
   },
   "enum": {
     "type": {

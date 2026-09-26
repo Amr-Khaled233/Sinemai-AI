@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 import { sheetScenesArg } from '@/lib/sheet-query';
 import { getBudgetTierConfig, getSettings } from '@/lib/settings';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
+import { convert, convertSheet } from '@/lib/currency';
+import { displayFx } from '@/lib/currency-server';
 import type { AppLocale } from '@/i18n/routing';
 
 export const dynamic = 'force-dynamic';
@@ -39,10 +41,17 @@ export default async function SharedSheetPage({
   // Fire-and-forget: a view counter must never block rendering the sheet.
   void prisma.shareLink.update({ where: { id: link.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
-  const [tierWindow, settings] = await Promise.all([
+  const [storedTierWindow, settings, fx] = await Promise.all([
     getBudgetTierConfig(link.project.budgetTier),
     getSettings(),
+    displayFx(),
   ]);
+  const tierWindow = {
+    ...storedTierWindow,
+    minTotal: convert(storedTierWindow.minTotal, fx),
+    maxTotal: convert(storedTierWindow.maxTotal, fx),
+    currency: fx.code,
+  };
 
   return (
     <ProductionSheet
@@ -76,7 +85,7 @@ export default async function SharedSheetPage({
         city: link.project.city,
         visualStyleTags: link.project.visualStyleTags,
       }}
-      recommendation={link.project.recommendation}
+      recommendation={convertSheet(link.project.recommendation, fx)}
       scenes={link.project.script?.scenes ?? []}
       tierWindow={tierWindow}
       shootDayHours={settings.shootDayHours}

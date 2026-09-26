@@ -1,5 +1,7 @@
 'use server';
 
+import { revalidatePath } from 'next/cache';
+import { z } from 'zod';
 import {
   ApprovalStatus,
   BudgetTier,
@@ -13,6 +15,8 @@ import { saveSettings, type PlatformSettings } from '@/lib/settings';
 import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
 import { slugify } from '@/lib/utils';
 import { reportError } from '@/lib/observability';
+import { BASE_CURRENCY, isCurrencyCode, type CurrencyConfig } from '@/lib/currency';
+import { saveCurrencyConfig } from '@/lib/currency-server';
 import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
 function baseUrl() {
@@ -286,6 +290,47 @@ export async function toggleStyleTag(slug: string, active: boolean) {
     await requireAdmin();
     await prisma.styleTag.update({ where: { slug }, data: { active } });
     revalidate(REVALIDATE.adminSettings);
+  });
+}
+
+// ---------------------------------------------------------------- currencies
+
+const currencySchema = z.object({
+  defaultCode: z.string().length(3),
+  rates: z
+    .array(
+      z.object({
+        code: z.string().refine(isCurrencyCode),
+        perBase: z.number().positive().max(1_000_000),
+        enabled: z.boolean(),
+      }),
+    )
+    .max(30),
+});
+
+/**
+ * Saves the display currencies. Rates are the admin's own numbers — nothing is
+ * fetched — and SAR stays the base every stored amount is in, so it cannot be
+ * listed as a rate of itself.
+ */
+export async function saveCurrencies(input: CurrencyConfig) {
+  return runAction('saveCurrencies', async () => {
+    await requireAdmin();
+    const parsed = currencySchema.safeParse(input);
+    if (!parsed.success) throw new Error('INVALID_INPUT');
+
+    const seen = new Set<string>();
+    const rates = parsed.data.rates.filter((rate) => {
+      if (rate.code === BASE_CURRENCY || seen.has(rate.code)) return false;
+      seen.add(rate.code);
+      return true;
+    });
+    const offered = [BASE_CURRENCY, ...rates.filter((r) => r.enabled).map((r) => r.code)];
+    const defaultCode = offered.includes(parsed.data.defaultCode) ? parsed.data.defaultCode : BASE_CURRENCY;
+
+    await saveCurrencyConfig({ defaultCode, rates });
+    // Every page that prints money reads these rates.
+    revalidatePath('/', 'layout');
   });
 }
 

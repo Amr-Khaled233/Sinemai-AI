@@ -12,6 +12,8 @@ import { ShareControls } from '@/components/sheet/share-controls';
 import { DeleteProjectButton } from '@/components/producer/danger-zone';
 import { VersionHistory } from '@/components/sheet/version-compare';
 import { listVersions } from '@/lib/versions';
+import { convert, convertSheet } from '@/lib/currency';
+import { displayFx } from '@/lib/currency-server';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -51,7 +53,7 @@ export default async function ProjectPage({
   if (!project) notFound();
   if (!mayReadProject(project, session.user)) notFound();
 
-  const [tierWindow, settings, versions, catalogRows] = await Promise.all([
+  const [storedTierWindow, settings, storedVersions, catalogRows] = await Promise.all([
     getBudgetTierConfig(project.budgetTier),
     getSettings(),
     listVersions(project.id),
@@ -65,7 +67,21 @@ export default async function ProjectPage({
       : Promise.resolve([]),
   ]);
   const hasScript = Boolean(project.script);
-  const ready = Boolean(project.recommendation);
+  // Everything is stored in SAR; the viewer sees their chosen currency.
+  const fx = await displayFx();
+  const recommendation = project.recommendation ? convertSheet(project.recommendation, fx) : null;
+  const tierWindow = {
+    ...storedTierWindow,
+    minTotal: convert(storedTierWindow.minTotal, fx),
+    maxTotal: convert(storedTierWindow.maxTotal, fx),
+    currency: fx.code,
+  };
+  const versions = storedVersions.map((version) => ({
+    ...version,
+    estimatedBudgetMid: convert(version.estimatedBudgetMid, fx),
+    currency: fx.code,
+  }));
+  const ready = Boolean(recommendation);
   // A run continues on the server with the page closed, so the client rejoins
   // one that is still moving rather than offering to start a second.
   const inFlight =
@@ -148,7 +164,7 @@ export default async function ProjectPage({
 
       {workspaceFirst && workspace}
 
-      {ready && project.recommendation && (
+      {ready && recommendation && (
         <ProductionSheet
           locale={locale}
           project={{
@@ -159,7 +175,7 @@ export default async function ProjectPage({
             city: project.city,
             visualStyleTags: project.visualStyleTags,
           }}
-          recommendation={project.recommendation}
+          recommendation={recommendation}
           catalog={catalogRows.map((row) => ({
             id: row.id,
             label: `${row.brand} ${row.model}`,

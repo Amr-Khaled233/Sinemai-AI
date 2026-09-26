@@ -16,7 +16,8 @@
     "settings": "الإعدادات",
     "analytics": "الإحصائيات",
     "language": "English",
-    "insights": "التحليلات"
+    "insights": "التحليلات",
+    "currency": "العملة"
   },
   "landing": {
     "heroKicker": "من النص إلى حزمة التصوير",
@@ -115,7 +116,8 @@
     "deleteTitle": "حذف هذا المشروع؟",
     "deleteWarning": "سيؤدي هذا إلى حذف النص وتحليل المشاهد والورقة المُنشأة وكل روابط المشاركة. لا يمكن التراجع.",
     "deleteConfirmLabel": "اكتب {name} للتأكيد",
-    "deleteConfirm": "حذف نهائي"
+    "deleteConfirm": "حذف نهائي",
+    "midEstimate": "التقدير المتوسط"
   },
   "analysis": {
     "title": "جارٍ إعداد ورقة الإنتاج",
@@ -391,7 +393,17 @@
     "headcountField": "عدد الأفراد",
     "styleTagsHint": "تظهر للمنتجين وتُستخدم كمفردات أسلوب مديري التصوير.",
     "capabilitiesHint": "مفصولة بفواصل، وتُطابق مع المتطلبات الخاصة للمشاهد.",
-    "specsHint": "مثال: '{\"sensor\":\"Super 35\",\"dynamicRange\":\"17 stops\"}'"
+    "specsHint": "مثال: '{\"sensor\":\"Super 35\",\"dynamicRange\":\"17 stops\"}'",
+    "currencies": "العملات",
+    "currenciesHint": "كل الأسعار محفوظة بالريال. حدّد كم تساوي الـ ١ ريال من كل عملة، والمستخدم يختار عملته من أعلى الصفحة.",
+    "defaultCurrency": "العملة الافتراضية",
+    "currencyCode": "الرمز",
+    "currencyRate": "القيمة مقابل ١ {base}",
+    "currencyShown": "متاحة",
+    "currencyBase": "العملة الأساسية",
+    "addCurrency": "إضافة عملة",
+    "saved": "تم الحفظ.",
+    "saveFailed": "تعذّر الحفظ. راجع القيم وحاول مرة أخرى."
   },
   "enum": {
     "type": {

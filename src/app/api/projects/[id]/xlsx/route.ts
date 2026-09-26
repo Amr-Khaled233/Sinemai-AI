@@ -9,6 +9,8 @@ import {
   loadSheetForExport,
   throttleExport,
 } from '@/lib/sheet-export';
+import { convertSheet } from '@/lib/currency';
+import { displayFx } from '@/lib/currency-server';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 import messagesAr from '../../../../../../messages/ar.json';
 import messagesEn from '../../../../../../messages/en.json';
@@ -34,7 +36,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const throttled = await throttleExport(request, id, 'xlsx', token);
   if (throttled) return throttled;
 
-  const { recommendation } = project;
+  // Exports use the same currency the viewer is looking at.
+  const recommendation = convertSheet(project.recommendation, await displayFx());
   const locale = exportLocale(url, recommendation.locale);
   const settings = await getSettings();
   const scenes = project.script?.scenes ?? [];

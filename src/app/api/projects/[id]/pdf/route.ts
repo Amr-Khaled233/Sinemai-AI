@@ -9,6 +9,8 @@ import {
   loadSheetForExport,
   throttleExport,
 } from '@/lib/sheet-export';
+import { convertSheet } from '@/lib/currency';
+import { displayFx } from '@/lib/currency-server';
 import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 export const runtime = 'nodejs';
@@ -35,7 +37,8 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
   const throttled = await throttleExport(request, id, 'pdf', token);
   if (throttled) return throttled;
 
-  const { recommendation } = sheet;
+  // Exports use the same currency the viewer is looking at.
+  const recommendation = convertSheet(sheet.recommendation, await displayFx());
   const locale = exportLocale(url, recommendation.locale);
 
   const data: SheetPdfData = {

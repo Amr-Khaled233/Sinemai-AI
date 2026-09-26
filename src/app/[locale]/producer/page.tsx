@@ -4,7 +4,8 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Badge, Card, EmptyState, SectionTitle } from '@/components/ui';
 import { Reveal } from '@/components/motion';
-import { formatDate, formatMoney } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
+import { moneyFormatter } from '@/lib/currency-server';
 import type { AppLocale } from '@/i18n/routing';
 
 const STATUS_TONE = {
@@ -20,10 +21,11 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, tNav] = await Promise.all([
+  const [t, tEnum, tNav, money] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
     getTranslations('nav'),
+    moneyFormatter(locale),
   ]);
 
   const projects = await prisma.project.findMany({
@@ -90,13 +92,9 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
                     )}
                     {project.recommendation && (
                       <div className="flex justify-between text-accent">
-                        <dt>Mid estimate</dt>
+                        <dt>{t('midEstimate')}</dt>
                         <dd className="tabular-nums">
-                          {formatMoney(
-                            project.recommendation.estimatedBudgetMid,
-                            locale,
-                            project.recommendation.currency,
-                          )}
+                          {money(project.recommendation.estimatedBudgetMid, project.recommendation.currency)}
                         </dd>
                       </div>
                     )}

@@ -3,6 +3,7 @@ import { Link } from '@/i18n/routing';
 import { auth, homeForRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { AnimatedNumber, Reveal } from '@/components/motion';
+import { moneyFormatter } from '@/lib/currency-server';
 import type { AppLocale } from '@/i18n/routing';
 
 // Platform counters are live-ish rather than frozen into the prerendered page.
@@ -12,7 +13,12 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
   const { locale } = await params;
   setRequestLocale(locale as AppLocale);
 
-  const [t, tSheet, session] = await Promise.all([getTranslations('landing'), getTranslations('sheet'), auth()]);
+  const [t, tSheet, session, money] = await Promise.all([
+    getTranslations('landing'),
+    getTranslations('sheet'),
+    auth(),
+    moneyFormatter(locale),
+  ]);
   const [equipmentCount, dopCount, vendorCount, projectCount] = await Promise.all([
     prisma.equipment.count({ where: { active: true } }),
     prisma.dop.count({ where: { status: 'APPROVED' } }),
@@ -70,7 +76,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
               low: tSheet('budgetLow'),
               high: tSheet('budgetHigh'),
             }}
-            locale={locale}
+            money={money}
           />
         </div>
 
@@ -161,17 +167,12 @@ function ArrowIcon() {
  */
 function SheetPreview({
   labels,
-  locale,
+  money,
 }: {
   labels: Record<'title' | 'scenes' | 'shootDays' | 'night' | 'package' | 'budget' | 'low' | 'high', string>;
-  locale: string;
+  /** Amounts are written in SAR and shown in the viewer's currency. */
+  money: (amount: number) => string;
 }) {
-  const money = (value: number) =>
-    new Intl.NumberFormat(locale === 'ar' ? 'ar-SA-u-nu-latn' : 'en-SA', {
-      style: 'currency',
-      currency: 'SAR',
-      maximumFractionDigits: 0,
-    }).format(value);
   const format = (value: number) => new Intl.NumberFormat('en').format(value);
 
   const facts = [

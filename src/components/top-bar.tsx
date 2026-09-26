@@ -5,6 +5,8 @@ import { auth, homeForRole } from '@/lib/auth';
 import { LocaleSwitcher } from '@/components/locale-switcher';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
+import { CurrencySwitcher } from '@/components/currency-switcher';
+import { getDisplayCurrency } from '@/lib/currency-server';
 import { SignOutButton } from '@/components/sign-out-button';
 import { NavLinks, type NavLink } from '@/components/nav-links';
 import { countUnreadInquiries } from '@/lib/inquiries';
@@ -35,7 +37,7 @@ const NAV_BY_ROLE: Record<Role, NavLink[]> = {
 };
 
 export async function TopBar({ locale }: { locale: string }) {
-  const [t, session] = await Promise.all([getTranslations('nav'), auth()]);
+  const [t, session, currency] = await Promise.all([getTranslations('nav'), auth(), getDisplayCurrency()]);
   const role = session?.user?.role;
   const links = role ? NAV_BY_ROLE[role] : [];
 
@@ -59,6 +61,7 @@ export async function TopBar({ locale }: { locale: string }) {
 
         <div className="ms-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeToggle />
+          <CurrencySwitcher current={currency.code} options={currency.options} />
           <LocaleSwitcher locale={locale} />
           {session?.user ? (
             <>
