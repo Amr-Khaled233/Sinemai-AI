@@ -5,6 +5,7 @@ import { getSession, signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { Field, Input, Spinner } from '@/components/ui';
+import { PasswordInput } from '@/components/password-input';
 
 
 async function homeForCurrentSession() {
@@ -44,7 +45,7 @@ export function SignInForm() {
         <Input name="email" type="email" required autoComplete="email" dir="ltr" />
       </Field>
       <Field label={t('password')} error={error}>
-        <Input name="password" type="password" required autoComplete="current-password" dir="ltr" />
+        <PasswordInput name="password" required autoComplete="current-password" />
       </Field>
       <button type="submit" className="btn-primary w-full" disabled={pending}>
         {pending && <Spinner className="size-4" />}
@@ -111,7 +112,7 @@ export function SignUpForm({ locale }: { locale: string }) {
       </div>
 
       <Field label={t('password')}>
-        <Input name="password" type="password" required minLength={8} autoComplete="new-password" dir="ltr" />
+        <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
       </Field>
 
       {error && (

@@ -498,7 +498,9 @@
     "errorReference": "Reference",
     "retry": "Try again",
     "tagline": "Production intelligence for film and advertising.",
-    "edit": "Edit"
+    "edit": "Edit",
+    "showPassword": "Show password",
+    "hidePassword": "Hide password"
   },
   "theme": {
     "dark": "Switch to dark mode",

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { Field, Input, Spinner } from '@/components/ui';
+import { PasswordInput } from '@/components/password-input';
 
 export function ForgotPasswordForm() {
   const t = useTranslations('auth');
@@ -128,10 +129,10 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <form onSubmit={onSubmit} noValidate>
       <Field label={t('newPassword')}>
-        <Input name="password" type="password" required minLength={8} autoComplete="new-password" dir="ltr" />
+        <PasswordInput name="password" required minLength={8} autoComplete="new-password" />
       </Field>
       <Field label={t('confirmPassword')} error={error}>
-        <Input name="confirm" type="password" required minLength={8} autoComplete="new-password" dir="ltr" />
+        <PasswordInput name="confirm" required minLength={8} autoComplete="new-password" />
       </Field>
       <button type="submit" className="btn-primary w-full" disabled={pending}>
         {pending && <Spinner className="size-4" />}
