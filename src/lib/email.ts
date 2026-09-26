@@ -1,26 +1,41 @@
-import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { escapeHtml, escapeHtmlMultiline } from '@/lib/security';
 import { reportError } from '@/lib/observability';
 
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
-const FROM = process.env.EMAIL_FROM ?? 'Sinemai AI <noreply@sinemai.ai>';
+/**
+ * Mail goes out through a Gmail account over SMTP, authenticated with an App
+ * Password (Google Account → Security → 2-Step Verification → App passwords).
+ * Google shows the password in groups of four; the spaces are not part of it.
+ */
+const GMAIL_USER = process.env.GMAIL_USER?.trim();
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD?.replace(/\s+/g, '');
+
+const transport =
+  GMAIL_USER && GMAIL_APP_PASSWORD
+    ? nodemailer.createTransport({ service: 'gmail', auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } })
+    : null;
+
+// Gmail rewrites any other sender address to the signed-in account, so the
+// default says so honestly rather than promising a domain it will not use.
+const FROM = process.env.EMAIL_FROM ?? `Sinemai AI <${GMAIL_USER ?? 'noreply@sinemai.ai'}>`;
 
 type Mail = { to: string | string[]; subject: string; html: string; replyTo?: string };
 
-/** Sends via Resend when configured; otherwise logs so local dev stays unblocked. */
+/** Sends via Gmail when configured; otherwise logs so local dev stays unblocked. */
 export async function sendEmail({ to, subject, html, replyTo }: Mail) {
-  if (!resend) {
+  if (!transport) {
     console.info('[email:dev]', { to, subject, replyTo });
     return { delivered: false as const };
   }
-  const { error } = await resend.emails.send({
-    from: FROM,
-    to: Array.isArray(to) ? to : [to],
-    subject,
-    html,
-    ...(replyTo ? { replyTo } : {}),
-  });
-  if (error) {
+  try {
+    await transport.sendMail({
+      from: FROM,
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      html,
+      ...(replyTo ? { replyTo } : {}),
+    });
+  } catch (error) {
     // A bounced approval or inquiry mail is invisible to the user, so it has to
     // be visible to us.
     reportError(error, { scope: 'email:send', severity: 'warning', extra: { subject } });

@@ -19,7 +19,7 @@ Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay head
 | Database | Postgres + `pgvector` (Vercel Postgres / Neon) via Prisma |
 | Auth | NextAuth (credentials, JWT sessions) with `PRODUCER · VENDOR · DOP · ADMIN` roles |
 | Files | Vercel Blob (scripts, equipment photos) |
-| Email | Resend (falls back to console logging in dev) |
+| Email | Gmail SMTP with an App Password via `nodemailer` (falls back to console logging in dev) |
 | PDF | `@react-pdf/renderer` with an embedded IBM Plex Sans Arabic — Arabic and English, no headless browser |
 | Auth extras | Self-service password reset: hashed single-use tokens, 60-minute expiry, no account enumeration |
 | i18n | `next-intl`, `dir="rtl"` + logical CSS properties; agents answer in the reader's language |
