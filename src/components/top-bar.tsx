@@ -30,6 +30,7 @@ const NAV_BY_ROLE: Record<Role, NavLink[]> = {
   ADMIN: [
     { href: '/admin', key: 'analytics' },
     { href: '/admin/equipment', key: 'equipment' },
+    { href: '/admin/rentals', key: 'rentals' },
     { href: '/admin/vendors', key: 'vendors' },
     { href: '/admin/dops', key: 'dops' },
     { href: '/admin/content', key: 'content' },
@@ -56,7 +57,7 @@ export async function TopBar({ locale }: { locale: string }) {
           <Logo />
         </Link>
 
-        <nav className="hidden flex-1 items-center gap-1 md:flex">
+        <nav className="hidden min-w-0 flex-1 items-center gap-0.5 overflow-x-auto md:flex">
           <NavLinks links={links} badges={{ inquiries: unread }} />
         </nav>
 

@@ -10,15 +10,16 @@
     "inventory": "Inventory",
     "profile": "Profile",
     "inquiries": "Inquiries",
-    "equipment": "Equipment catalog",
+    "equipment": "Catalog",
     "vendors": "Vendors",
-    "dops": "Cinematographers",
+    "dops": "DOPs",
     "settings": "Settings",
     "analytics": "Analytics",
     "language": "العربية",
     "insights": "Insights",
     "currency": "Currency",
-    "content": "Site content"
+    "content": "Content",
+    "rentals": "Rentals"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -292,7 +293,8 @@
     "blocks": "Blocked ranges",
     "noBlocks": "No blocked dates.",
     "photos": "Photos",
-    "uploadPhoto": "Upload photo"
+    "uploadPhoto": "Upload photo",
+    "itemCount": "{count, plural, =0 {No items yet} one {# item} other {# items}}"
   },
   "dop": {
     "title": "Cinematographer profile",
@@ -417,7 +419,12 @@
     "copyEmpty": "Text cannot be empty.",
     "copyTooLong": "Too long.",
     "copySyntax": "Braces do not match. Check every '{' has its '}'.",
-    "copyUnknownVariables": "The site does not provide {names} here."
+    "copyUnknownVariables": "The site does not provide {names} here.",
+    "rentalsTitle": "Rental prices",
+    "rentalsHint": "Every vendor’s stock, day, week and month rates, and blocked dates. Prices are in SAR; viewers see them in their chosen currency.",
+    "rentalsVendor": "Vendor",
+    "rentalsShow": "Show",
+    "rentalsNoVendors": "No vendors yet."
   },
   "enum": {
     "type": {
@@ -498,7 +505,8 @@
     "errorBody": "The page could not be loaded. The failure has been logged; trying again often works.",
     "errorReference": "Reference",
     "retry": "Try again",
-    "tagline": "Production intelligence for film and advertising."
+    "tagline": "Production intelligence for film and advertising.",
+    "edit": "Edit"
   },
   "theme": {
     "dark": "Switch to dark mode",

@@ -34,14 +34,42 @@ export type InventoryRow = {
   blocks: Array<{ id: string; startDate: string; endDate: string; quantity: number; reason: string | null }>;
 };
 
+type ActionResult = { ok: boolean; error?: string };
+
+/**
+ * The writes this editor performs. A vendor gets their own actions by default;
+ * the admin rentals page passes the admin actions bound to the vendor being
+ * edited, so one editor serves both.
+ */
+export type InventoryActions = {
+  save: (formData: FormData) => Promise<ActionResult>;
+  remove: (itemId: string) => Promise<ActionResult>;
+  toggle: (itemId: string, active: boolean) => Promise<ActionResult>;
+  addBlock: (formData: FormData) => Promise<ActionResult>;
+  removeBlock: (blockId: string) => Promise<ActionResult>;
+};
+
+const VENDOR_ACTIONS: InventoryActions = {
+  save: saveInventoryItem,
+  remove: deleteInventoryItem,
+  toggle: toggleInventoryActive,
+  addBlock: addAvailabilityBlock,
+  removeBlock: removeAvailabilityBlock,
+};
+
 export function InventoryManager({
   catalog,
   items,
   defaultCity,
+  actions = VENDOR_ACTIONS,
+  title,
 }: {
   catalog: CatalogOption[];
   items: InventoryRow[];
   defaultCity: string;
+  actions?: InventoryActions;
+  /** Overrides the card title, e.g. with the vendor's name on the admin page. */
+  title?: string;
 }) {
   const t = useTranslations('vendor');
   const tc = useTranslations('common');
@@ -58,14 +86,14 @@ export function InventoryManager({
   async function submit(formData: FormData) {
     setPending(true);
     setError(null);
-    const result = await saveInventoryItem(formData);
+    const result = await actions.save(formData);
     setPending(false);
     if (result.ok) {
       setEditing(null);
       setAdding(false);
       router.refresh();
     } else {
-      setError(result.error);
+      setError(result.error ?? 'UNEXPECTED_ERROR');
     }
   }
 
@@ -74,8 +102,8 @@ export function InventoryManager({
   return (
     <div className="space-y-6">
       <Card
-        title={t('inventoryTitle')}
-        subtitle={`${items.length} item(s)`}
+        title={title ?? t('inventoryTitle')}
+        subtitle={t('itemCount', { count: items.length })}
         action={
           !showForm && (
             <button type="button" className="btn-primary text-xs" onClick={() => setAdding(true)}>
@@ -223,7 +251,7 @@ export function InventoryManager({
                                 type="button"
                                 className="text-danger hover:underline"
                                 onClick={async () => {
-                                  await removeAvailabilityBlock(block.id);
+                                  await actions.removeBlock(block.id);
                                   router.refresh();
                                 }}
                               >
@@ -243,13 +271,13 @@ export function InventoryManager({
                     <td>
                       <div className="flex flex-wrap justify-end gap-1.5 max-sm:justify-start">
                         <button type="button" className="btn-ghost text-[11px]" onClick={() => setEditing(item)}>
-                          {tc('save')}
+                          {tc('edit')}
                         </button>
                         <button
                           type="button"
                           className="btn-ghost text-[11px]"
                           onClick={async () => {
-                            await toggleInventoryActive(item.id, !item.active);
+                            await actions.toggle(item.id, !item.active);
                             router.refresh();
                           }}
                         >
@@ -259,7 +287,7 @@ export function InventoryManager({
                           type="button"
                           className="btn-ghost text-[11px] text-danger"
                           onClick={async () => {
-                            await deleteInventoryItem(item.id);
+                            await actions.remove(item.id);
                             router.refresh();
                           }}
                         >
@@ -280,10 +308,10 @@ export function InventoryManager({
           <form
             action={async (formData) => {
               setPending(true);
-              const result = await addAvailabilityBlock(formData);
+              const result = await actions.addBlock(formData);
               setPending(false);
               if (result.ok) router.refresh();
-              else setError(result.error);
+              else setError(result.error ?? 'UNEXPECTED_ERROR');
             }}
             className="grid items-end gap-x-4 sm:grid-cols-2 lg:grid-cols-5"
           >

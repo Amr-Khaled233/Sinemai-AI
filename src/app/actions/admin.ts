@@ -19,6 +19,13 @@ import { BASE_CURRENCY, isCurrencyCode, type CurrencyConfig } from '@/lib/curren
 import { saveCurrencyConfig } from '@/lib/currency-server';
 import { checkOverride, flattenMessages, type Messages } from '@/lib/site-copy';
 import { SITE_COPY_TAG, writeCopyOverride } from '@/lib/site-copy-server';
+import {
+  addBlockFor,
+  deleteInventoryFor,
+  removeBlockFor,
+  saveInventoryFor,
+  toggleInventoryFor,
+} from '@/lib/inventory';
 import { REVALIDATE, requireAdmin, revalidate, runAction } from './shared';
 
 function baseUrl() {
@@ -374,6 +381,64 @@ export async function resetSiteCopy(key: string) {
     await writeCopyOverride('ar', key, null);
     revalidateTag(SITE_COPY_TAG);
     revalidatePath('/', 'layout');
+  });
+}
+
+// ---------------------------------------------------------------- rental prices
+
+/**
+ * The vendor an admin is editing, resolved once so every write is pinned to
+ * it. Callers check requireAdmin() first, in their own body, where the
+ * access-control audit can see it.
+ */
+async function vendorForAdmin(vendorId: string) {
+  const vendor = await prisma.vendor.findUnique({
+    where: { id: vendorId },
+    select: { id: true, company: { select: { city: true } } },
+  });
+  if (!vendor) throw new Error('NOT_FOUND');
+  return { id: vendor.id, city: vendor.company.city };
+}
+
+const RENTAL_PAGES = [REVALIDATE.adminRentals, REVALIDATE.vendorHome, REVALIDATE.vendorInventory] as const;
+
+export async function adminSaveInventoryItem(vendorId: string, formData: FormData) {
+  return runAction('adminSaveInventoryItem', async () => {
+    await requireAdmin();
+    await saveInventoryFor(await vendorForAdmin(vendorId), formData);
+    revalidate(...RENTAL_PAGES);
+  });
+}
+
+export async function adminDeleteInventoryItem(vendorId: string, itemId: string) {
+  return runAction('adminDeleteInventoryItem', async () => {
+    await requireAdmin();
+    await deleteInventoryFor((await vendorForAdmin(vendorId)).id, itemId);
+    revalidate(...RENTAL_PAGES);
+  });
+}
+
+export async function adminToggleInventoryActive(vendorId: string, itemId: string, active: boolean) {
+  return runAction('adminToggleInventoryActive', async () => {
+    await requireAdmin();
+    await toggleInventoryFor((await vendorForAdmin(vendorId)).id, itemId, active);
+    revalidate(...RENTAL_PAGES);
+  });
+}
+
+export async function adminAddAvailabilityBlock(vendorId: string, formData: FormData) {
+  return runAction('adminAddAvailabilityBlock', async () => {
+    await requireAdmin();
+    await addBlockFor((await vendorForAdmin(vendorId)).id, formData);
+    revalidate(...RENTAL_PAGES);
+  });
+}
+
+export async function adminRemoveAvailabilityBlock(vendorId: string, blockId: string) {
+  return runAction('adminRemoveAvailabilityBlock', async () => {
+    await requireAdmin();
+    await removeBlockFor((await vendorForAdmin(vendorId)).id, blockId);
+    revalidate(...RENTAL_PAGES);
   });
 }
 

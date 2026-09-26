@@ -41,6 +41,7 @@ export const REVALIDATE = {
   adminVendors: '/[locale]/admin/vendors',
   adminDops: '/[locale]/admin/dops',
   adminSettings: '/[locale]/admin/settings',
+  adminRentals: '/[locale]/admin/rentals',
 } as const;
 
 export function revalidate(...paths: Array<(typeof REVALIDATE)[keyof typeof REVALIDATE]>) {

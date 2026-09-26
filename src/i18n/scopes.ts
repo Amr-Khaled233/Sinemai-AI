@@ -26,8 +26,8 @@ export const SCOPES = {
   vendor: ['vendor', 'enum', 'inquiry', 'common'],
   /** Cinematographer profile and inquiry threads. */
   dop: ['dop', 'enum', 'inquiry', 'common'],
-  /** Admin catalog, approvals and settings. */
-  admin: ['admin', 'enum', 'common'],
+  /** Admin catalog, approvals, settings, and every vendor's rental prices (the vendor editor). */
+  admin: ['admin', 'vendor', 'enum', 'common'],
   /** A shared read-only sheet: export controls and the inquiry form. */
   share: ['sheet', 'inquiry', 'common'],
 } as const satisfies Record<string, readonly string[]>;

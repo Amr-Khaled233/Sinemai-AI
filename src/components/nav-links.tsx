@@ -65,7 +65,7 @@ export function NavLinks({
             href={link.href}
             aria-current={active ? 'page' : undefined}
             className={cn(
-              'relative rounded-lg px-3 py-1.5 text-sm transition-colors duration-200',
+              'relative whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm transition-colors duration-200',
               active ? 'text-strong' : 'text-muted hover:text-strong',
             )}
           >
