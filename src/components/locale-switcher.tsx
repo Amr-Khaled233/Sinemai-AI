@@ -14,7 +14,7 @@ export function LocaleSwitcher({ locale }: { locale: string }) {
   return (
     <button
       type="button"
-      className="btn-ghost text-xs"
+      className="btn-ghost px-2 text-xs"
       disabled={pending}
       onClick={() => startTransition(() => router.replace(pathname, { locale: next }))}
     >

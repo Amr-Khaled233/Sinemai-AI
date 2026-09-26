@@ -3,7 +3,6 @@ import { hash } from 'bcryptjs';
 import { Role } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { registerSchema } from '@/lib/validation';
-import { applicationEmail, sendEmail } from '@/lib/email';
 import { clientIp, consumeRateLimit, LIMITS, rateLimitResponse } from '@/lib/rate-limit';
 import { crossOriginRejected, isSameOrigin } from '@/lib/security';
 
@@ -33,55 +32,11 @@ export async function POST(request: Request) {
       name: data.name,
       phone: data.phone || null,
       passwordHash,
-      role: data.role,
+      role: Role.PRODUCER,
       locale: data.locale,
     },
-    select: { id: true, role: true, name: true },
+    select: { role: true },
   });
 
-  // Vendors and DOPs get a listing in PENDING state — an admin has to approve it
-  // before producers can be matched to them.
-  if (data.role === Role.VENDOR) {
-    const company = await prisma.company.create({
-      data: {
-        name: data.companyName ?? data.name,
-        crNumber: data.crNumber || null,
-        city: data.city ?? 'Riyadh',
-        phone: data.phone || null,
-      },
-      select: { id: true },
-    });
-    await prisma.vendor.create({ data: { userId: user.id, companyId: company.id } });
-  }
-
-  if (data.role === Role.DOP) {
-    await prisma.dop.create({
-      data: {
-        userId: user.id,
-        displayName: data.name,
-        city: data.city || null,
-      },
-    });
-  }
-
-  if (data.role !== Role.PRODUCER) {
-    const admins = await prisma.user.findMany({ where: { role: Role.ADMIN }, select: { email: true } });
-    if (admins.length) {
-      const origin = new URL(request.url).origin;
-      await sendEmail({
-        to: admins.map((a) => a.email),
-        // The subject is plain text in Resend's JSON payload, but a name with a
-        // newline in it has no business in a header either.
-        subject: `New ${data.role.toLowerCase()} application: ${data.name.replace(/\s+/g, ' ').slice(0, 80)}`,
-        html: applicationEmail({
-          name: data.name,
-          email,
-          role: data.role,
-          reviewUrl: `${origin}/${data.locale}/admin/${data.role === Role.VENDOR ? 'vendors' : 'dops'}`,
-        }),
-      });
-    }
-  }
-
-  return NextResponse.json({ ok: true, role: user.role, pending: data.role !== Role.PRODUCER });
+  return NextResponse.json({ ok: true, role: user.role });
 }

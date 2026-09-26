@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation';
 import { Link } from '@/i18n/routing';
 import { auth, homeForRole } from '@/lib/auth';
 import { SignUpForm } from '@/components/auth-forms';
-import { Card } from '@/components/ui';
+import { AuthPanel } from '@/components/auth-panel';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function RegisterPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -16,16 +16,19 @@ export default async function RegisterPage({ params }: { params: Promise<{ local
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-lg animate-fade-up pt-4 sm:pt-10">
-      <Card title={t('signUpTitle')} subtitle={t('signUpSubtitle')}>
-        <SignUpForm locale={locale} />
-        <p className="mt-5 text-xs text-muted">
+    <AuthPanel
+      title={t('signUpTitle')}
+      subtitle={t('signUpSubtitle')}
+      footer={
+        <p>
           {t('haveAccount')}{' '}
-          <Link href="/login" className="tap-link text-accent hover:underline">
+          <Link href="/login" className="tap-link font-medium text-accent hover:underline">
             {t('signInTitle')}
           </Link>
         </p>
-      </Card>
-    </div>
+      }
+    >
+      <SignUpForm locale={locale} />
+    </AuthPanel>
   );
 }

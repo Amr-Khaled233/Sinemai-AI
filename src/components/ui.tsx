@@ -161,7 +161,7 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="animate-fade-in rounded-2xl border border-dashed border-line px-6 py-12 text-center">
+    <div className="animate-fade-in rounded-lg border border-dashed border-line px-6 py-12 text-center">
       {icon && <div className="mb-3 flex justify-center text-muted/50">{icon}</div>}
       <p className="text-sm text-muted">{title}</p>
       {action && <div className="mt-5 flex justify-center">{action}</div>}

@@ -62,7 +62,7 @@ export function DeleteProjectButton({ projectId, projectName }: { projectId: str
             if (event.target === event.currentTarget) close();
           }}
         >
-          <div className="card w-full max-w-md animate-scale-in rounded-b-none p-5 shadow-lift sm:rounded-2xl">
+          <div className="card w-full max-w-md animate-scale-in rounded-b-none p-5 shadow-lift sm:rounded-lg">
             <h2 className="text-base font-semibold text-strong">{t('deleteTitle')}</h2>
             <p className="mt-2 text-sm leading-6 text-muted">{t('deleteWarning')}</p>
 

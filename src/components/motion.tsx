@@ -175,34 +175,3 @@ export function MeterFill({
     </div>
   );
 }
-
-/** Decorative animated background for the hero; hidden from assistive tech. */
-export function Aurora() {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 overflow-hidden">
-      <div
-        className="aurora-blob animate-aurora"
-        style={{
-          insetInlineEnd: '-6rem',
-          top: '-8rem',
-          width: '34rem',
-          height: '22rem',
-          background:
-            'radial-gradient(closest-side, rgb(var(--glow-a) / var(--glow-strength)), transparent 72%)',
-        }}
-      />
-      <div
-        className="aurora-blob animate-aurora"
-        style={{
-          insetInlineStart: '-8rem',
-          top: '2rem',
-          width: '26rem',
-          height: '18rem',
-          background:
-            'radial-gradient(closest-side, rgb(var(--glow-b) / calc(var(--glow-strength) * 0.55)), transparent 70%)',
-          animationDelay: '-7s',
-        }}
-      />
-    </div>
-  );
-}

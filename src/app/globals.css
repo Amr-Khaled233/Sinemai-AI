@@ -9,75 +9,58 @@
  * sets rather than two sets of components. Values are raw RGB triplets so
  * Tailwind's `/opacity` modifiers keep working (`bg-surface/60`).
  *
- * Resolution order: no stored preference → follow the OS; an explicit choice
- * (data-theme on <html>) always wins.
+ * Two themes, chosen explicitly: `data-theme` on <html> is always set, by the
+ * inline script in <head> before first paint (dark unless the visitor picked
+ * light). The palette is a warm charcoal with one signal yellow.
  */
 
 :root {
-  --font-sans: 'IBM Plex Sans Arabic', 'Segoe UI', 'Helvetica Neue', Tahoma, system-ui, sans-serif;
+  --font-sans: var(--font-plex), 'Segoe UI', Tahoma, system-ui, sans-serif;
+  --font-display: var(--font-oswald), var(--font-cairo), var(--font-plex), system-ui, sans-serif;
 
   /* light */
-  --page: 250 249 246;
+  --page: 246 245 242;
   --surface: 255 255 255;
-  --surface-raised: 252 250 246;
-  --surface-sunken: 244 241 235;
-  --line: 228 223 213;
-  --line-strong: 201 194 180;
-  --text-strong: 17 20 26;
-  --text-body: 48 53 63;
-  --muted: 110 117 132;
-  --accent: 150 116 34;
-  --accent-soft: 212 169 79;
+  --surface-raised: 250 249 247;
+  --surface-sunken: 241 239 236;
+  --line: 226 223 218;
+  --line-strong: 199 195 189;
+  --text-strong: 36 32 33;
+  --text-body: 62 58 59;
+  --muted: 111 114 113;
+  /* Yellow does not read as text on white, so light mode uses its deep shade. */
+  --accent: 138 106 6;
+  --accent-soft: 227 184 35;
   --danger: 185 28 28;
   --warning: 180 83 9;
-  --success: 4 120 87;
-  --info: 13 148 136;
-  --shadow: 24 22 18;
-  --glow-a: 212 169 79;
-  --glow-b: 79 209 197;
-  --glow-strength: 0.5;
+  --success: 21 128 61;
+  --info: 29 78 216;
+  --shadow: 36 32 33;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme='light']) {
-    --page: 10 12 16;
-    --surface: 20 23 31;
-    --surface-raised: 28 33 43;
-    --surface-sunken: 14 16 22;
-    --line: 42 48 64;
-    --line-strong: 63 71 92;
-    --text-strong: 255 255 255;
-    --text-body: 226 229 236;
-    --muted: 148 155 172;
-    --accent: 232 195 122;
-    --accent-soft: 212 169 79;
-    --danger: 248 113 113;
-    --warning: 251 191 36;
-    --success: 52 211 153;
-    --info: 79 209 197;
-    --shadow: 0 0 0;
-    --glow-strength: 0.42;
-  }
+/* Arabic pages lead with Cairo, which carries Latin too, so a line never
+   switches typeface mid-sentence. */
+[dir='rtl'] {
+  --font-display: var(--font-cairo), var(--font-plex), system-ui, sans-serif;
 }
 
 :root[data-theme='dark'] {
-  --page: 10 12 16;
-  --surface: 20 23 31;
-  --surface-raised: 28 33 43;
-  --surface-sunken: 14 16 22;
-  --line: 42 48 64;
-  --line-strong: 63 71 92;
+  --page: 20 18 19;
+  --surface: 29 26 27;
+  --surface-raised: 36 32 33;
+  --surface-sunken: 24 21 22;
+  --line: 54 49 50;
+  --line-strong: 78 72 73;
   --text-strong: 255 255 255;
-  --text-body: 226 229 236;
-  --muted: 148 155 172;
-  --accent: 232 195 122;
-  --accent-soft: 212 169 79;
+  --text-body: 224 222 221;
+  --muted: 150 153 152;
+  --accent: 227 184 35;
+  --accent-soft: 227 184 35;
   --danger: 248 113 113;
   --warning: 251 191 36;
-  --success: 52 211 153;
-  --info: 79 209 197;
+  --success: 74 222 128;
+  --info: 96 165 250;
   --shadow: 0 0 0;
-  --glow-strength: 0.42;
 }
 
 @layer base {
@@ -88,12 +71,6 @@
 
   :root[data-theme='dark'] {
     color-scheme: dark;
-  }
-
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme='light']) {
-      color-scheme: dark;
-    }
   }
 
   body {
@@ -113,12 +90,19 @@
   h1,
   h2,
   h3 {
-    @apply text-balance;
-    letter-spacing: -0.015em;
+    @apply text-balance font-display;
+    letter-spacing: 0.01em;
+  }
+
+  /* Letter-spacing pulls Arabic letters apart and breaks their joins. */
+  [dir='rtl'] h1,
+  [dir='rtl'] h2,
+  [dir='rtl'] h3 {
+    letter-spacing: 0;
   }
 
   ::selection {
-    background: rgb(var(--accent-soft) / 0.28);
+    background: rgb(var(--accent-soft) / 0.3);
   }
 
   /* A scrollbar that belongs to the theme rather than to the OS. */
@@ -145,7 +129,7 @@
   }
 
   :focus-visible {
-    outline: 2px solid rgb(var(--accent));
+    outline: 2px solid rgb(var(--accent-soft));
     outline-offset: 2px;
     border-radius: 6px;
   }
@@ -155,109 +139,80 @@
   /* ---------------------------------------------------------------- surfaces */
 
   .card {
-    @apply relative rounded-2xl border border-line bg-surface/[0.85] shadow-card backdrop-blur-sm
-      transition-[transform,box-shadow,border-color] duration-300 ease-smooth;
+    @apply relative rounded-lg border border-line bg-surface shadow-card
+      transition-[border-color,box-shadow] duration-200 ease-smooth;
   }
 
-  /* Cards that are links or otherwise actionable lift on hover. */
+  /* Cards that are links or otherwise actionable. */
   .card-interactive {
-    @apply hover:-translate-y-1 hover:border-accent/40 hover:shadow-lift;
-  }
-
-  /* A one-pixel highlight along the top edge gives the card a lit surface. */
-  .card::after {
-    content: '';
-    position: absolute;
-    inset-inline: 1rem;
-    top: 0;
-    height: 1px;
-    background: linear-gradient(90deg, transparent, rgb(var(--accent) / 0.35), transparent);
-    opacity: 0;
-    transition: opacity 0.35s ease;
-    pointer-events: none;
-  }
-
-  .card-interactive:hover::after {
-    opacity: 1;
-  }
-
-  .glass {
-    @apply border-line/80 bg-page/70 backdrop-blur-xl backdrop-saturate-150;
+    @apply hover:border-accent-soft/60 hover:shadow-lift;
   }
 
   /* ---------------------------------------------------------------- form */
 
   .label {
-    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-muted;
+    @apply mb-1.5 block text-xs font-medium text-muted;
   }
 
   .input {
-    @apply w-full rounded-xl border border-line bg-surface-sunken px-3.5 py-3 text-base text-body
+    @apply w-full rounded-md border border-line bg-surface-sunken px-3.5 py-3 text-base text-body
       sm:py-2.5 sm:text-sm
-      transition-[border-color,box-shadow,background-color] duration-200 ease-smooth
+      transition-[border-color,box-shadow,background-color] duration-150 ease-smooth
       placeholder:text-muted/60 hover:border-line-strong
-      focus:border-accent focus:bg-surface focus:outline-none focus:ring-4 focus:ring-accent/[0.12];
-  }
-
-  /* Comfortable hit area on touch, tighter on a mouse. */
-  .btn {
-    @apply min-h-[2.75rem] sm:min-h-0;
+      focus:border-accent-soft focus:bg-surface focus:outline-none focus:ring-2 focus:ring-accent-soft/25;
   }
 
   /* ---------------------------------------------------------------- buttons */
 
+  /* Pill buttons with a condensed uppercase label; Arabic keeps its own case
+     and spacing. Comfortable hit area on touch, tighter on a mouse. */
   .btn {
-    @apply relative inline-flex select-none items-center justify-center gap-2 overflow-hidden
-      rounded-xl px-4 py-2.5 text-sm font-medium
+    @apply relative inline-flex min-h-[2.75rem] select-none items-center justify-center gap-2
+      rounded-full px-5 py-2.5 font-display text-sm font-medium uppercase tracking-[0.06em]
       transition-[transform,background-color,border-color,color,box-shadow] duration-200 ease-smooth
-      active:scale-[0.97] disabled:pointer-events-none disabled:opacity-50;
+      active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 sm:min-h-0;
+  }
+
+  [dir='rtl'] .btn {
+    @apply tracking-normal;
   }
 
   .btn-primary {
-    @apply btn bg-gradient-to-b from-brass-400 to-brass-500 text-ink-950 shadow-card
-      hover:shadow-glow hover:brightness-105;
-  }
-
-  /* A sheen sweeps across the primary action on hover. */
-  .btn-primary::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(110deg, transparent 25%, rgb(255 255 255 / 0.45), transparent 75%);
-    transform: translateX(-120%);
-    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .btn-primary:hover::before {
-    transform: translateX(120%);
+    @apply btn bg-brass-500 text-ink-950 hover:-translate-y-0.5 hover:bg-brass-400 hover:shadow-lift;
   }
 
   .btn-secondary {
-    @apply btn border border-line bg-surface-raised text-body
-      hover:-translate-y-0.5 hover:border-accent/50 hover:text-accent hover:shadow-card;
+    @apply btn border border-line-strong text-strong
+      hover:-translate-y-0.5 hover:border-accent-soft hover:text-accent;
   }
 
   .btn-ghost {
-    @apply btn text-muted hover:bg-accent/[0.08] hover:text-accent;
+    @apply btn px-3 text-muted hover:text-strong;
   }
 
   .btn-danger {
     @apply btn border border-danger/40 bg-danger/10 text-danger hover:bg-danger/20;
   }
 
+  /* Square icon button (theme switch and similar). */
+  .btn-icon {
+    @apply inline-grid size-9 place-items-center rounded-full border border-line text-muted
+      transition-colors duration-200 hover:border-accent-soft hover:text-accent;
+  }
+
   /* ---------------------------------------------------------------- chips */
 
   .chip {
     @apply inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs text-muted
-      transition-[background-color,border-color,color,transform] duration-200 ease-smooth;
+      transition-[background-color,border-color,color] duration-150 ease-smooth;
   }
 
   .chip-on {
-    @apply border-accent/60 bg-accent/10 text-accent;
+    @apply border-accent-soft bg-accent-soft/15 text-accent;
   }
 
   button.chip:hover {
-    @apply -translate-y-0.5 border-accent/50 text-accent;
+    @apply border-accent-soft/70 text-accent;
   }
 
   /* ---------------------------------------------------------------- tables */
@@ -293,7 +248,7 @@
    *   wide    60rem — the seven and eight column tables
    */
   .table-wrap {
-    @apply overflow-x-auto rounded-2xl border border-line bg-surface/50;
+    @apply overflow-x-auto rounded-lg border border-line bg-surface;
     container-type: inline-size;
     container-name: tablewrap;
   }
@@ -315,7 +270,7 @@
   }
 
   .grid-table tr {
-    @apply mb-2.5 rounded-xl border border-line bg-surface/60 p-3;
+    @apply mb-2.5 rounded-md border border-line bg-surface p-3;
   }
 
   .grid-table tr:last-child {
@@ -375,7 +330,7 @@
     }
 
     .grid-table.grid-table-compact tbody tr:hover td {
-      @apply bg-accent/[0.04];
+      @apply bg-accent-soft/[0.06];
     }
 
     .grid-table.grid-table-compact tbody tr:last-child td {
@@ -418,7 +373,7 @@
     }
 
     .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr:hover td {
-      @apply bg-accent/[0.04];
+      @apply bg-accent-soft/[0.06];
     }
 
     .grid-table:not(.grid-table-compact):not(.grid-table-wide) tbody tr:last-child td {
@@ -461,7 +416,7 @@
     }
 
     .grid-table.grid-table-wide tbody tr:hover td {
-      @apply bg-accent/[0.04];
+      @apply bg-accent-soft/[0.06];
     }
 
     .grid-table.grid-table-wide tbody tr:last-child td {
@@ -491,17 +446,15 @@
   /* ---------------------------------------------------------------- stats */
 
   .stat {
-    @apply relative overflow-hidden rounded-2xl border border-line bg-surface/60 p-4
-      transition-[transform,border-color,box-shadow] duration-300 ease-smooth
-      hover:-translate-y-0.5 hover:border-accent/[0.35] hover:shadow-card;
+    @apply relative rounded-lg border border-line bg-surface p-4;
   }
 
   .stat-value {
-    @apply mt-1 text-2xl font-semibold tabular-nums text-strong;
+    @apply mt-1 font-display text-2xl font-semibold tabular-nums text-strong;
   }
 
   .stat-label {
-    @apply text-xs uppercase tracking-wider text-muted;
+    @apply text-xs text-muted;
   }
 
   /**
@@ -527,26 +480,17 @@
   /* ---------------------------------------------------------------- headings */
 
   .eyebrow {
-    @apply text-xs font-semibold uppercase tracking-[0.2em] text-accent;
+    @apply font-display text-xs font-medium uppercase tracking-[0.2em] text-accent;
   }
 
-  .headline-gradient {
-    background: linear-gradient(
-      135deg,
-      rgb(var(--text-strong)) 15%,
-      rgb(var(--accent)) 55%,
-      rgb(var(--text-strong)) 90%
-    );
-    background-size: 200% 200%;
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+  [dir='rtl'] .eyebrow {
+    @apply tracking-normal;
   }
 
   /* ---------------------------------------------------------------- feedback */
 
   .skeleton {
-    @apply rounded-lg bg-line/60;
+    @apply rounded-md bg-line/60;
     background-image: linear-gradient(
       90deg,
       transparent,
@@ -558,7 +502,11 @@
   }
 
   .alert {
-    @apply flex items-start gap-2.5 rounded-xl border p-3.5 text-xs leading-6;
+    @apply flex items-start gap-2.5 rounded-md border p-3.5 text-xs leading-6;
+  }
+
+  .alert-danger {
+    @apply rounded-md border border-danger/40 bg-danger/10 p-3 text-sm text-danger;
   }
 }
 
@@ -566,10 +514,10 @@
   /* Scroll-triggered reveal, driven by the Reveal component. */
   .reveal {
     opacity: 0;
-    transform: translate3d(0, 16px, 0);
+    transform: translate3d(0, 12px, 0);
     transition:
-      opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1),
-      transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
     transition-delay: var(--reveal-delay, 0ms);
   }
 
@@ -577,49 +525,16 @@
     opacity: 1;
     transform: translate3d(0, 0, 0);
   }
-
-  .bg-grid {
-    background-image:
-      linear-gradient(rgb(var(--line) / 0.6) 1px, transparent 1px),
-      linear-gradient(90deg, rgb(var(--line) / 0.6) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 100%);
-  }
 }
 
 /* The progress rail mirrors itself in RTL without extra markup. */
 .progress-rail {
-  @apply relative h-2 w-full overflow-hidden rounded-full bg-line/70;
+  @apply relative h-1.5 w-full overflow-hidden rounded-full bg-line/70;
 }
 
 .progress-fill {
-  @apply relative h-full rounded-full bg-gradient-to-r from-brass-600 to-brass-400;
+  @apply relative h-full rounded-full bg-brass-500;
   transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
-}
-
-[dir='rtl'] .progress-fill {
-  @apply bg-gradient-to-l;
-}
-
-/* A travelling highlight makes a slow step feel alive rather than stalled. */
-.progress-fill::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
-  background-size: 200% 100%;
-  animation: shimmer 1.8s linear infinite;
-}
-
-/* Animated glow behind the hero.
-   A radial gradient fades to transparent on its own, so the edges never read
-   as a coloured rectangle the way a blurred solid fill did. */
-.aurora-blob {
-  position: absolute;
-  border-radius: 9999px;
-  filter: blur(40px);
-  pointer-events: none;
-  will-change: transform;
 }
 
 /**

@@ -85,7 +85,7 @@ export function InventoryManager({
         }
       >
         {showForm && (
-          <form action={submit} className="mb-6 rounded-xl border border-accent/40 bg-surface-sunken p-4">
+          <form action={submit} className="mb-6 rounded-md border border-accent/40 bg-surface-sunken p-4">
             {editing && <input type="hidden" name="id" value={editing.id} />}
 
             <Field label={t('equipment')}>

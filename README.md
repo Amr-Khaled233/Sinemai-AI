@@ -23,7 +23,7 @@ Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay head
 | PDF | `@react-pdf/renderer` with an embedded IBM Plex Sans Arabic — Arabic and English, no headless browser |
 | Auth extras | Self-service password reset: hashed single-use tokens, 60-minute expiry, no account enumeration |
 | i18n | `next-intl`, `dir="rtl"` + logical CSS properties; agents answer in the reader's language |
-| Theming | Semantic CSS-variable tokens, light/dark/system with a no-flash init script |
+| Theming | Semantic CSS-variable tokens, a dark and a light theme with a no-flash init script |
 | Jobs | Vercel Cron (`vercel.json`) hitting guarded `/api/cron/*` routes |
 
 ---
@@ -347,16 +347,19 @@ move the PDF route.
 
 ## Theming
 
-Light, dark and "follow the OS" are one token set with two value tables in
-[`src/app/globals.css`](src/app/globals.css) — `--page`, `--surface`, `--line`, `--text-strong`,
-`--muted`, `--accent`, `--danger`… Tailwind maps each to a semantic utility
-(`bg-surface`, `border-line`, `text-muted`), so components never name a literal colour and a
-third theme would be a third value table, not a component rewrite.
+The palette is a warm charcoal with one signal yellow, set in Oswald (Latin headings and buttons),
+Cairo (Arabic headings) and IBM Plex Sans Arabic (body, and the PDF). Dark and light are one token
+set with two value tables in [`src/app/globals.css`](src/app/globals.css) — `--page`, `--surface`,
+`--line`, `--text-strong`, `--muted`, `--accent`, `--danger`… Tailwind maps each to a semantic
+utility (`bg-surface`, `border-line`, `text-muted`), so components never name a literal colour.
 
-Resolution order: an explicit choice on `<html data-theme>` wins; with no choice the
-`prefers-color-scheme` media query applies. The choice is stored in `localStorage` and replayed
-by a tiny inline script in `<head>`, so a dark-mode visitor never sees a white flash. Every
-storage read and write is wrapped in try/catch, because private windows throw.
+There are two themes and no "follow the OS" mode: the switch toggles between them, and a first
+visit opens dark. The choice is stored in `localStorage` and applied by a tiny inline script in
+`<head>` before first paint, so the page never flashes the wrong theme. Every storage read and
+write is wrapped in try/catch, because private windows throw.
+
+Public sign-up creates producer accounts only; there is no role field for the browser to set.
+Vendor and cinematographer accounts come from the seed or an admin.
 
 ## Arabic PDF
 

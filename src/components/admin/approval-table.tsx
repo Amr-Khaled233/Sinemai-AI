@@ -43,7 +43,7 @@ export function ApprovalTable({ kind, rows }: { kind: 'VENDOR' | 'DOP'; rows: Ap
   return (
     <ul className="space-y-3">
       {rows.map((row) => (
-        <li key={row.id} className="rounded-xl border border-line bg-surface-sunken p-4">
+        <li key={row.id} className="rounded-md border border-line bg-surface-sunken p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
               <h3 className="flex items-center gap-2 text-sm font-semibold text-strong">

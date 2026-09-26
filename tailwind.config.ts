@@ -34,18 +34,19 @@ const config: Config = {
         info: token('info'),
 
         // Fixed palette, used where a colour must not shift between themes
-        // (the gold primary button, brand marks, chart marks).
+        // (the primary button, brand marks, chart marks): a warm charcoal and
+        // one signal yellow, the way a rental house's own branding reads.
         ink: {
-          950: '#08090d',
-          900: '#0d0f14',
-          800: '#14171f',
-          700: '#1d222c',
-          600: '#2a3040',
+          950: '#141213',
+          900: '#1b1819',
+          800: '#242021',
+          700: '#2e2a2b',
+          600: '#3a3536',
         },
         brass: {
-          400: '#e8c37a',
-          500: '#d4a94f',
-          600: '#b38c33',
+          400: '#ebc94f',
+          500: '#e3b823',
+          600: '#c49c12',
         },
         teal: {
           400: '#4fd1c5',
@@ -59,11 +60,12 @@ const config: Config = {
       },
       fontFamily: {
         sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        // Condensed display face for headings, labels and buttons.
+        display: ['var(--font-display)', 'var(--font-sans)', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 1px 2px rgb(var(--shadow) / 0.04), 0 8px 24px -12px rgb(var(--shadow) / 0.18)',
         lift: '0 2px 4px rgb(var(--shadow) / 0.06), 0 18px 40px -16px rgb(var(--shadow) / 0.28)',
-        glow: '0 0 0 1px rgb(var(--accent) / 0.25), 0 12px 32px -12px rgb(var(--accent) / 0.35)',
         inset: 'inset 0 1px 0 0 rgb(255 255 255 / 0.04)',
       },
       transitionTimingFunction: {
@@ -88,10 +90,6 @@ const config: Config = {
           '0%': { backgroundPosition: '200% 0' },
           '100%': { backgroundPosition: '-200% 0' },
         },
-        aurora: {
-          '0%, 100%': { transform: 'translate3d(0, 0, 0) scale(1)', opacity: '0.7' },
-          '50%': { transform: 'translate3d(0, -3%, 0) scale(1.08)', opacity: '1' },
-        },
         'pulse-ring': {
           '0%': { transform: 'scale(0.9)', opacity: '0.7' },
           '70%': { transform: 'scale(1.6)', opacity: '0' },
@@ -105,21 +103,15 @@ const config: Config = {
           from: { strokeDashoffset: '24' },
           to: { strokeDashoffset: '0' },
         },
-        float: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-6px)' },
-        },
       },
       animation: {
         'fade-up': 'fade-up .5s cubic-bezier(0.22, 1, 0.36, 1) both',
         'fade-in': 'fade-in .4s ease-out both',
         'scale-in': 'scale-in .25s cubic-bezier(0.22, 1, 0.36, 1) both',
         shimmer: 'shimmer 1.8s linear infinite',
-        aurora: 'aurora 14s ease-in-out infinite',
         'pulse-ring': 'pulse-ring 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite',
         'grow-x': 'grow-x .8s cubic-bezier(0.22, 1, 0.36, 1) both',
         'draw-check': 'draw-check .4s ease-out .1s both',
-        float: 'float 6s ease-in-out infinite',
       },
     },
   },

@@ -328,7 +328,7 @@ export function AnalysisRunner({
       {awaiting && <ClarifyForm questions={state.questions} onSubmit={answer} />}
 
       {(state.running || state.stage === 'done' || state.error) && (
-        <div className="mt-5 animate-scale-in rounded-2xl border border-line bg-surface-sunken/70 p-4">
+        <div className="mt-5 animate-scale-in rounded-lg border border-line bg-surface-sunken/70 p-4">
           <div className="mb-3 flex items-baseline justify-between gap-3">
             <h3 className="text-sm font-semibold text-strong">{t('title')}</h3>
             <span className="text-xs font-medium tabular-nums text-accent">{state.pct}%</span>
@@ -415,7 +415,7 @@ function ClarifyForm({
 
   return (
     <form
-      className="mt-5 animate-scale-in rounded-2xl border border-accent/40 bg-surface-sunken/70 p-4"
+      className="mt-5 animate-scale-in rounded-lg border border-accent/40 bg-surface-sunken/70 p-4"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit(answers);

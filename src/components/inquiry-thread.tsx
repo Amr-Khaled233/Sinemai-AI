@@ -117,7 +117,7 @@ export function InquiryThread({
               <li
                 key={message.id}
                 className={cn(
-                  'max-w-[42rem] rounded-xl border p-3',
+                  'max-w-[42rem] rounded-md border p-3',
                   message.mine
                     ? 'ms-auto border-accent/30 bg-accent/[0.06]'
                     : 'border-line bg-surface-sunken/70',
@@ -155,7 +155,7 @@ export function InquiryThread({
           </div>
 
           {thread.closed ? (
-            <p className="mt-4 rounded-xl border border-line bg-surface-sunken/60 p-3 text-xs text-muted">
+            <p className="mt-4 rounded-md border border-line bg-surface-sunken/60 p-3 text-xs text-muted">
               {t('closedNotice')}
             </p>
           ) : (

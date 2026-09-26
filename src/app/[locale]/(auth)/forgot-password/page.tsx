@@ -1,7 +1,7 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { Link } from '@/i18n/routing';
 import { ForgotPasswordForm } from '@/components/password-forms';
-import { Card } from '@/components/ui';
+import { AuthPanel } from '@/components/auth-panel';
 import type { AppLocale } from '@/i18n/routing';
 
 export default async function ForgotPasswordPage({ params }: { params: Promise<{ locale: string }> }) {
@@ -10,15 +10,16 @@ export default async function ForgotPasswordPage({ params }: { params: Promise<{
   const t = await getTranslations('auth');
 
   return (
-    <div className="mx-auto max-w-md animate-fade-up pt-4 sm:pt-10">
-      <Card title={t('forgotTitle')} subtitle={t('forgotSubtitle')}>
-        <ForgotPasswordForm />
-        <p className="mt-5 text-xs text-muted">
-          <Link href="/login" className="tap-link text-accent hover:underline">
-            {t('backToSignIn')}
-          </Link>
-        </p>
-      </Card>
-    </div>
+    <AuthPanel
+      title={t('forgotTitle')}
+      subtitle={t('forgotSubtitle')}
+      footer={
+        <Link href="/login" className="tap-link text-accent hover:underline">
+          {t('backToSignIn')}
+        </Link>
+      }
+    >
+      <ForgotPasswordForm />
+    </AuthPanel>
   );
 }

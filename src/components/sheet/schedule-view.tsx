@@ -33,7 +33,7 @@ export async function ScheduleView({ schedule }: { schedule: Schedule }) {
 
       <ol className="mt-5 space-y-3">
         {schedule.days.map((day) => (
-          <li key={day.day} className="rounded-2xl border border-line bg-surface-sunken/60 p-4">
+          <li key={day.day} className="rounded-lg border border-line bg-surface-sunken/60 p-4">
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex size-8 items-center justify-center rounded-lg border border-accent/40 bg-accent/10 text-xs font-semibold text-accent">
                 {day.day}

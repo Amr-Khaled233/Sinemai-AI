@@ -26,7 +26,7 @@ export function ForgotPasswordForm() {
   }
 
   if (sent) {
-    return <p className="animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetSent')}</p>;
+    return <p className="animate-fade-in rounded-md border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetSent')}</p>;
   }
 
   return (
@@ -79,13 +79,13 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (status === 'checking') return <p className="text-sm text-muted">{tc('loading')}</p>;
 
   if (done) {
-    return <p className="animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetDone')}</p>;
+    return <p className="animate-fade-in rounded-md border border-info/40 bg-info/10 p-3 text-sm leading-6 text-info">{t('resetDone')}</p>;
   }
 
   if (status === 'invalid') {
     return (
       <div>
-        <p className="animate-fade-in rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm leading-6 text-danger">
+        <p className="animate-fade-in rounded-md border border-danger/40 bg-danger/10 p-3 text-sm leading-6 text-danger">
           {t(REASONS[reason] ?? 'resetInvalid')}
         </p>
         <button type="button" className="btn-secondary mt-4 w-full" onClick={() => router.replace('/forgot-password')}>

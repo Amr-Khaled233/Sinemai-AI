@@ -52,7 +52,7 @@ export async function VersionHistory({
         {versions.map((version) => (
           <li
             key={version.version}
-            className="flex flex-wrap items-center gap-3 rounded-xl border border-line bg-surface-sunken/60 p-3"
+            className="flex flex-wrap items-center gap-3 rounded-md border border-line bg-surface-sunken/60 p-3"
           >
             <Badge tone="gold">v{version.version}</Badge>
             <span className="text-xs text-muted">{t(`reason.${version.reason}`)}</span>

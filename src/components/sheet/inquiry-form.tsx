@@ -112,7 +112,7 @@ export function InquiryButton({
         >
           <div
             ref={dialogRef}
-            className="card max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-b-none p-5 shadow-lift sm:max-h-[85dvh] sm:rounded-2xl"
+            className="card max-h-[92dvh] w-full max-w-lg animate-scale-in overflow-y-auto rounded-b-none p-5 shadow-lift sm:max-h-[85dvh] sm:rounded-lg"
           >
             <header className="mb-4">
               <h2 className="text-base font-semibold text-strong">{t('title')}</h2>

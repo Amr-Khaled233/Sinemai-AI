@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { getSession, signIn } from 'next-auth/react';
 import { useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
-import { Field, Input, Select, Spinner } from '@/components/ui';
+import { Field, Input, Spinner } from '@/components/ui';
 
 const HOME_BY_ROLE: Record<string, string> = {
   ADMIN: '/admin',
@@ -60,14 +60,10 @@ export function SignInForm() {
   );
 }
 
-type Role = 'PRODUCER' | 'VENDOR' | 'DOP';
-
 export function SignUpForm({ locale }: { locale: string }) {
   const t = useTranslations('auth');
   const router = useRouter();
-  const [role, setRole] = useState<Role>('PRODUCER');
   const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -80,11 +76,7 @@ export function SignUpForm({ locale }: { locale: string }) {
       email: String(form.get('email') ?? ''),
       password: String(form.get('password') ?? ''),
       phone: String(form.get('phone') ?? ''),
-      role,
       locale,
-      companyName: String(form.get('companyName') ?? '') || undefined,
-      crNumber: String(form.get('crNumber') ?? '') || undefined,
-      city: String(form.get('city') ?? '') || undefined,
     };
 
     const response = await fetch('/api/register', {
@@ -100,27 +92,17 @@ export function SignUpForm({ locale }: { locale: string }) {
       return;
     }
 
-    setNotice(t('created'));
     await signIn('credentials', {
       email: payload.email,
       password: payload.password,
       redirect: false,
     });
-    setPending(false);
     router.replace(await homeForCurrentSession());
     router.refresh();
   }
 
   return (
     <form onSubmit={onSubmit} noValidate>
-      <Field label={t('role')}>
-        <Select name="role" value={role} onChange={(e) => setRole(e.target.value as Role)}>
-          <option value="PRODUCER">{t('roleProducer')}</option>
-          <option value="VENDOR">{t('roleVendor')}</option>
-          <option value="DOP">{t('roleDop')}</option>
-        </Select>
-      </Field>
-
       <Field label={t('name')}>
         <Input name="name" required autoComplete="name" />
       </Field>
@@ -130,7 +112,7 @@ export function SignUpForm({ locale }: { locale: string }) {
           <Input name="email" type="email" required autoComplete="email" dir="ltr" />
         </Field>
         <Field label={t('phone')}>
-          <Input name="phone" type="tel" dir="ltr" placeholder="+9665…" />
+          <Input name="phone" type="tel" autoComplete="tel" dir="ltr" placeholder="+966 5x xxx xxxx" />
         </Field>
       </div>
 
@@ -138,48 +120,15 @@ export function SignUpForm({ locale }: { locale: string }) {
         <Input name="password" type="password" required minLength={8} autoComplete="new-password" dir="ltr" />
       </Field>
 
-      {role === 'VENDOR' && (
-        <div className="mb-2 animate-scale-in rounded-2xl border border-line bg-surface-sunken/70 p-4">
-          <Field label={t('companyName')}>
-            <Input name="companyName" required />
-          </Field>
-          <div className="grid gap-x-4 sm:grid-cols-2">
-            <Field label={t('crNumber')}>
-              <Input name="crNumber" dir="ltr" inputMode="numeric" />
-            </Field>
-            <Field label={t('city')}>
-              <Input name="city" required defaultValue="Riyadh" />
-            </Field>
-          </div>
-        </div>
-      )}
-
-      {role === 'DOP' && (
-        <Field label={t('city')}>
-          <Input name="city" defaultValue="Riyadh" />
-        </Field>
-      )}
-
-      {role !== 'PRODUCER' && (
-        <p className="mb-4 animate-fade-in rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-xs leading-6 text-accent">
-          {t('pendingNotice')}
-        </p>
-      )}
-
       {error && (
-        <p className="mb-3 animate-fade-in rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm text-danger" role="alert">
+        <p className="alert-danger mb-4" role="alert">
           {error}
-        </p>
-      )}
-      {notice && (
-        <p className="mb-3 animate-fade-in rounded-xl border border-info/40 bg-info/10 p-3 text-sm text-info">
-          {notice}
         </p>
       )}
 
       <button type="submit" className="btn-primary w-full" disabled={pending}>
         {pending && <Spinner className="size-4" />}
-        {t('submitSignUp')}
+        {pending ? t('created') : t('submitSignUp')}
       </button>
     </form>
   );

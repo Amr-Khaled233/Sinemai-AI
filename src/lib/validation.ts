@@ -1,24 +1,19 @@
 import { z } from 'zod';
-import { BudgetTier, ProjectType, Role } from '@prisma/client';
+import { BudgetTier, ProjectType } from '@prisma/client';
 import { isSafeHttpUrl } from '@/lib/security';
 
-export const registerSchema = z
-  .object({
-    name: z.string().min(2).max(120),
-    email: z.string().email().max(160),
-    password: z.string().min(8).max(200),
-    phone: z.string().max(40).optional().or(z.literal('')),
-    role: z.enum([Role.PRODUCER, Role.VENDOR, Role.DOP]),
-    locale: z.enum(['ar', 'en']).default('ar'),
-    // vendors only
-    companyName: z.string().max(200).optional(),
-    crNumber: z.string().max(40).optional(),
-    city: z.string().max(80).optional(),
-  })
-  .refine((data) => data.role !== Role.VENDOR || Boolean(data.companyName && data.city), {
-    message: 'Vendors must provide a company name and city.',
-    path: ['companyName'],
-  });
+/**
+ * Public sign-up creates producer accounts only. There is no role field on
+ * purpose: a role sent by the browser would be a role the browser chose.
+ * Vendor and cinematographer accounts are provisioned by an admin.
+ */
+export const registerSchema = z.object({
+  name: z.string().min(2).max(120),
+  email: z.string().email().max(160),
+  password: z.string().min(8).max(200),
+  phone: z.string().max(40).optional().or(z.literal('')),
+  locale: z.enum(['ar', 'en']).default('ar'),
+});
 
 export const projectSchema = z.object({
   name: z.string().min(2).max(160),

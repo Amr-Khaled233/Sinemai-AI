@@ -284,7 +284,7 @@ export async function ProductionSheet({
       {/* ---------------------------------------------------------- equipment */}
       <Card title={t('equipmentTitle')} subtitle={!readOnly && catalog ? t('repriceHint') : undefined}>
         {recommendation.editedAt && (
-          <p className="mb-4 rounded-xl border border-accent/40 bg-accent/[0.08] p-3 text-xs leading-6 text-accent">
+          <p className="mb-4 rounded-md border border-accent/40 bg-accent/[0.08] p-3 text-xs leading-6 text-accent">
             {t('editedNotice')}
           </p>
         )}
@@ -534,7 +534,7 @@ export async function ProductionSheet({
 
             <div>
               <p className="label">{t('total')}</p>
-              <dl className="space-y-2.5 rounded-2xl border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-transparent p-5 text-sm">
+              <dl className="space-y-2.5 rounded-lg border border-accent/25 bg-gradient-to-br from-accent/[0.08] to-transparent p-5 text-sm">
                 <Row label={t('equipmentRental')} value={money(budget.equipmentRental)} />
                 <Row label={t('crew')} value={money(budget.crewTotal)} />
                 <Row
