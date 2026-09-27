@@ -5,7 +5,9 @@ import { z } from 'zod';
 import { BudgetTier, ProjectType } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { deleteFile } from '@/lib/blob';
-import { getSettings } from '@/lib/settings';
+import { getBudgetTierConfigs, getSettings } from '@/lib/settings';
+import { parseBudgetRange, tierForRange } from '@/lib/budget-range';
+import { displayFx } from '@/lib/currency-server';
 import { storeScript } from '@/lib/script-store';
 import { randomToken } from '@/lib/utils';
 import {
@@ -19,8 +21,7 @@ import {
 
 const startSchema = z.object({
   type: z.nativeEnum(ProjectType),
-  budgetTier: z.nativeEnum(BudgetTier),
-  city: z.string().trim().max(80),
+  budget: z.string().max(80),
   visualStyleTags: z.array(z.string().max(60)).max(8),
 });
 
@@ -59,8 +60,8 @@ export async function startFromScript(formData: FormData) {
 
     const parsed = startSchema.safeParse({
       type: formData.get('type'),
-      budgetTier: formData.get('budgetTier'),
-      city: formData.get('city') ?? '',
+      // Two optional boxes, read as one range; typed in the reader's currency.
+      budget: [formData.get('budgetMin'), formData.get('budgetMax')].filter(Boolean).join(' - '),
       visualStyleTags: formData.getAll('visualStyleTags').map(String),
     });
     if (!parsed.success) throw new Error('INVALID_INPUT');
@@ -70,13 +71,21 @@ export async function startFromScript(formData: FormData) {
     const fileName = file instanceof File && file.size > 0 ? file.name : null;
     if (!fileName && !pasted) throw new Error('NO_SCRIPT');
 
+    // A budget typed in another currency is stored in SAR, like every amount.
+    const [fx, tiers] = await Promise.all([displayFx(), getBudgetTierConfigs()]);
+    const range = parseBudgetRange(parsed.data.budget, (amount) => Math.round(amount / fx.factor));
+
     const project = await prisma.project.create({
       data: {
         ownerId: user.id,
         name: nameFromScript(fileName, pasted),
         type: parsed.data.type,
-        budgetTier: parsed.data.budgetTier,
-        city: parsed.data.city || settings.defaultCity,
+        // Without a range the assistant asks for one; until then, the middle tier.
+        budgetTier: range ? tierForRange(range, tiers) : BudgetTier.MEDIUM,
+        budgetMin: range?.min ?? null,
+        budgetMax: range?.max ?? null,
+        // Where it shoots is asked in the conversation; until then, the default city.
+        city: settings.defaultCity,
         // Only tags the platform knows; anything else would mislead the agents.
         visualStyleTags: await knownStyleTags(parsed.data.visualStyleTags),
       },

@@ -55,6 +55,12 @@ export async function runCriticAgent(
   options: { attempt?: number } = {},
 ): Promise<CriticResult> {
   const tierConfig = await getBudgetTierConfig(brief.budgetTier);
+  // The producer's own range, when they gave one, is the budget to hold to;
+  // otherwise the tier's window.
+  const window =
+    brief.budgetMax !== null
+      ? { minTotal: brief.budgetMin ?? 0, maxTotal: brief.budgetMax, currency: 'SAR', label: "the producer's budget" }
+      : { ...tierConfig, label: `the ${brief.budgetTier} tier` };
 
   // The review is wrapped rather than allowed to throw: a reviewer that cannot
   // run must not block a sheet that is otherwise complete, so the failure is
@@ -67,7 +73,7 @@ export async function runCriticAgent(
         attempt: options.attempt ?? 1,
         model: MODELS.reasoning,
         systemPrompt: withLanguage(CRITIC_SYSTEM, brief.locale),
-        input: { budgetTier: brief.budgetTier, tierWindow: [tierConfig.minTotal, tierConfig.maxTotal] },
+        input: { budgetTier: brief.budgetTier, budgetWindow: [window.minTotal, window.maxTotal] },
       },
       async () => {
       ctx.report({ type: 'stage', stage: 'reviewing', pct: 80 });
@@ -78,7 +84,7 @@ export async function runCriticAgent(
         system: withLanguage(CRITIC_SYSTEM, brief.locale),
         temperature: 0.1,
         prompt: [
-          `PROJECT: "${brief.name}" — ${brief.type}, declared budget tier ${brief.budgetTier} (${tierConfig.minTotal}–${tierConfig.maxTotal} ${tierConfig.currency}), ${brief.city}.`,
+          `PROJECT: "${brief.name}" — ${brief.type}, budget ${window.minTotal}–${window.maxTotal} ${window.currency} (${window.label}), ${brief.city}.`,
           brief.visualStyleTags.length ? `Requested visual style: ${brief.visualStyleTags.join(', ')}.` : '',
           describeClarifications(brief.clarifications),
           '',
@@ -125,7 +131,7 @@ export async function runCriticAgent(
       });
 
       // Deterministic checks the model should not be trusted to do by eye.
-      const mechanical = mechanicalChecks(brief, parts, tierConfig);
+      const mechanical = mechanicalChecks(brief, parts, window);
       const issues: CriticIssue[] = [...mechanical, ...(object.issues as CriticIssue[])];
       const passed = object.passed && !issues.some((i) => i.severity === 'blocker');
 
@@ -165,7 +171,7 @@ function mechanicalChecks(
     dops: DopResult;
     vendorBudget: VendorBudgetResult;
   },
-  tier: { minTotal: number; maxTotal: number; currency: string },
+  tier: { minTotal: number; maxTotal: number; currency: string; label: string },
 ): CriticIssue[] {
   const issues: CriticIssue[] = [];
   const { summary, equipment, vendorBudget } = parts;
@@ -174,8 +180,8 @@ function mechanicalChecks(
     issues.push({
       agent: 'EQUIPMENT',
       severity: 'blocker',
-      problem: `Mid estimate ${vendorBudget.mid} ${tier.currency} exceeds the ${brief.budgetTier} tier ceiling of ${tier.maxTotal}.`,
-      suggestion: `Rebuild the package inside the ${brief.budgetTier} tier: drop or downgrade the most expensive line items and do not set includeAdjacentTiers.`,
+      problem: `Mid estimate ${vendorBudget.mid} ${tier.currency} exceeds ${tier.label} ceiling of ${tier.maxTotal}.`,
+      suggestion: `Rebuild the package to fit ${tier.label}: drop or downgrade the most expensive line items and do not set includeAdjacentTiers.`,
     });
   }
 

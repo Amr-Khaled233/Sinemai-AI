@@ -6,12 +6,15 @@ import { PackageEditor, type CatalogOption } from '@/components/sheet/package-ed
 import { ScheduleView } from '@/components/sheet/schedule-view';
 import { CurrencySwitcher } from '@/components/currency-switcher';
 import { getDisplayCurrency } from '@/lib/currency-server';
+import { fxFor } from '@/lib/currency';
+import { AdviceSection } from '@/components/sheet/advice-section';
 import { equipmentNamer } from '@/lib/equipment-name-server';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { safeHttpUrls } from '@/lib/security';
 import { cityName } from '@/lib/city-name';
 import type {
+  Advice,
   BudgetBreakdown,
   DopMatch,
   PackageItem,
@@ -44,6 +47,8 @@ export type SheetRecommendation = {
   criticPassed: boolean;
   editedAt?: Date | null;
   modelVersions: Prisma.JsonValue;
+  /** The advisor's suggestions (amounts in SAR); absent on older sheets. */
+  advice?: Prisma.JsonValue | null;
   generatedAt: Date;
 };
 
@@ -92,7 +97,8 @@ export async function ProductionSheet({
   project: SheetProject;
   recommendation: SheetRecommendation;
   scenes: SheetScene[];
-  tierWindow: { minTotal: number; maxTotal: number; currency: string };
+  /** The producer's own budget in the display currency, when they gave one. */
+  tierWindow: { minTotal: number; maxTotal: number; currency: string } | null;
   readOnly?: boolean;
   actions?: React.ReactNode;
   /** Catalog for the package editor; omitted on a shared, read-only sheet. */
@@ -107,6 +113,7 @@ export async function ProductionSheet({
   ]);
 
   const pkg = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
+  const advice = (recommendation.advice as unknown as Advice | null | undefined) ?? null;
   const dops = (recommendation.matchedDops as unknown as DopMatch[]) ?? [];
   const vendors = (recommendation.matchedVendors as unknown as VendorMatch[]) ?? [];
   const budget = (recommendation.budgetBreakdown as unknown as BudgetExtras) ?? null;
@@ -140,15 +147,16 @@ export async function ProductionSheet({
             <h1 className="mt-2 text-2xl font-semibold text-strong sm:text-3xl">{project.name}</h1>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
-              <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
               <span>{cityName(project.city, locale)}</span>
               <span>·</span>
               <span>{t('generated', { date: formatDate(recommendation.generatedAt, locale) })}</span>
               {readOnly && <Badge tone="teal">{t('readOnly')}</Badge>}
             </p>
+            {tierWindow && (
             <p className="mt-2 text-xs text-muted/80">
               {t('tierWindow', { min: money(tierWindow.minTotal), max: money(tierWindow.maxTotal) })}
             </p>
+            )}
           </div>
           {actions}
         </div>
@@ -164,6 +172,11 @@ export async function ProductionSheet({
           </div>
         )}
       </header>
+
+      {/* ---------------------------------------------------------- advisor */}
+      {advice && (
+        <AdviceSection advice={advice} locale={locale} fx={fxFor(display.config, 'SAR', display.code)} />
+      )}
 
       {/* ---------------------------------------------------------- reviewer */}
       <Card

@@ -7,23 +7,28 @@ import { withLanguage } from './language';
 import { detectGaps, MAX_QUESTIONS, normaliseQuestions } from './clarifications';
 import type { ClarifyQuestion, ProjectBrief, SceneSummary } from './types';
 
-export const CLARIFY_SYSTEM = `You are a line producer reviewing a brief before the equipment, crew and budget are committed. The script has already been broken down; you see the brief and the breakdown statistics.
+export const CLARIFY_SYSTEM = `You are an experienced producer meeting someone about their script. They may be a seasoned producer or someone making their very first film, so speak plainly and never use technical film jargon (no lenses, lighting setups, drones, frame rates — you and your team work those out from the script yourselves).
 
-Your only decision: is there anything the brief and the script leave genuinely open that would materially change the package, the crew or the budget? If so, call askProducer with those questions. If not, do not call any tool and reply with the single word CLEAR.
+The script has been read. Before you plan the shoot and the money, call askProducer once with the few questions any producer would ask a client:
+- roughly how much they can spend (offer ranges in SAR as options),
+- where the work will be shown (cinema, TV, a streaming platform, social media, festivals) and when it should come out,
+- when they want to shoot and whether there is a hard deadline,
+- where they will shoot (which city, what kinds of places),
+- what kind of cast they have in mind (known stars, a mix, new faces, non-actors).
 
 Rules:
-- Ask only what changes the sheet. Never ask for something the brief or the breakdown already answers, and never ask out of curiosity.
-- At most four questions, most consequential first. Fewer is better.
-- Each question is short and answerable in a few words. Offer two to four concrete options whenever the answer is a choice.
-- Every question carries the assumption you will work from if the producer skips it — a sensible default, not "unknown".
-- The hints you are given are candidates, not a checklist: drop any that would not move the numbers for this production.`;
+- Skip anything the brief already answers. Three to five questions, most important first.
+- Each question is short, friendly and answerable with one tap: always give two to four options.
+- Tag each question with its topic.
+- Every question carries the assumption you will work from if they skip it — a sensible default, never "unknown".`;
 
 const askSchema = z.object({
   questions: z
     .array(
       z.object({
+        topic: z.enum(['budget', 'release', 'schedule', 'location', 'cast', 'other']),
         question: z.string().min(8).max(300),
-        why: z.string().max(200).describe('What the answer changes: equipment, crew, schedule or budget.'),
+        why: z.string().max(200).describe('In plain words, what the answer helps with.'),
         options: z.array(z.string().min(1).max(80)).max(4).describe('Suggested answers, when it is a choice.'),
         assumption: z.string().min(2).max(200).describe('What you will assume if the producer skips it.'),
       }),

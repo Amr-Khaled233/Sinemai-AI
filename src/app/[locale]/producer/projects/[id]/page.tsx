@@ -6,7 +6,7 @@ import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { mayReadProject } from '@/lib/authz';
 import { sheetScenesArg } from '@/lib/sheet-query';
-import { getBudgetTierConfig, getSettings } from '@/lib/settings';
+import { getSettings } from '@/lib/settings';
 import { Badge, Card } from '@/components/ui';
 import { ScriptUpload } from '@/components/producer/script-upload';
 import { AnalysisRunner } from '@/components/producer/analysis-runner';
@@ -16,8 +16,8 @@ import { VersionHistory } from '@/components/sheet/version-compare';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import { ProjectChat } from '@/components/producer/project-chat';
 import { listVersions } from '@/lib/versions';
-import { convert, convertSheet } from '@/lib/currency';
-import { displayFx } from '@/lib/currency-server';
+import { convert, convertSheet, type Fx } from '@/lib/currency';
+import { displayFx, moneyFormatter } from '@/lib/currency-server';
 import { CHAT_MAX_HISTORY } from '@/lib/project-chat';
 import { equipmentName } from '@/lib/equipment-name';
 import { cityName } from '@/lib/city-name';
@@ -58,16 +58,21 @@ export default async function ProjectPage({
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, tChat, project] = await Promise.all([
+  const [t, tEnum, tChat, project, money] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
     getTranslations('chat'),
     loadProject(id),
+    moneyFormatter(locale),
   ]);
 
   if (!project) notFound();
   if (!mayReadProject(project, session.user)) notFound();
 
+  const budgetText =
+    project.budgetMin !== null && project.budgetMax !== null
+      ? `${money(project.budgetMin)} – ${money(project.budgetMax)}`
+      : t('budgetOpen');
   const hasScript = Boolean(project.script);
   const ready = Boolean(project.recommendation);
   // A run continues on the server with the page closed, so the client rejoins
@@ -107,7 +112,7 @@ export default async function ProjectPage({
             </h1>
             <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted">
               <Badge tone="gold">{tEnum(`type.${project.type}`)}</Badge>
-              <Badge>{tEnum(`tier.${project.budgetTier}`)}</Badge>
+              <span className="tabular-nums">{budgetText}</span>
               <span>{cityName(project.city, locale)}</span>
               {project.script && (
                 <>
@@ -172,8 +177,7 @@ export default async function ProjectPage({
 /** The full sheet and everything around it: exports, history, script, deletion. */
 async function SheetTab({ project, locale }: { project: LoadedProject; locale: string }) {
   const t = await getTranslations('project');
-  const [storedTierWindow, settings, storedVersions, catalogRows, fx] = await Promise.all([
-    getBudgetTierConfig(project.budgetTier),
+  const [settings, storedVersions, catalogRows, fx] = await Promise.all([
     getSettings(),
     listVersions(project.id),
     prisma.equipment.findMany({
@@ -186,12 +190,7 @@ async function SheetTab({ project, locale }: { project: LoadedProject; locale: s
   ]);
 
   const recommendation = convertSheet(project.recommendation!, fx);
-  const tierWindow = {
-    ...storedTierWindow,
-    minTotal: convert(storedTierWindow.minTotal, fx),
-    maxTotal: convert(storedTierWindow.maxTotal, fx),
-    currency: fx.code,
-  };
+  const tierWindow = budgetWindow(project, fx);
   const versions = storedVersions.map((version) => ({
     ...version,
     estimatedBudgetMid: convert(version.estimatedBudgetMid, fx),
@@ -242,4 +241,10 @@ async function SheetTab({ project, locale }: { project: LoadedProject; locale: s
       </div>
     </div>
   );
+}
+
+/** The producer's own budget in the reader's currency, or null when they gave none. */
+function budgetWindow(project: { budgetMin: number | null; budgetMax: number | null }, fx: Fx) {
+  if (project.budgetMin === null || project.budgetMax === null) return null;
+  return { minTotal: convert(project.budgetMin, fx), maxTotal: convert(project.budgetMax, fx), currency: fx.code };
 }

@@ -1,4 +1,5 @@
 import 'server-only';
+import { openai } from '@ai-sdk/openai';
 import { tool } from 'ai';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
@@ -7,17 +8,18 @@ import { convert, type Fx } from '@/lib/currency';
 import { repricePackage } from '@/lib/package-edit';
 import { equipmentName } from '@/lib/equipment-name';
 import { languageDirective } from '@/agents/language';
-import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { Advice, BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 /**
- * The project assistant: a conversation about one project, with tools that read
- * the real sheet and change the real package.
+ * The project assistant: a conversation about one production.
  *
- * The same rule as the agents holds: facts come from tools, not from the
- * model's memory. It reads the package, prices and scenes through tools, finds
- * equipment through the catalog tool, and edits the package through the same
- * repricePackage the package editor uses — so a change made in chat is priced
- * exactly like one made by hand.
+ * Two kinds of knowledge, kept apart. The platform's own data — the priced
+ * package, the rental companies that stock it, real day rates — comes through
+ * tools and is quoted as fact; package edits go through the same
+ * repricePackage the package editor uses. Everything beyond it — directors,
+ * cast and cinematographers anywhere in the market, equipment not in the
+ * catalog, market prices, permits — comes from web search and the model's own
+ * knowledge, and is presented as a suggestion to verify.
  */
 
 export const CHAT_MAX_HISTORY = 40;
@@ -27,10 +29,11 @@ export function chatSystemPrompt(args: {
   project: {
     name: string;
     type: string;
-    budgetTier: string;
     city: string;
     visualStyleTags: string[];
     synopsis: string | null;
+    budgetMin: number | null;
+    budgetMax: number | null;
     shootStartDate: Date | null;
     shootEndDate: Date | null;
   };
@@ -44,12 +47,18 @@ export function chatSystemPrompt(args: {
     project.shootStartDate && project.shootEndDate
       ? `${project.shootStartDate.toISOString().slice(0, 10)} to ${project.shootEndDate.toISOString().slice(0, 10)}`
       : 'not set';
+  const budget =
+    project.budgetMin !== null && project.budgetMax !== null
+      ? `${project.budgetMin.toLocaleString('en')}–${project.budgetMax.toLocaleString('en')} SAR`
+      : 'not given yet';
 
-  return `You are the production assistant inside Sinemai AI, talking with the producer of one project. You help them understand and adjust their Production & Equipment Sheet: the scene breakdown, the equipment package, the rental companies, the cinematographers and the budget.
+  return `You are the production assistant inside Sinemai AI, talking with the person behind one production. They may be a seasoned producer or making their first film: speak plainly, explain any film term you use, and never assume they know the jargon.
+
+You help them plan the whole production — what the script needs, how long the shoot takes, what it costs, which scenes are dangerous or expensive and how to handle them, and who could make it: directors, cinematographers, cast, crew.
 
 PROJECT
 - Name: ${project.name}
-- Type: ${project.type}; budget tier: ${project.budgetTier}; city: ${project.city}
+- Type: ${project.type}; budget: ${budget}; city: ${project.city}
 - Visual style: ${project.visualStyleTags.join(', ') || 'none chosen'}
 - Shoot dates: ${dates}
 - Synopsis: ${project.synopsis ?? 'none'}
@@ -57,19 +66,26 @@ PROJECT
 - Sheet: ${args.hasSheet ? 'generated' : 'not generated yet'}
 - Money is shown to this user in ${args.currency}.
 
+TWO KINDS OF KNOWLEDGE — keep them apart
+- The platform's own data (getSheet, getScenes, searchCatalog, findAlternatives): the priced package, rental companies that actually stock the gear, real day rates. Quote these as facts.
+- Everything else — directors, actors, cinematographers anywhere in the market, equipment not in the catalog, market prices, permits, safety rules — comes from web_search and your own knowledge. Use web_search for anything current or specific (who is active, recent credits, today's prices). Present it as a suggestion to verify, and never invent a person or a credit.
+
 HOW TO WORK
-- Never state a price, a spec, an equipment name or a scene detail you did not get from a tool in this conversation. Call getSheet, getScenes or searchCatalog first.
-- To change the package, call updatePackage with equipment ids from getSheet or searchCatalog. Confirm what you are about to change in one short sentence when the request is ambiguous; when it is clear, just do it and report the new totals.
-- If there is no script yet, tell them to upload it with the button above the chat. If there is a script but no sheet, tell them to press "Run breakdown". You cannot upload or run the breakdown yourself.
-- Be brief and concrete: a few sentences or a short list. Cite numbers from the tools.
+- Always give more than one option: several directors, several actors per role, several ways to handle a scene, several ways to save — with what each option trades off.
+- When something important is unclear (budget, where it will be shown, dates, cast, locations), ask first — one or two plain questions at a time — then answer with the best fit.
+- To change the package, call updatePackage with ids from getSheet, searchCatalog or findAlternatives, then report the new totals.
+- If there is no script yet, tell them to upload it above. If there is a script but no sheet, the analysis is running or needs "Run breakdown".
+- Be clear and structured: short headings and lists, numbers from the tools.
 
 THE OPENING BRIEFING
-When asked for the briefing (the first message once the sheet is ready), call getSheet and getScenes, then findAlternatives for the two or three most expensive items, and write, with headings:
-1. What this script needs — by department (camera, lenses, lighting, grip and movement, sound, power), each item with quantity, days and why the scenes need it.
-2. Alternatives — for the most expensive items, a cheaper or different option from findAlternatives and what the production gives up by taking it.
-3. Where to save — three to five concrete moves with the amount each saves (drop or swap an item, fewer rental days, a company that stocks more of the package), and the new mid estimate if all were taken.
-4. Watch out for — the reviewer's notes and anything the script demands that the package does not cover.
-End by offering to apply any of the savings.
+When asked for the briefing (the first message once the sheet is ready), call getSheet (it includes the advisor's research) and getScenes, then findAlternatives for the two or three most expensive items, and write, with headings:
+1. What this script needs — the essentials by department, each with why the scenes need it.
+2. How long the shoot takes — days and a realistic range.
+3. The costly and risky scenes — each with two or three ways to handle it for less or more safely.
+4. Who could make it — several directors, cinematographers and actors for the lead roles, each with what they are known for.
+5. Alternatives and where to save — options with the amount each saves, and the new estimate.
+6. The budget — how the estimate compares with theirs.
+End with one or two questions that would sharpen the plan, and offer to apply any of the savings.
 
 ${languageDirective(args.locale)}`;
 }
@@ -95,6 +111,7 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
       const nameOf = new Map(names.map((row) => [row.id, equipmentName(row, locale)]));
       const budget = rec.budgetBreakdown as unknown as BudgetBreakdown | null;
       const summary = rec.sceneSummary as unknown as SceneSummary | null;
+      const advice = (rec.advice as unknown as Advice | null) ?? null;
 
       return {
         package: pkg.map((item) => ({
@@ -143,6 +160,15 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
             }
           : null,
         reviewerNotes: rec.criticNotes.map((note) => note.replace(/^\[\w+\]\s*[A-Z_]+:\s*/, '')),
+        // The advisor's research: suggestions, not platform facts.
+        advisor: advice
+          ? {
+              ...advice,
+              equipmentIdeas: advice.equipmentIdeas.map((idea) => ({ ...idea, approxDayRate: money(idea.approxDayRateSar) })),
+              savings: advice.savings.map((saving) => ({ ...saving, estimatedSaving: money(saving.estimatedSavingSar) })),
+              note: 'Suggestions from research — people and market prices to verify, not platform data.',
+            }
+          : null,
         editedByHand: Boolean(rec.editedAt),
       };
     },
@@ -324,5 +350,11 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
     },
   });
 
-  return { getSheet, getScenes, searchCatalog, findAlternatives, updatePackage };
+  // Everything outside the platform's own data: people, market prices, permits.
+  const web_search = openai.tools.webSearch({
+    searchContextSize: 'medium',
+    userLocation: { type: 'approximate', country: 'SA' },
+  });
+
+  return { getSheet, getScenes, searchCatalog, findAlternatives, updatePackage, web_search };
 }

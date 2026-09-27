@@ -20,6 +20,9 @@ export type ProjectBrief = {
   shootStartDate: Date | null;
   shootEndDate: Date | null;
   synopsis: string | null;
+  /** The producer's own budget range in SAR, when they gave one. */
+  budgetMin: number | null;
+  budgetMax: number | null;
   locale: string;
   /** What the producer answered when the run paused to ask — empty until then. */
   clarifications: ClarifyAnswer[];
@@ -28,8 +31,12 @@ export type ProjectBrief = {
 // ------------------------------------------------------------ clarification
 
 /** One thing the brief and the script leave open that would change the sheet. */
+/** What a question is about; budget and location answers are written back to the project. */
+export type ClarifyTopic = 'budget' | 'release' | 'schedule' | 'location' | 'cast' | 'other';
+
 export type ClarifyQuestion = {
   id: string;
+  topic: ClarifyTopic;
   question: string;
   /** What the answer changes — equipment, crew, budget — in one line. */
   why: string;
@@ -209,6 +216,33 @@ export type CriticResult = {
   summary: string;
 };
 
+// ------------------------------------------------------------ advisor
+
+/**
+ * The advisor's read beyond the catalog. Everything here is a suggestion from
+ * the model and the web — people to approach, market prices to confirm — not a
+ * priced fact from the platform's own data. Each list carries several options.
+ */
+export type Advice = {
+  shootDuration: { days: number; rangeLow: number; rangeHigh: number; rationale: string };
+  budgetFit: { verdict: 'within' | 'over' | 'under' | 'unknown'; note: string };
+  costlyScenes: Array<{
+    scenes: string;
+    whyCostly: string;
+    risk: 'safety' | 'cost' | 'both';
+    options: string[];
+  }>;
+  directors: Array<{ name: string; knownFor: string; why: string }>;
+  cast: Array<{ role: string; suggestions: Array<{ name: string; why: string }> }>;
+  cinematographers: Array<{ name: string; knownFor: string; why: string }>;
+  equipmentIdeas: Array<{ item: string; why: string; approxDayRateSar: number | null }>;
+  savings: Array<{ idea: string; estimatedSavingSar: number | null }>;
+  sources: Array<{ title: string; url: string }>;
+};
+
+/** What the research stage hands the structuring stage. */
+export type AdviceNotes = { text: string; sources: Array<{ title: string; url: string }> };
+
 // ------------------------------------------------------------ final sheet
 
 export type ProductionSheet = {
@@ -235,6 +269,8 @@ export type ProgressStage =
   | 'pricing'
   | 'reviewing'
   | 'retrying'
+  | 'researching'
+  | 'advising'
   | 'saving'
   | 'done'
   | 'error';

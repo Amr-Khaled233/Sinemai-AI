@@ -1,14 +1,13 @@
 import { getTranslations, setRequestLocale } from 'next-intl/server';
-import { BudgetTier, ProjectType } from '@prisma/client';
+import { ProjectType } from '@prisma/client';
 import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { Badge, Card } from '@/components/ui';
 import { StartFromScript } from '@/components/producer/start-from-script';
 import { formatDate } from '@/lib/utils';
-import { moneyFormatter } from '@/lib/currency-server';
-import { getBudgetTierConfigs, getSettings, getStyleTags } from '@/lib/settings';
-import { cityName } from '@/lib/city-name';
+import { getDisplayCurrency, moneyFormatter } from '@/lib/currency-server';
+import { getStyleTags } from '@/lib/settings';
 import type { AppLocale } from '@/i18n/routing';
 
 const STATUS_TONE = {
@@ -27,12 +26,11 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, money, tiers, settings, styleTags, projects] = await Promise.all([
+  const [t, tEnum, money, currency, styleTags, projects] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
     moneyFormatter(locale),
-    getBudgetTierConfigs(),
-    getSettings(),
+    getDisplayCurrency(),
     getStyleTags(),
     prisma.project.findMany({
       where: { ownerId: session.user.id },
@@ -41,7 +39,8 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
         id: true,
         name: true,
         type: true,
-        budgetTier: true,
+        budgetMin: true,
+        budgetMax: true,
         city: true,
         status: true,
         updatedAt: true,
@@ -51,22 +50,12 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
     }),
   ]);
 
-  const tierByKey = new Map(tiers.map((tier) => [tier.tier, tier]));
-
   return (
     <div className="space-y-10">
       <StartFromScript
-        defaultCity={cityName(settings.defaultCity, locale)}
+        currency={currency.code}
         styleTags={styleTags.map((tag) => ({ slug: tag.slug, labelEn: tag.labelEn, labelAr: tag.labelAr }))}
         types={Object.values(ProjectType).map((value) => ({ value, label: tEnum(`type.${value}`) }))}
-        tiers={Object.values(BudgetTier).map((value) => {
-          const tier = tierByKey.get(value);
-          return {
-            value,
-            label: tEnum(`tier.${value}`),
-            hint: tier ? `${money(tier.minTotal, tier.currency)} – ${money(tier.maxTotal, tier.currency)}` : undefined,
-          };
-        })}
       />
 
       <section>
@@ -99,7 +88,9 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
                           {project.name}
                         </Link>
                         <span className="block text-[11px] text-muted">
-                          {tEnum(`tier.${project.budgetTier}`)} · {cityName(project.city, locale)}
+                          {project.budgetMin !== null && project.budgetMax !== null
+                            ? `${money(project.budgetMin)} – ${money(project.budgetMax)}`
+                            : t('budgetOpen')}
                         </span>
                       </td>
                       <td data-label={t('type')} className="text-muted">

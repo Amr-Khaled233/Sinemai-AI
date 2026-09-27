@@ -5,49 +5,32 @@ import type { ClarifyAnswer, ClarifyQuestion, ProjectBrief, SceneSummary } from 
  * gets asked and how answers are applied can be tested directly.
  */
 
-export const MAX_QUESTIONS = 4;
+export const MAX_QUESTIONS = 5;
 const MAX_ANSWER_LENGTH = 500;
 
 /** What the model submits through askProducer, before ids are assigned. */
-export type DraftQuestion = Omit<ClarifyQuestion, 'id'>;
+export type DraftQuestion = Omit<ClarifyQuestion, 'id' | 'topic'> & { topic?: ClarifyQuestion['topic'] };
 
 /**
- * Gaps code can see without a model. They are handed to the agent as hints —
- * it decides which matter for this production and phrases the question — so
- * the obvious ones are never missed and the irrelevant ones are never asked.
+ * What the brief does not tell us yet, in plain language. The person on the
+ * other side may never have made a film, so these are the questions any
+ * producer would ask a client — money, audience, timing, place, cast — never
+ * technical ones: the agents work out lenses, lights and drones themselves.
+ *
+ * They are handed to the agent as hints; it phrases the questions.
  */
-export function detectGaps(brief: ProjectBrief, summary: SceneSummary): string[] {
+export function detectGaps(brief: ProjectBrief, _summary: SceneSummary): string[] {
   const gaps: string[] = [];
 
+  if (brief.budgetMax === null) {
+    gaps.push('No budget yet: ask roughly how much they can spend, with ranges in SAR as options (e.g. under 100k, 100k–300k, 300k–1M, over 1M).');
+  }
+  gaps.push('Where will it be shown (cinema, TV, a streaming platform, social media, festivals) and roughly when is the release? This sets the quality bar and the deadline.');
   if (!brief.shootStartDate) {
-    gaps.push(
-      `No shoot dates: vendor availability cannot be checked against real dates, and rental days rest on the estimated ${summary.shootDays} shoot day(s).`,
-    );
-  } else if (brief.shootEndDate) {
-    const windowDays =
-      Math.floor((brief.shootEndDate.getTime() - brief.shootStartDate.getTime()) / 86_400_000) + 1;
-    if (windowDays > 0 && windowDays < summary.shootDays) {
-      gaps.push(
-        `The shoot window is ${windowDays} day(s) but the breakdown estimates ${summary.shootDays} shoot day(s): a second unit, longer days, or cut scenes?`,
-      );
-    }
+    gaps.push('When do they want to shoot, and is there a hard deadline? This sets the schedule and what can be booked.');
   }
-
-  if (brief.visualStyleTags.length === 0 && !brief.synopsis) {
-    gaps.push('No visual style and no synopsis: cinematographer matching has only the lighting notes to go on.');
-  }
-
-  if (summary.movementMix.DRONE > 0) {
-    gaps.push(
-      `${summary.movementMix.DRONE} scene(s) read as drone work: a licensed aerial unit (GACA permit), or can it be covered another way?`,
-    );
-  }
-
-  if (summary.specialRequirements.length > 0) {
-    gaps.push(
-      `Special requirements found in the script: ${summary.specialRequirements.join(', ')}. Each can add a specialist unit, rig or crew.`,
-    );
-  }
+  gaps.push(`Where will they shoot — which city or kinds of places? (Assumed ${brief.city} until told.)`);
+  gaps.push('Cast: known stars, a mix, new faces or non-actors? It changes the budget and who to suggest.');
 
   return gaps;
 }
@@ -56,6 +39,7 @@ export function detectGaps(brief: ProjectBrief, summary: SceneSummary): string[]
 export function normaliseQuestions(questions: DraftQuestion[]): ClarifyQuestion[] {
   return questions.slice(0, MAX_QUESTIONS).map((q, index) => ({
     id: `q${index + 1}`,
+    topic: q.topic ?? 'other',
     question: q.question.trim(),
     why: q.why.trim(),
     options: [...new Set(q.options.map((option) => option.trim()).filter(Boolean))].slice(0, 4),
@@ -78,6 +62,14 @@ export function resolveAnswers(
       ? { id: q.id, question: q.question, answer: value, assumed: false }
       : { id: q.id, question: q.question, answer: q.assumption, assumed: true };
   });
+}
+
+/** The producer's budget as the agents should read it. */
+export function describeBudget(brief: Pick<ProjectBrief, 'budgetMin' | 'budgetMax' | 'budgetTier'>): string {
+  if (brief.budgetMin !== null && brief.budgetMax !== null) {
+    return `The producer's budget is ${brief.budgetMin.toLocaleString('en')}–${brief.budgetMax.toLocaleString('en')} SAR (catalog tier ${brief.budgetTier}). Keep the mid estimate inside it, or say plainly what it would take to fit.`;
+  }
+  return `The producer has not given a budget yet (catalog tier ${brief.budgetTier} assumed). Aim for good value.`;
 }
 
 /** The block every downstream agent reads, so an answer outranks a guess everywhere. */

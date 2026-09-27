@@ -18,6 +18,8 @@ const brief = (over: Partial<ProjectBrief> = {}): ProjectBrief => ({
   shootStartDate: new Date('2026-10-01'),
   shootEndDate: new Date('2026-10-05'),
   synopsis: 'A short spot.',
+  budgetMin: null,
+  budgetMax: null,
   locale: 'en',
   clarifications: [],
   ...over,
@@ -42,6 +44,7 @@ const summary = (over: Partial<SceneSummary> = {}): SceneSummary => ({
 
 const question = (id: string, over: Partial<ClarifyQuestion> = {}): ClarifyQuestion => ({
   id,
+  topic: 'other',
   question: `Question ${id}?`,
   why: 'Changes the package.',
   options: [],
@@ -50,48 +53,34 @@ const question = (id: string, over: Partial<ClarifyQuestion> = {}): ClarifyQuest
 });
 
 describe('detectGaps', () => {
-  it('finds nothing in a complete brief', () => {
-    assert.deepEqual(detectGaps(brief(), summary()), []);
+  const topics = (gaps: string[]) => ({
+    budget: gaps.some((gap) => /No budget yet/i.test(gap)),
+    release: gaps.some((gap) => /shown/i.test(gap)),
+    schedule: gaps.some((gap) => /When do they want to shoot/i.test(gap)),
+    location: gaps.some((gap) => /Where will they shoot/i.test(gap)),
+    cast: gaps.some((gap) => /Cast/i.test(gap)),
   });
 
-  it('flags missing shoot dates', () => {
+  it('asks the plain questions any producer would ask a new client', () => {
     const gaps = detectGaps(brief({ shootStartDate: null, shootEndDate: null }), summary());
-    assert.equal(gaps.length, 1);
-    assert.match(gaps[0], /No shoot dates/);
+    assert.deepEqual(topics(gaps), { budget: true, release: true, schedule: true, location: true, cast: true });
   });
 
-  it('flags a shoot window shorter than the estimated shoot days', () => {
+  it('skips the budget when a range was given, and the timing when dates are set', () => {
+    const gaps = detectGaps(brief({ budgetMin: 100_000, budgetMax: 300_000 }), summary());
+    assert.equal(topics(gaps).budget, false);
+    assert.equal(topics(gaps).schedule, false);
+  });
+
+  it('never asks technical questions', () => {
     const gaps = detectGaps(
-      brief({ shootStartDate: new Date('2026-10-01'), shootEndDate: new Date('2026-10-02') }),
-      summary({ shootDays: 4 }),
-    );
-    assert.equal(gaps.length, 1);
-    assert.match(gaps[0], /2 day\(s\).*4 shoot day\(s\)/);
-  });
-
-  it('counts the window inclusively', () => {
-    const exact = brief({ shootStartDate: new Date('2026-10-01'), shootEndDate: new Date('2026-10-03') });
-    assert.deepEqual(detectGaps(exact, summary({ shootDays: 3 })), []);
-  });
-
-  it('flags no style and no synopsis only when both are missing', () => {
-    assert.deepEqual(detectGaps(brief({ visualStyleTags: [] }), summary()), []);
-    const gaps = detectGaps(brief({ visualStyleTags: [], synopsis: null }), summary());
-    assert.equal(gaps.length, 1);
-    assert.match(gaps[0], /visual style/);
-  });
-
-  it('flags drone work and special requirements', () => {
-    const gaps = detectGaps(
-      brief(),
+      brief({ budgetMin: null, budgetMax: null }),
       summary({
         movementMix: { STATIC: 6, HANDHELD: 2, STEADICAM_GIMBAL: 0, CRANE_DOLLY: 0, DRONE: 2 },
         specialRequirements: ['underwater'],
       }),
     );
-    assert.equal(gaps.length, 2);
-    assert.match(gaps[0], /2 scene\(s\) read as drone/);
-    assert.match(gaps[1], /underwater/);
+    assert.ok(gaps.every((gap) => !/drone|underwater|lens|GACA/i.test(gap)), gaps.join('\n'));
   });
 });
 
@@ -102,6 +91,7 @@ describe('normaliseQuestions', () => {
     ]);
     assert.deepEqual(q, {
       id: 'q1',
+      topic: 'other',
       question: 'Night or day?',
       why: 'lights',
       options: ['Night', 'Day'],
@@ -116,7 +106,7 @@ describe('normaliseQuestions', () => {
       options: [],
       assumption: 'x',
     }));
-    assert.equal(normaliseQuestions(drafts).length, 4);
+    assert.equal(normaliseQuestions(drafts).length, 5);
   });
 });
 

@@ -123,7 +123,12 @@
     "fullSheet": "Full sheet",
     "views": "Views",
     "visualStyle": "Visual style",
-    "visualStyleHint": "Optional. It steers the camera, lens and lighting choices and which cinematographers are suggested."
+    "visualStyleHint": "Optional. It steers the camera, lens and lighting choices and which cinematographers are suggested.",
+    "budgetRange": "Budget ({currency}) — optional",
+    "budgetFrom": "From",
+    "budgetTo": "To",
+    "budgetHint": "A rough range is enough. Leave it empty and the assistant will ask.",
+    "budgetOpen": "Budget to be decided"
   },
   "analysis": {
     "title": "Building your production sheet",
@@ -140,7 +145,9 @@
       "retrying": "Fixing flagged results",
       "saving": "Saving the sheet",
       "done": "Done",
-      "error": "Something went wrong"
+      "error": "Something went wrong",
+      "researching": "Researching people and prices",
+      "advising": "Preparing advice"
     },
     "agents": "Six agents: supervisor, script analyst, equipment, cinematographer matching, vendor and budget, reviewer.",
     "failed": "The breakdown failed: {message}",
@@ -215,7 +222,7 @@
     "rate": "Day rate",
     "total": "Total",
     "notes": "Sourcing notes",
-    "tierWindow": "Declared tier window: {min} – {max}",
+    "tierWindow": "Your budget: {min} – {max}",
     "readOnly": "Read-only shared sheet",
     "pages": "Script pages",
     "addItem": "Add equipment…",
@@ -247,7 +254,37 @@
     "notesShort": "Notes",
     "email": "Email",
     "showIn": "Show prices in",
-    "weekRate": "Week rate"
+    "weekRate": "Week rate",
+    "adviceTitle": "Advice",
+    "adviceHint": "How long it takes, the scenes to watch, who could make it, and where to save.",
+    "shootDuration": "Shoot duration",
+    "daysCount": "{count, plural, one {# day} other {# days}}",
+    "budgetFit": "Against your budget",
+    "fit": {
+      "within": "Within budget",
+      "over": "Over budget",
+      "under": "Under budget",
+      "unknown": "No budget given"
+    },
+    "costlyScenes": "Costly and risky scenes",
+    "scenesCol": "Scenes",
+    "whyCostly": "Why",
+    "risk": "Risk",
+    "riskKind": {
+      "safety": "Safety",
+      "cost": "Cost",
+      "both": "Safety & cost"
+    },
+    "howToSave": "Ways to handle it",
+    "savingsTitle": "Where to save",
+    "suggestedDirectors": "Directors to consider",
+    "suggestedCinematographers": "Cinematographers to consider",
+    "suggestedCast": "Cast to consider",
+    "options": "Options",
+    "beyondCatalog": "Worth considering beyond our catalog",
+    "approxRate": "Approx. day rate",
+    "adviceDisclaimer": "These are suggestions from research, not bookings: confirm availability and fees with each person, and market prices with the rental company.",
+    "sources": "{count, plural, one {# source} other {# sources}}"
   },
   "vendor": {
     "title": "Vendor dashboard",
@@ -572,7 +609,7 @@
     "byProject": "Budget by project",
     "project": "Project",
     "type": "Type",
-    "tier": "Tier",
+    "tier": "Budget",
     "low": "Low",
     "mid": "Mid",
     "high": "High",
@@ -647,6 +684,7 @@
     "unavailable": "The AI service is unavailable right now (the account has no credit). Try again later.",
     "rateLimited": "Too many messages in a short time. Wait a little and try again.",
     "kickoff": "Give me the briefing: what this script needs, the alternatives, and where I can save.",
-    "toolAlternatives": "Looked for alternatives"
+    "toolAlternatives": "Looked for alternatives",
+    "toolWeb": "Searched the web"
   }
 }

@@ -14,6 +14,7 @@ const TOOL_LABELS: Record<string, string> = {
   'tool-getScenes': 'toolScenes',
   'tool-searchCatalog': 'toolCatalog',
   'tool-findAlternatives': 'toolAlternatives',
+  'tool-web_search': 'toolWeb',
   'tool-updatePackage': 'toolUpdate',
 };
 

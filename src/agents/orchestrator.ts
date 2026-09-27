@@ -8,10 +8,15 @@ import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
 import { runClarifyAgent } from './clarify-agent';
-import { describeClarifications, resolveAnswers } from './clarifications';
+import { runAdvisor, runAdvisorResearch } from './advisor-agent';
+import { describeBudget, describeClarifications, resolveAnswers } from './clarifications';
 import { languageDirective, languageName } from './language';
 import { snapshotRecommendation } from '@/lib/versions';
+import { getBudgetTierConfigs } from '@/lib/settings';
+import { parseBudgetRange, tierForRange } from '@/lib/budget-range';
 import type {
+  Advice,
+  AdviceNotes,
   ClarifyAnswer,
   ClarifyQuestion,
   CriticIssue,
@@ -54,6 +59,8 @@ const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage 
   VENDOR_BUDGET: { pct: 70, stage: 'pricing' },
   CRITIC: { pct: 80, stage: 'reviewing' },
   RETRY: { pct: 86, stage: 'retrying' },
+  RESEARCH: { pct: 88, stage: 'researching' },
+  ADVISE: { pct: 91, stage: 'advising' },
   ASSEMBLE: { pct: 94, stage: 'saving' },
   DONE: { pct: 100, stage: 'done' },
   FAILED: { pct: 100, stage: 'error' },
@@ -97,6 +104,29 @@ async function claimLease(projectId: string, owner: string) {
   return count > 0;
 }
 
+/**
+ * Budget and location answers change the project itself, so every step after
+ * the pause — and the sheet header — works from them: a budget becomes the
+ * range (and the internal tier), a place becomes the city.
+ */
+async function applyAnswersToProject(projectId: string, questions: ClarifyQuestion[], answers: ClarifyAnswer[]) {
+  const topicOf = new Map(questions.map((question) => [question.id, question.topic]));
+  const data: Prisma.ProjectUpdateInput = {};
+
+  const budget = answers.find((answer) => topicOf.get(answer.id) === 'budget');
+  const range = budget ? parseBudgetRange(budget.answer) : null;
+  if (range) {
+    data.budgetMin = range.min;
+    data.budgetMax = range.max;
+    data.budgetTier = tierForRange(range, await getBudgetTierConfigs());
+  }
+
+  const location = answers.find((answer) => topicOf.get(answer.id) === 'location' && !answer.assumed);
+  if (location) data.city = location.answer.slice(0, 80);
+
+  if (Object.keys(data).length) await prisma.project.update({ where: { id: projectId }, data });
+}
+
 async function releaseLease(projectId: string, owner: string) {
   await prisma.analysisState
     .updateMany({
@@ -122,6 +152,8 @@ export async function beginAnalysis(projectId: string, locale: string) {
     critic: Prisma.DbNull,
     questions: Prisma.DbNull,
     answers: Prisma.DbNull,
+    adviceNotes: Prisma.DbNull,
+    advice: Prisma.DbNull,
     retriedAgents: [],
     criticRound: 0,
     errorText: null,
@@ -340,7 +372,7 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         // SCRIPT_ANALYST is never retried here: re-running the breakdown would
         // invalidate the equipment and pricing built on top of it, so its
         // blockers are surfaced to the producer instead.
-        const nextStage = retryable && state.criticRound < 2 ? AnalysisStage.RETRY : AnalysisStage.ASSEMBLE;
+        const nextStage = retryable && state.criticRound < 2 ? AnalysisStage.RETRY : AnalysisStage.RESEARCH;
 
         await save(projectId, {
           stage: nextStage,
@@ -365,8 +397,8 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         );
 
         if (!blocker) {
-          await save(projectId, { stage: AnalysisStage.ASSEMBLE });
-          return { done: false, stage: AnalysisStage.ASSEMBLE, pct: STAGE_PROGRESS.ASSEMBLE.pct };
+          await save(projectId, { stage: AnalysisStage.RESEARCH });
+          return { done: false, stage: AnalysisStage.RESEARCH, pct: STAGE_PROGRESS.RESEARCH.pct };
         }
 
         report({ type: 'stage', stage: 'retrying', pct: progress.pct, detail: blocker.agent });
@@ -411,12 +443,50 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
             type: 'log',
             message: `Retry of ${blocker.agent} failed: ${error instanceof Error ? error.message : 'unknown error'}`,
           });
-          await save(projectId, { stage: AnalysisStage.ASSEMBLE, retriedAgents });
-          return { done: false, stage: AnalysisStage.ASSEMBLE, pct: STAGE_PROGRESS.ASSEMBLE.pct };
+          await save(projectId, { stage: AnalysisStage.RESEARCH, retriedAgents });
+          return { done: false, stage: AnalysisStage.RESEARCH, pct: STAGE_PROGRESS.RESEARCH.pct };
         }
       }
 
       // ---- 7. executive summary + persistence
+      // ---- 6b. the advisor: web research, then structured suggestions. Neither
+      // may sink a finished sheet — without them it simply ships without advice.
+      case AnalysisStage.RESEARCH: {
+        const parts = readParts(state);
+        let notes: AdviceNotes | null = null;
+        try {
+          notes = await runAdvisorResearch(ctx, brief, parts);
+        } catch (error) {
+          report({ type: 'log', message: `Research skipped: ${error instanceof Error ? error.message : 'unknown error'}` });
+        }
+        await save(projectId, {
+          stage: AnalysisStage.ADVISE,
+          adviceNotes: (notes ?? Prisma.DbNull) as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.ADVISE, pct: STAGE_PROGRESS.ADVISE.pct };
+      }
+
+      case AnalysisStage.ADVISE: {
+        const parts = readParts(state);
+        let advice: Advice | null = null;
+        try {
+          advice = await runAdvisor(
+            ctx,
+            brief,
+            parts,
+            await loadSceneRequirements(projectId),
+            readJson<AdviceNotes>(state.adviceNotes),
+          );
+        } catch (error) {
+          report({ type: 'log', message: `Advice skipped: ${error instanceof Error ? error.message : 'unknown error'}` });
+        }
+        await save(projectId, {
+          stage: AnalysisStage.ASSEMBLE,
+          advice: (advice ?? Prisma.DbNull) as unknown as Prisma.InputJsonValue,
+        });
+        return { done: false, stage: AnalysisStage.ASSEMBLE, pct: STAGE_PROGRESS.ASSEMBLE.pct };
+      }
+
       case AnalysisStage.ASSEMBLE: {
         report({ type: 'stage', stage: 'saving', pct: progress.pct });
         const parts = readParts(state);
@@ -454,7 +524,7 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
           modelVersions: ctx.modelVersions,
         };
 
-        await persistSheet(projectId, sheet, brief.locale);
+        await persistSheet(projectId, sheet, brief.locale, readJson<Advice>(state.advice));
         await save(projectId, { stage: AnalysisStage.DONE });
 
         await finishRun(handle, {
@@ -506,7 +576,8 @@ export async function answerClarifications(projectId: string, raw: Record<string
   });
   if (!state || state.stage !== AnalysisStage.AWAITING_INPUT) return false;
 
-  const answers = resolveAnswers(readJson<ClarifyQuestion[]>(state.questions) ?? [], raw);
+  const questions = readJson<ClarifyQuestion[]>(state.questions) ?? [];
+  const answers = resolveAnswers(questions, raw);
   const { count } = await prisma.analysisState.updateMany({
     where: { projectId, stage: AnalysisStage.AWAITING_INPUT },
     data: {
@@ -514,6 +585,7 @@ export async function answerClarifications(projectId: string, raw: Record<string
       answers: answers as unknown as Prisma.InputJsonValue,
     },
   });
+  if (count > 0) await applyAnswersToProject(projectId, questions, answers);
   return count > 0;
 }
 
@@ -625,6 +697,7 @@ async function writeExecutiveSummary(
       prompt: [
         `Project "${brief.name}" — ${brief.type}, ${brief.budgetTier} tier, ${brief.city}.`,
         brief.visualStyleTags.length ? `Requested look: ${brief.visualStyleTags.join(', ')}.` : '',
+        describeBudget(brief),
         describeClarifications(brief.clarifications),
         `${parts.summary.sceneCount} scenes, ${parts.summary.shootDays} shoot day(s), ${parts.summary.nightScenePct}% night/dawn, ${parts.summary.exteriorScenePct}% exterior, ${parts.summary.highComplexityPct}% high lighting complexity.`,
         `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}`).join(', ')}.`,
@@ -650,7 +723,7 @@ async function writeExecutiveSummary(
   }
 }
 
-async function persistSheet(projectId: string, sheet: ProductionSheet, locale: string) {
+async function persistSheet(projectId: string, sheet: ProductionSheet, locale: string, advice: Advice | null) {
   // Freeze whatever is being replaced, so the producer can see what changed.
   await snapshotRecommendation(projectId, 'ANALYSIS');
 
@@ -677,6 +750,7 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
     ),
     criticPassed: sheet.critic.passed,
     sceneSummary: sheet.sceneSummary as unknown as Prisma.InputJsonValue,
+    advice: (advice ?? Prisma.DbNull) as unknown as Prisma.InputJsonValue,
     modelVersions: sheet.modelVersions as unknown as Prisma.InputJsonValue,
     generatedAt: new Date(),
   };
@@ -713,6 +787,8 @@ async function loadBrief(
     shootStartDate: project.shootStartDate,
     shootEndDate: project.shootEndDate,
     synopsis: project.synopsis,
+    budgetMin: project.budgetMin,
+    budgetMax: project.budgetMax,
     // The language the run was started in wins over the account default, so the
     // sheet comes back in whatever language the producer is using right now.
     locale: locale || project.owner.locale,

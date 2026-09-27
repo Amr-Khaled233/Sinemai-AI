@@ -345,6 +345,10 @@ model Project {
   budgetTier      BudgetTier
   visualStyleTags String[]      @default([])
   city            String        @default("Riyadh")
+  /// The producer's own budget range in SAR, when they gave one. The tier is
+  /// derived from it and stays internal (it filters the catalog and crew rates).
+  budgetMin       Int?
+  budgetMax       Int?
   shootStartDate  DateTime?     @db.Date
   shootEndDate    DateTime?     @db.Date
   synopsis        String?
@@ -437,6 +441,10 @@ model ProjectRecommendation {
   criticPassed  Boolean   @default(true)
   /// Aggregated scene statistics the whole sheet is derived from.
   sceneSummary  Json      @default("{}")
+  /// The advisor's read of the production beyond the catalog: shoot duration,
+  /// risky and costly scenes with savings, suggested directors, cast and crew,
+  /// and equipment not in the catalog. Suggestions, not priced facts.
+  advice        Json?
   modelVersions Json      @default("{}")
   generatedAt   DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -646,6 +654,10 @@ enum AnalysisStage {
   VENDOR_BUDGET
   CRITIC
   RETRY
+  /// The advisor looks beyond the catalog on the web (people, market prices).
+  RESEARCH
+  /// …and turns what it found into structured suggestions.
+  ADVISE
   ASSEMBLE
   DONE
   FAILED
@@ -672,6 +684,9 @@ model AnalysisState {
   /// answered (ClarifyAnswer[]). Every agent after the pause reads the answers.
   questions     Json?
   answers       Json?
+  /// The advisor's web research notes (with sources), then its structured advice.
+  adviceNotes   Json?
+  advice        Json?
   /// Agents already retried once, so the one-retry-per-agent cap survives resumes.
   retriedAgents String[]      @default([])
   criticRound   Int           @default(0)

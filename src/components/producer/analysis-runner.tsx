@@ -16,6 +16,8 @@ const STAGE_ORDER: ProgressStage[] = [
   'matching_dops',
   'pricing',
   'reviewing',
+  'researching',
+  'advising',
   'saving',
   'done',
 ];

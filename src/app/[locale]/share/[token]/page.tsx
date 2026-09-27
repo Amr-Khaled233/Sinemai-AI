@@ -2,7 +2,7 @@ import { notFound } from 'next/navigation';
 import { setRequestLocale } from 'next-intl/server';
 import { prisma } from '@/lib/prisma';
 import { sheetScenesArg } from '@/lib/sheet-query';
-import { getBudgetTierConfig, getSettings } from '@/lib/settings';
+import { getSettings } from '@/lib/settings';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import { convert, convertSheet } from '@/lib/currency';
 import { displayFx } from '@/lib/currency-server';
@@ -41,17 +41,15 @@ export default async function SharedSheetPage({
   // Fire-and-forget: a view counter must never block rendering the sheet.
   void prisma.shareLink.update({ where: { id: link.id }, data: { viewCount: { increment: 1 } } }).catch(() => {});
 
-  const [storedTierWindow, settings, fx] = await Promise.all([
-    getBudgetTierConfig(link.project.budgetTier),
-    getSettings(),
-    displayFx(),
-  ]);
-  const tierWindow = {
-    ...storedTierWindow,
-    minTotal: convert(storedTierWindow.minTotal, fx),
-    maxTotal: convert(storedTierWindow.maxTotal, fx),
-    currency: fx.code,
-  };
+  const [settings, fx] = await Promise.all([getSettings(), displayFx()]);
+  const tierWindow =
+    link.project.budgetMin !== null && link.project.budgetMax !== null
+      ? {
+          minTotal: convert(link.project.budgetMin, fx),
+          maxTotal: convert(link.project.budgetMax, fx),
+          currency: fx.code,
+        }
+      : null;
 
   return (
     <ProductionSheet

@@ -19,15 +19,14 @@ type Option = { value: string; label: string; hint?: string };
  */
 export function StartFromScript({
   types,
-  tiers,
   styleTags,
-  defaultCity,
+  currency,
 }: {
   types: Option[];
-  tiers: Option[];
+  /** The currency the budget is typed in: the reader's display currency. */
+  currency: string;
   /** The visual style vocabulary; it steers the equipment and the cinematographer match. */
   styleTags: StyleTag[];
-  defaultCity: string;
 }) {
   const t = useTranslations('project');
   const locale = useLocale();
@@ -38,7 +37,6 @@ export function StartFromScript({
   const [fileName, setFileName] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
   const [type, setType] = useState(types[0]?.value ?? '');
-  const [tier, setTier] = useState(tiers[1]?.value ?? tiers[0]?.value ?? '');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,7 +56,6 @@ export function StartFromScript({
         setPending(true);
         setError(null);
         formData.set('type', type);
-        formData.set('budgetTier', tier);
         const result = await startFromScript(formData);
         if (result.ok && result.projectId) {
           router.push(`/producer/projects/${result.projectId}?start=1`);
@@ -139,7 +136,7 @@ export function StartFromScript({
         )}
       </div>
 
-      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_1fr_14rem]">
+      <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_minmax(16rem,22rem)]">
         <fieldset>
           <legend className="label">{t('type')}</legend>
           <div className="flex flex-wrap gap-2">
@@ -157,31 +154,28 @@ export function StartFromScript({
           </div>
         </fieldset>
         <fieldset>
-          <legend className="label">{t('budgetTier')}</legend>
-          <div className="flex flex-wrap gap-2">
-            {tiers.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                aria-pressed={tier === option.value}
-                title={option.hint}
-                onClick={() => setTier(option.value)}
-                className={cn('chip', tier === option.value && 'chip-on')}
-              >
-                {option.label}
-              </button>
-            ))}
+          <legend className="label">{t('budgetRange', { currency })}</legend>
+          <div className="flex items-center gap-2">
+            <input
+              name="budgetMin"
+              inputMode="numeric"
+              dir="ltr"
+              className="input"
+              placeholder={t('budgetFrom')}
+              aria-label={t('budgetFrom')}
+            />
+            <span className="text-muted">–</span>
+            <input
+              name="budgetMax"
+              inputMode="numeric"
+              dir="ltr"
+              className="input"
+              placeholder={t('budgetTo')}
+              aria-label={t('budgetTo')}
+            />
           </div>
-          {tiers.find((option) => option.value === tier)?.hint && (
-            <p className="mt-2 text-[11px] text-muted">{tiers.find((option) => option.value === tier)?.hint}</p>
-          )}
+          <p className="mt-2 text-[11px] text-muted">{t('budgetHint')}</p>
         </fieldset>
-        <div>
-          <label className="label" htmlFor="start-city">
-            {t('city')}
-          </label>
-          <input id="start-city" name="city" className="input" dir="auto" placeholder={defaultCity} />
-        </div>
       </div>
 
       {styleTags.length > 0 && (

@@ -3,7 +3,7 @@ import { Link } from '@/i18n/routing';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { equipmentNamer } from '@/lib/equipment-name-server';
-import { Badge, Card, EmptyState, MeterBar, SectionTitle, Stat } from '@/components/ui';
+import { Card, EmptyState, MeterBar, SectionTitle, Stat } from '@/components/ui';
 import { AnimatedNumber } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
 import { moneyFormatter } from '@/lib/currency-server';
@@ -40,7 +40,8 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
       id: true,
       name: true,
       type: true,
-      budgetTier: true,
+      budgetMin: true,
+      budgetMax: true,
       city: true,
       status: true,
       updatedAt: true,
@@ -248,8 +249,10 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
                       </span>
                     </td>
                     <td data-label={t('type')}>{tEnum(`type.${project.type}`)}</td>
-                    <td data-label={t('tier')}>
-                      <Badge tone="gold">{tEnum(`tier.${project.budgetTier}`)}</Badge>
+                    <td data-label={t('tier')} className="text-xs tabular-nums text-muted">
+                      {project.budgetMin !== null && project.budgetMax !== null
+                        ? `${money(project.budgetMin)} – ${money(project.budgetMax)}`
+                        : '—'}
                     </td>
                     <td data-label={t('low')} className="text-end tabular-nums">
                       {money(recommendation.estimatedBudgetLow, recommendation.currency)}
