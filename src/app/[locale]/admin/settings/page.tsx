@@ -58,20 +58,6 @@ export default async function AdminSettingsPage({ params }: { params: Promise<{ 
           </div>
 
           <div className="grid gap-x-4 sm:grid-cols-3">
-            <Field label={t('dopMatchMinScore')}>
-              <Input
-                name="dopMatchMinScore"
-                type="number"
-                step="0.01"
-                min={0}
-                max={1}
-                dir="ltr"
-                defaultValue={settings.dopMatchMinScore}
-              />
-            </Field>
-            <Field label={t('dopMatchCount')}>
-              <Input name="dopMatchCount" type="number" min={1} max={12} dir="ltr" defaultValue={settings.dopMatchCount} />
-            </Field>
             <Field label={t('shootDayHours')}>
               <Input name="shootDayHours" type="number" min={4} max={18} dir="ltr" defaultValue={settings.shootDayHours} />
             </Field>

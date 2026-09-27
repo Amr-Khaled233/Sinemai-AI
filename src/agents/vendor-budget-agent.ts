@@ -7,6 +7,7 @@ import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
 import { withLanguage } from './language';
 import { describeClarifications } from './clarifications';
+import { isMarketItem } from './types';
 import type {
   CrewLine,
   EquipmentResult,
@@ -20,7 +21,7 @@ import type {
 export const VENDOR_BUDGET_SYSTEM = `You are a line producer sourcing a rental package in Saudi Arabia.
 
 Workflow:
-1. Call queryVendorInventory with every equipment id in the recommended package, plus the shoot dates and the production city.
+1. Call queryVendorInventory with every catalog equipment id in the recommended package, plus the shoot dates and the production city. Market gear has no id to source here — it is priced from the department head's estimate.
 2. Call getCrewDayRates for the crew this production actually needs on the floor.
 
 Hard rules:
@@ -62,7 +63,10 @@ export async function runVendorBudgetAgent(
       ctx.report({ type: 'stage', stage: 'pricing', pct: 68 });
 
       const tools = makeVendorTools(handle, { budgetTier: brief.budgetTier });
-      const equipmentIds = equipment.package.map((i) => i.equipmentId);
+      // Market gear is priced from its estimate; only catalog gear has vendors to ask.
+      const catalogItems = equipment.package.filter((i) => !isMarketItem(i));
+      const marketItems = equipment.package.filter(isMarketItem);
+      const equipmentIds = catalogItems.map((i) => i.equipmentId);
 
       await generateText({
         model: model('reasoning'),
@@ -77,10 +81,13 @@ export async function runVendorBudgetAgent(
             : 'Shoot dates are not fixed yet; check general availability.',
           describeClarifications(brief.clarifications),
           '',
-          'Recommended package:',
-          ...equipment.package.map(
+          catalogItems.length ? 'Recommended package (catalog gear):' : 'No catalog gear in this package; only pull the crew rates.',
+          ...catalogItems.map(
             (i) => `- ${i.equipmentId} | ${i.brand} ${i.model} | ${i.categorySlug} | qty ${i.quantity} | ${i.rentalDays} day(s)`,
           ),
+          marketItems.length
+            ? `Market gear, priced from estimates (do not source): ${marketItems.map((i) => `${i.brand} ${i.model}`).join(', ')}`
+            : '',
           '',
           options.criticFlag ? `Reviewer flag on the previous pass: ${options.criticFlag}` : '',
           'Source this package and pull the crew rates for this tier.',
@@ -129,7 +136,10 @@ export async function runVendorBudgetAgent(
             ? `Items no approved vendor stocks: ${inventory.fallbackRates
                 .map((f) => `${f.brand} ${f.model}`)
                 .join(', ')}`
-            : 'Every package item is stocked by at least one approved vendor.',
+            : 'Every catalog item is stocked by at least one approved vendor.',
+          marketItems.length
+            ? `Market gear to rent from outside the platform: ${marketItems.map((i) => `${i.brand} ${i.model}`).join(', ')}`
+            : '',
           '',
           'Crew roles available at this tier:',
           ...crewRates.map((r) => `- ${r.roleSlug} (${r.labelEn}): ${r.dayRate} ${r.currency}/day × ${r.headcount}`),
@@ -167,6 +177,9 @@ export async function runVendorBudgetAgent(
  * differently, an edited sheet would silently disagree with the one the agent
  * produced.
  */
+/** How far above its estimate a market item's price may land, for the high figure. */
+const MARKET_HIGH_FACTOR = 1.3;
+
 export function priceProject(args: {
   equipment: EquipmentResult;
   inventory: VendorInventoryResult;
@@ -196,6 +209,12 @@ export function priceProject(args: {
   const high = Math.round(highBase + highBase * (contingencyPct / 100));
 
   const notes = [...(args.notes ?? [])];
+  const market = equipment.package.filter(isMarketItem).length;
+  if (market) {
+    notes.push(
+      `${market} item(s) come from the wider market and are priced from estimated Saudi rental rates — confirm with rental houses.`,
+    );
+  }
   if (inventory.unstockedIds.length) {
     notes.push(
       `${inventory.unstockedIds.length} item(s) are not stocked by any approved vendor yet and are priced from indicative market rates.`,
@@ -315,7 +334,7 @@ export function allocatePackage(
 
     if (offers.length === 0) {
       const fallback = inventory.fallbackRates.find((f) => f.equipmentId === packageItem.equipmentId);
-      const rate = fallback?.indicativeDayRate ?? null;
+      const rate = fallback?.indicativeDayRate ?? packageItem.estimatedDayRate ?? null;
       uncovered.push({
         equipmentId: packageItem.equipmentId,
         brand: packageItem.brand,
@@ -325,7 +344,8 @@ export function allocatePackage(
       if (rate) {
         const cost = lineCost(rate, null, packageItem.rentalDays, packageItem.quantity, opts.weeklyDiscountPct);
         equipmentLow += cost;
-        equipmentHigh += cost;
+        // A market estimate is a guess at someone else's price list; the high end allows for it.
+        equipmentHigh += isMarketItem(packageItem) ? cost * MARKET_HIGH_FACTOR : cost;
         uncoveredFallbackTotal += cost;
       }
       continue;

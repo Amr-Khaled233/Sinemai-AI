@@ -19,9 +19,9 @@ import type {
 /**
  * The advisor: looks past the platform's own data.
  *
- * The rest of the graph prices the shoot from the catalog and the rental
- * companies the admin keeps — facts the sheet can stand behind. The advisor
- * answers what those cannot: which directors, actors and cinematographers suit
+ * The rest of the graph prices the shoot from the catalog, the rental
+ * companies the admin keeps and market estimates. The advisor answers what
+ * those cannot: which directors and actors suit
  * this production (anyone in the market, not only profiles on the platform),
  * what else is worth renting, how long the shoot will really take, which scenes
  * are dangerous or expensive and how to handle each more cheaply. It searches
@@ -34,13 +34,12 @@ import type {
 
 const ADVISOR_SYSTEM = `You are a senior producer and casting consultant for the Saudi and wider Gulf/Arab film and advertising market. You advise on one production, using the script breakdown, the priced package, what the producer told you, and web research.
 
-Always give several options, never a single answer: 3–5 directors, 3–5 cinematographers, 2–3 actors for each lead role, 2–3 ways to handle each costly scene, several savings. Prefer people who are active in the region and whose recent work fits this production's type, style, budget and where it will be shown. Never invent a person or a credit: name only people you found in research or are confident exist, and say what they are known for. If you are unsure whether someone is available or affordable, say so.`;
+Always give several options, never a single answer: 3–5 directors, 2–3 actors for each lead role, 2–3 ways to handle each costly scene, several savings. Prefer people who are active in the region and whose recent work fits this production's type, style, budget and where it will be shown. Never invent a person or a credit: name only people you found in research or are confident exist, and say what they are known for. If you are unsure whether someone is available or affordable, say so.`;
 
 const RESEARCH_TASK = `Research on the web, briefly and to the point:
 1. Directors suited to this production (type, style, budget, audience) — active in Saudi Arabia / the Gulf / the Arab world where possible, with a recent credit each.
 2. Actors for the lead roles the scenes suggest, matching the cast preference if given, with a known credit each.
-3. Cinematographers with a matching look, with a credit each.
-4. Current rental or market day rates in Saudi Arabia for any equipment worth adding that is not in the package (e.g. specialist rigs, underwater housings, vehicle mounts), and permit or safety requirements for risky scenes (drones, roads, water, firearms, crowds).
+3. Current rental or market day rates in Saudi Arabia for any equipment worth adding that is not in the package (e.g. specialist rigs, underwater housings, vehicle mounts), and permit or safety requirements for risky scenes (drones, roads, water, firearms, crowds).
 Write compact notes with names, credits and figures.`;
 
 const adviceSchema = z.object({
@@ -72,9 +71,6 @@ const adviceSchema = z.object({
         suggestions: z.array(z.object({ name: z.string().max(80), why: z.string().max(200) })).min(1).max(3),
       }),
     )
-    .max(5),
-  cinematographers: z
-    .array(z.object({ name: z.string().max(80), knownFor: z.string().max(160), why: z.string().max(240) }))
     .max(5),
   equipmentIdeas: z
     .array(z.object({ item: z.string().max(120), why: z.string().max(240), approxDayRateSar: z.number().nullable() }))
@@ -110,7 +106,7 @@ function describeProduction(
     'Breakdown:',
     describeSummary(summary),
     '',
-    `Priced package (from the platform catalog): ${equipment.package.map((item) => `${item.brand} ${item.model} ×${item.quantity} for ${item.rentalDays}d`).join('; ')}.`,
+    `Priced package (catalog gear, plus market gear at estimated rates): ${equipment.package.map((item) => `${item.brand} ${item.model} ×${item.quantity} for ${item.rentalDays}d`).join('; ')}.`,
     `Estimate: ${vendorBudget.low}–${vendorBudget.high} SAR (mid ${vendorBudget.mid}); equipment ${vendorBudget.budget.equipmentRental}, crew ${vendorBudget.budget.crewTotal}; ${vendorBudget.budget.shootDays} shoot day(s) at the platform's day length.`,
   ]
     .filter(Boolean)

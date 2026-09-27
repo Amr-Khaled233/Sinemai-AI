@@ -23,7 +23,7 @@ export const SCOPES = {
   /** The user area: project form, upload, analysis runner, sheet editing, the assistant chat, support. */
   producer: ['project', 'analysis', 'sheet', 'chat', 'support', 'common'],
   /** Admin: catalog, rental companies and their stock, cinematographers, content, settings. */
-  admin: ['admin', 'vendor', 'dop', 'support', 'enum', 'common'],
+  admin: ['admin', 'vendor', 'support', 'enum', 'common'],
   /** A shared read-only sheet: export controls. */
   share: ['sheet', 'common'],
 } as const satisfies Record<string, readonly string[]>;

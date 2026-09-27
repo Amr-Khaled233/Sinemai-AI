@@ -107,6 +107,7 @@ export type CatalogItem = {
 };
 
 export type PackageItem = {
+  /** A catalog id, or `market:…` for gear the platform does not list. */
   equipmentId: string;
   categorySlug: string;
   brand: string;
@@ -114,7 +115,25 @@ export type PackageItem = {
   quantity: number;
   rentalDays: number;
   reason: string;
+  /** Market gear only: the assistant's estimate of a Saudi rental day rate, in SAR. */
+  estimatedDayRate?: number | null;
 };
+
+export const MARKET_PREFIX = 'market:';
+
+/** Gear chosen from the wider market rather than the platform's catalog. */
+export function isMarketItem(item: { equipmentId: string }) {
+  return item.equipmentId.startsWith(MARKET_PREFIX);
+}
+
+export function marketId(brand: string, model: string) {
+  const slug = `${brand} ${model}`
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+  return `${MARKET_PREFIX}${slug || 'item'}`;
+}
 
 export type EquipmentResult = {
   package: PackageItem[];
@@ -234,7 +253,8 @@ export type Advice = {
   }>;
   directors: Array<{ name: string; knownFor: string; why: string }>;
   cast: Array<{ role: string; suggestions: Array<{ name: string; why: string }> }>;
-  cinematographers: Array<{ name: string; knownFor: string; why: string }>;
+  /** Only on sheets made before cinematographer suggestions were dropped; no longer shown. */
+  cinematographers?: Array<{ name: string; knownFor: string; why: string }>;
   equipmentIdeas: Array<{ item: string; why: string; approxDayRateSar: number | null }>;
   savings: Array<{ idea: string; estimatedSavingSar: number | null }>;
   sources: Array<{ title: string; url: string }>;

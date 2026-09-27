@@ -95,7 +95,6 @@ describe('route handlers', () => {
     'api/auth/[...nextauth]/route.ts': /NextAuth\(authOptions\)/,
     // Cron jobs present a shared secret instead of a session.
     'api/cron/availability-cleanup/route.ts': /isAuthorizedJob/,
-    'api/cron/reembed-dops/route.ts': /isAuthorizedJob/,
     // Exports accept a share token in place of a session.
     'api/projects/[id]/pdf/route.ts': /authoriseExport/,
     'api/projects/[id]/xlsx/route.ts': /authoriseExport/,

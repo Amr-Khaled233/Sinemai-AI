@@ -19,7 +19,6 @@ import {
   Role,
   DayNightSuitability,
 } from '@prisma/client';
-import { buildDopEmbeddingText, writeDopEmbedding, embedText } from '../src/lib/embeddings';
 import { DEFAULT_BUDGET_TIERS, DEFAULT_SETTINGS } from '../src/lib/settings';
 
 const prisma = new PrismaClient();
@@ -1038,112 +1037,6 @@ async function main() {
         update: data,
       });
     }
-  }
-
-  // ---- launch-partner cinematographers
-  const dopSeeds = [
-    {
-      name: 'Faisal Al-Harbi',
-      nameAr: 'فيصل الحربي',
-      city: 'Riyadh',
-      dayRate: 6500,
-      years: 12,
-      styleTags: ['night-cinematography', 'high-contrast-noir', 'anamorphic-widescreen', 'moody-low-key'],
-      bio: 'Feature and long-form drama cinematographer. Works almost entirely at night and in low-key interiors, favouring anamorphic glass, hard single sources and deep shadow with very little fill. Ten features and limited series across the Gulf.',
-      links: ['https://vimeo.com/example/faisal-reel', 'https://www.imdb.com/name/nm0000001/'],
-    },
-    {
-      name: 'Noura Al-Qahtani',
-      nameAr: 'نورة القحطاني',
-      city: 'Riyadh',
-      dayRate: 5200,
-      years: 9,
-      styleTags: ['warm-tones', 'classic-cinematic', 'soft-pastel', 'luxury-product'],
-      bio: 'Commercial cinematographer specialising in warm, soft, classically composed brand films. Large-format primes, heavy diffusion, motivated practicals and controlled golden-hour exteriors. Regular collaborator on luxury retail and hospitality campaigns.',
-      links: ['https://vimeo.com/example/noura-reel', 'https://www.youtube.com/@example-noura'],
-    },
-    {
-      name: 'Omar Haddad',
-      nameAr: 'عمر حداد',
-      city: 'Jeddah',
-      dayRate: 3800,
-      years: 7,
-      styleTags: ['documentary-verite', 'natural-light', 'handheld-intimate'],
-      bio: 'Documentary and branded-documentary cinematographer. Available-light shooter, long handheld days on a body rig, minimal crew, fast with interviews and observational coverage in uncontrolled locations.',
-      links: ['https://vimeo.com/example/omar-reel'],
-    },
-    {
-      name: 'Layla Mansour',
-      nameAr: 'ليلى منصور',
-      city: 'AlUla',
-      dayRate: 4400,
-      years: 10,
-      styleTags: ['desert-landscape', 'high-key-bright', 'natural-light', 'fast-paced-commercial'],
-      bio: 'Exterior and landscape specialist working across AlUla and the Empty Quarter. Big daylight exteriors, large diffusion frames, aerial integration and high-key desert light for tourism and automotive campaigns.',
-      links: ['https://vimeo.com/example/layla-reel', 'https://www.imdb.com/name/nm0000004/'],
-    },
-    {
-      name: 'Tariq Bin Saleh',
-      nameAr: 'طارق بن صالح',
-      city: 'Riyadh',
-      dayRate: 3000,
-      years: 6,
-      styleTags: ['fast-paced-commercial', 'high-key-bright', 'luxury-product'],
-      bio: 'Fast-turnaround commercial and social-first cinematographer. Table-top and product work, gimbal-driven coverage, high shot counts per day, comfortable with compact bodies and small lighting packages.',
-      links: ['https://www.youtube.com/@example-tariq'],
-    },
-  ];
-
-  // Embeddings are optional: without them the profiles exist but cannot be
-  // matched until the admin re-embed job runs. So a failing API (no key, no
-  // credit, rate limited) skips the rest of the embeddings instead of leaving
-  // the seed half-done.
-  let canEmbed = Boolean(process.env.OPENAI_API_KEY);
-  let embedFailure: string | null = null;
-  for (const seed of dopSeeds) {
-    const profile = {
-      displayName: seed.name,
-      displayNameAr: seed.nameAr,
-      bio: seed.bio,
-      city: seed.city,
-      dayRate: seed.dayRate,
-      yearsExperience: seed.years,
-      portfolioLinks: seed.links,
-      styleTags: seed.styleTags,
-    };
-    // No unique key but the name: re-runs update the profile rather than adding a twin.
-    const existing = await prisma.dop.findFirst({ where: { displayName: seed.name }, select: { id: true } });
-    const dop = existing
-      ? await prisma.dop.update({ where: { id: existing.id }, data: profile })
-      : await prisma.dop.create({ data: { ...profile, status: 'APPROVED', approvedAt: new Date() } });
-
-    if (canEmbed) {
-      const text = buildDopEmbeddingText({
-        displayName: dop.displayName,
-        bio: dop.bio,
-        styleTags: dop.styleTags,
-        city: dop.city,
-        yearsExperience: dop.yearsExperience,
-      });
-      try {
-        const vector = await embedText(text);
-        await writeDopEmbedding(dop.id, text, vector);
-        console.log(`  embedded ${dop.displayName}`);
-      } catch (error) {
-        canEmbed = false;
-        embedFailure = error instanceof Error ? error.message : String(error);
-      }
-    }
-  }
-
-  if (embedFailure) {
-    console.warn(
-      `  ! OpenAI refused the embedding request, so the remaining profiles were saved without one:\n    ${embedFailure.slice(0, 200)}\n    Fix the key or its credit, then run \`npm run db:seed\` again or use the admin re-embed job.`,
-    );
-  } else if (!process.env.OPENAI_API_KEY) {
-    console.warn(
-      '  ! OPENAI_API_KEY not set — DOP embeddings were skipped. Run `npm run db:seed` again with the key, or use the admin re-embed job.',
-    );
   }
 
   console.log(`

@@ -5,20 +5,24 @@ import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './
 import { makeEquipmentTools, queryEquipmentCatalog } from './tools/equipment-tools';
 import { withLanguage } from './language';
 import { describeBudget, describeClarifications } from './clarifications';
-import type { CatalogItem, EquipmentResult, PackageItem, ProjectBrief, SceneSummary } from './types';
+import { marketId, type CatalogItem, type EquipmentResult, type PackageItem, type ProjectBrief, type SceneSummary } from './types';
+
+/** The categories the sheet knows how to label; market gear is filed under one of them. */
+const CATEGORY_SLUGS = ['camera-body', 'lens', 'lighting', 'grip', 'support', 'sound', 'power', 'drone', 'monitoring', 'other'];
 
 export const EQUIPMENT_SYSTEM = `You are a camera and lighting department head building a rental package for a production in Saudi Arabia.
 
-Hard rules:
-- You may ONLY recommend equipment returned by the queryEquipmentCatalog tool. Never name a camera, lens, light or grip item from your own memory, and never state a spec or a price that did not come back from the tool.
-- Query the catalog first. Start with the categories the breakdown actually demands, and issue a second, wider query if a category comes back thin or empty.
-- Respect the declared budget tier. Only set includeAdjacentTiers when the strict tier leaves an essential category unfilled, and say so in your rationale.
+How to work:
+- Choose the gear that serves this script best, from the whole market — cameras, lenses, lighting, grip, sound, drones, anything the scenes need. You are not limited to the platform's catalog.
+- Query the platform's catalog first with queryEquipmentCatalog: that gear is bookable here, with real rates from rental companies. When a catalog item fits as well as anything else, prefer it.
+- When the right tool is not in the catalog, recommend it anyway from your own knowledge: real, current products only, named exactly (brand and model), with a realistic Saudi rental day rate in SAR. Never invent a product.
+- Fit the budget: the tier and the producer's range decide how ambitious the package is.
 
 Think like a department head: night exteriors need output and dynamic range; long handheld days need weight and rigging; a commercial with fast-paced coverage needs a body that reloads and reframes quickly.`;
 
 const SELECTION_SYSTEM = `${EQUIPMENT_SYSTEM}
 
-You are now committing to the package. Choose from the catalog shortlist you retrieved and nothing else. Every item must carry:
+You are now committing to the package. For each item either give the exact id from the catalog shortlist, or set equipmentId to null and name market gear (brand, model, category, estimatedDayRateSar). Every item must carry:
 - a realistic quantity for a single-unit shoot of this size
 - rentalDays no greater than the shoot day count you were given
 - a one-line reason tied to the scene statistics (night ratio, lighting complexity, movement mix), not to marketing language
@@ -30,7 +34,11 @@ const packageSchema = z.object({
   items: z
     .array(
       z.object({
-        equipmentId: z.string().describe('Exact id from the catalog shortlist.'),
+        equipmentId: z.string().nullable().describe('Exact id from the catalog shortlist, or null for gear from the wider market.'),
+        brand: z.string().max(60).describe('Market gear: the maker. Empty for catalog items.'),
+        model: z.string().max(100).describe('Market gear: the exact model. Empty for catalog items.'),
+        category: z.string().max(40).describe('Market gear: one of the category slugs given. Empty for catalog items.'),
+        estimatedDayRateSar: z.number().nullable().describe('Market gear: a realistic rental day rate in Saudi Arabia, in SAR. Null for catalog items.'),
         quantity: z.number().int().min(1).max(12),
         rentalDays: z.number().int().min(1).max(120),
         reason: z.string().max(200),
@@ -91,7 +99,6 @@ export async function runEquipmentAgent(
         );
         for (const item of fallback.items) retrieved.set(item.id, item);
       }
-      if (retrieved.size === 0) throw new Error('EMPTY_EQUIPMENT_CATALOG');
 
       // ---- phase 2: selection, constrained to the retrieved shortlist.
       const shortlist = [...retrieved.values()];
@@ -103,19 +110,26 @@ export async function runEquipmentAgent(
         prompt: buildSelectionPrompt(brief, summary, shortlist, options.criticFlag),
       });
 
-      // ---- phase 3: enforcement. Anything not in the shortlist is dropped, loudly.
+      // ---- phase 3: enforcement. Catalog ids must be in the shortlist; market gear must be named and priced.
       const dropped: string[] = [];
       const seen = new Set<string>();
       const pkg: PackageItem[] = [];
 
       for (const item of object.items) {
-        const catalogItem = retrieved.get(item.equipmentId);
+        const catalogItem = item.equipmentId ? retrieved.get(item.equipmentId) : undefined;
         if (!catalogItem) {
-          dropped.push(item.equipmentId);
+          // Gear from the wider market: kept when it is named and priced.
+          const market = marketItem(item, summary.shootDays);
+          if (market && !seen.has(market.equipmentId)) {
+            seen.add(market.equipmentId);
+            pkg.push(market);
+          } else if (!market) {
+            dropped.push(item.equipmentId ?? `${item.brand} ${item.model}`.trim());
+          }
           continue;
         }
-        if (seen.has(item.equipmentId)) continue;
-        seen.add(item.equipmentId);
+        if (seen.has(catalogItem.id)) continue;
+        seen.add(catalogItem.id);
         pkg.push({
           equipmentId: catalogItem.id,
           categorySlug: catalogItem.categorySlug,
@@ -139,11 +153,33 @@ export async function runEquipmentAgent(
         output: result,
         status: dropped.length ? AgentRunStatus.RETRIED : AgentRunStatus.OK,
         criticFlag: dropped.length
-          ? `Dropped ${dropped.length} equipment id(s) not present in the catalog shortlist.`
+          ? `Dropped ${dropped.length} item(s) that were neither in the catalog shortlist nor named and priced as market gear.`
           : undefined,
       };
     },
   );
+}
+
+/** A market pick the sheet can price: named, with a sane day rate. */
+function marketItem(
+  item: { brand: string; model: string; category: string; estimatedDayRateSar: number | null; quantity: number; rentalDays: number; reason: string },
+  shootDays: number,
+): PackageItem | null {
+  const brand = item.brand.trim();
+  const model = item.model.trim();
+  const rate = item.estimatedDayRateSar;
+  if (!model || !rate || !Number.isFinite(rate) || rate <= 0 || rate > 250_000) return null;
+  const category = item.category.trim().toLowerCase();
+  return {
+    equipmentId: marketId(brand, model),
+    categorySlug: CATEGORY_SLUGS.includes(category) ? category : 'other',
+    brand,
+    model,
+    quantity: item.quantity,
+    rentalDays: Math.min(item.rentalDays, Math.max(shootDays, 1)),
+    reason: item.reason,
+    estimatedDayRate: Math.round(rate),
+  };
 }
 
 function buildRetrievalPrompt(brief: ProjectBrief, summary: SceneSummary, criticFlag?: string) {
@@ -157,7 +193,7 @@ function buildRetrievalPrompt(brief: ProjectBrief, summary: SceneSummary, critic
     describeSummary(summary),
     '',
     criticFlag ? `Reviewer flag on the previous package: ${criticFlag}` : '',
-    'Query the catalog for the categories this breakdown requires. Do not name any equipment yet.',
+    'Query the catalog for the categories this breakdown requires, to see what is bookable here. Do not commit to a package yet.',
   ]
     .filter(Boolean)
     .join('\n');
@@ -203,7 +239,11 @@ function buildSelectionPrompt(
     '',
     criticFlag ? `Reviewer flag you must fix: ${criticFlag}` : '',
     '',
-    `Catalog shortlist (${shortlist.length} items) — select only from these ids:`,
+    `Category slugs for market gear: ${CATEGORY_SLUGS.join(', ')}.`,
+    '',
+    shortlist.length
+      ? `Catalog shortlist (${shortlist.length} items) — bookable on the platform; use these ids when they fit:`
+      : 'The catalog has nothing for this production; choose everything from the market.',
     ...lines,
   ]
     .filter(Boolean)

@@ -19,12 +19,11 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
     auth(),
     moneyFormatter(locale),
   ]);
-  const [equipmentCount, dopCount, vendorCount, projectCount] = await Promise.all([
+  const [equipmentCount, vendorCount, projectCount] = await Promise.all([
     prisma.equipment.count({ where: { active: true } }),
-    prisma.dop.count({ where: { status: 'APPROVED' } }),
     prisma.vendor.count({ where: { status: 'APPROVED' } }),
     prisma.project.count({ where: { status: 'READY' } }),
-  ]).catch(() => [0, 0, 0, 0]);
+  ]).catch(() => [0, 0, 0]);
 
   const start = session?.user ? homeForRole(session.user.role) : '/register';
 
@@ -37,7 +36,6 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
 
   const stats = [
     { label: t('statEquipment'), value: equipmentCount },
-    { label: t('statDops'), value: dopCount },
     { label: t('statVendors'), value: vendorCount },
     { label: t('statSheets'), value: projectCount },
   ];
@@ -80,7 +78,7 @@ export default async function LandingPage({ params }: { params: Promise<{ locale
           />
         </div>
 
-        <dl className="mt-16 grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-line bg-line lg:grid-cols-4">
+        <dl className="mt-16 grid grid-cols-3 gap-px overflow-hidden rounded-lg border border-line bg-line">
           {stats.map((stat) => (
             <div key={stat.label} className="flex flex-col-reverse bg-surface p-5 sm:p-6">
               <dt className="mt-1 text-xs text-muted">{stat.label}</dt>

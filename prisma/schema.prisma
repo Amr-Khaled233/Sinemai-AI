@@ -1,10 +1,8 @@
 // Sinemai AI — production intelligence platform
 // Postgres + pgvector (Vercel Postgres / Neon).
 //
-// The `Dop.embedding` column is a pgvector column. Prisma cannot read/write
-// `Unsupported` types through the typed client, so every embedding write and
-// similarity search goes through raw SQL (src/lib/embeddings.ts,
-// src/agents/tools/dop-tools.ts).
+// The `Dop` table and its pgvector `embedding` column remain for old sheets;
+// cinematographers are no longer matched or managed.
 
 generator client {
   provider        = "prisma-client-js"

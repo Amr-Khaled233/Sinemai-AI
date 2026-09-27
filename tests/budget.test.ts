@@ -2,7 +2,7 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { allocatePackage, buildCrewLines, lineCost } from '../src/agents/vendor-budget-agent';
 import { aggregateScenes } from '../src/agents/script-analyst';
-import type { EquipmentResult, SceneRequirement } from '../src/agents/types';
+import { isMarketItem, marketId, type EquipmentResult, type SceneRequirement } from '../src/agents/types';
 import type { VendorInventoryResult } from '../src/agents/tools/vendor-tools';
 
 const packageItem = (over: Partial<EquipmentResult['package'][number]> = {}) => ({
@@ -135,6 +135,34 @@ describe('package allocation', () => {
     const result = allocatePackage(equipment, inventory, { city: 'Riyadh', weeklyDiscountPct: 20 });
     assert.equal(result.equipmentLow, 0);
     assert.equal(result.uncovered[0].fallbackDayRate, null);
+  });
+
+  it('prices market gear from its estimate, with room above it on the high end', () => {
+    const market = packageItem({
+      equipmentId: marketId('DJI', 'Inspire 3'),
+      categorySlug: 'drone',
+      brand: 'DJI',
+      model: 'Inspire 3',
+      rentalDays: 2,
+      estimatedDayRate: 1500,
+    });
+    const inventory: VendorInventoryResult = { vendors: [], requestedIds: [], unstockedIds: [], fallbackRates: [] };
+
+    const result = allocatePackage(
+      { package: [market], rationale: '', droppedHallucinatedIds: [] },
+      inventory,
+      { city: 'Riyadh', weeklyDiscountPct: 20 },
+    );
+    assert.ok(isMarketItem(market));
+    assert.equal(result.equipmentLow, 3000);
+    assert.equal(result.equipmentHigh, 3900);
+    assert.equal(result.uncovered[0].fallbackDayRate, 1500);
+  });
+
+  it('gives market gear a stable id from its name', () => {
+    assert.equal(marketId('DJI', 'Inspire 3'), 'market:dji-inspire-3');
+    assert.equal(marketId('ARRI', 'SkyPanel S60-C'), marketId('ARRI', 'SkyPanel S60-C'));
+    assert.ok(!isMarketItem({ equipmentId: 'cku1abc' }));
   });
 
   it('reports coverage as a share of the whole package', () => {

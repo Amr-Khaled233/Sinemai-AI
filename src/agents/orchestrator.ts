@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma';
 import { createRunContext, finishRun, model, MODELS, startRun } from './runtime';
 import { loadSceneRequirements, runScriptAnalystStep, summariseScenes } from './script-analyst';
 import { runEquipmentAgent } from './equipment-agent';
-import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
 import { runClarifyAgent } from './clarify-agent';
@@ -31,6 +30,7 @@ import type {
   SceneSummary,
   VendorBudgetResult,
 } from './types';
+import { isMarketItem } from './types';
 
 export const ORCHESTRATOR_SYSTEM = `You are the supervising producer of an automated breakdown. You have no database access: you delegate to specialist agents and then write the short executive summary that opens the Production & Equipment Sheet.
 
@@ -45,10 +45,12 @@ Write 3–5 sentences for the director/producer who will act on this sheet. Lead
  * inside its time budget and then returns; the client calls again to continue.
  *
  * That keeps every invocation comfortably inside a 60s serverless limit while
- * the graph itself is unchanged — equipment and DOP matching still run
- * concurrently, vendor pricing still waits for the package, and the critic
- * still gets one targeted retry per agent.
+ * the graph itself is unchanged — vendor pricing still waits for the package,
+ * and the critic still gets one targeted retry per agent.
  */
+
+/** Sheets no longer carry cinematographer matches; the slot stays for old sheets. */
+const NO_DOPS: DopResult = { matches: [], queryText: '', searchedCount: 0, note: null };
 
 const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage }> = {
   PARSE: { pct: 8, stage: 'parsing' },
@@ -304,46 +306,26 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
       case AnalysisStage.AWAITING_INPUT:
         return reportAwaiting(report, readJson<ClarifyQuestion[]>(state.questions) ?? []);
 
-      // ---- 3. equipment and DOP matching, concurrently
+      // ---- 3. the equipment package, from the catalog and the wider market
       case AnalysisStage.EQUIPMENT: {
         const summary = readJson<SceneSummary>(state.summary);
         if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
-        report({ type: 'log', message: 'Matching equipment and cinematographers' });
+        report({ type: 'log', message: 'Building the equipment package' });
 
-        const [equipmentSettled, dopsSettled] = await Promise.allSettled([
-          runEquipmentAgent(ctx, brief, summary),
-          runDopAgent(ctx, brief, summary),
-        ]);
-
-        if (equipmentSettled.status === 'rejected') throw equipmentSettled.reason;
-
-        // A DOP failure degrades the sheet; it does not sink it.
-        const dops: DopResult =
-          dopsSettled.status === 'fulfilled'
-            ? dopsSettled.value
-            : {
-                matches: [],
-                queryText: '',
-                searchedCount: 0,
-                note: 'Cinematographer matching failed for this run; the rest of the sheet is unaffected.',
-              };
-
+        const equipment = await runEquipmentAgent(ctx, brief, summary);
         await save(projectId, {
           stage: AnalysisStage.VENDOR_BUDGET,
-          equipment: equipmentSettled.value as unknown as Prisma.InputJsonValue,
-          dops: dops as unknown as Prisma.InputJsonValue,
+          equipment: equipment as unknown as Prisma.InputJsonValue,
+          dops: NO_DOPS as unknown as Prisma.InputJsonValue,
         });
         return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
       }
 
-      // DOPS is only reached when a retry re-runs matching on its own.
+      // Cinematographers are no longer matched; a run saved at this stage moves on.
       case AnalysisStage.DOPS: {
-        const summary = readJson<SceneSummary>(state.summary);
-        if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
-        const dops = await runDopAgent(ctx, brief, summary);
         await save(projectId, {
           stage: AnalysisStage.VENDOR_BUDGET,
-          dops: dops as unknown as Prisma.InputJsonValue,
+          dops: NO_DOPS as unknown as Prisma.InputJsonValue,
         });
         return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
       }
@@ -418,16 +400,6 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
               retriedAgents,
             });
             return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
-          }
-
-          if (blocker.agent === 'DOP_MATCH') {
-            const retried = await runDopAgent(ctx, brief, summary, { attempt: 2, criticFlag: flag });
-            await save(projectId, {
-              stage: AnalysisStage.CRITIC,
-              dops: retried as unknown as Prisma.InputJsonValue,
-              retriedAgents,
-            });
-            return { done: false, stage: AnalysisStage.CRITIC, pct: STAGE_PROGRESS.CRITIC.pct };
           }
 
           const retried = await runVendorBudgetAgent(ctx, brief, summary, equipment, {
@@ -703,11 +675,8 @@ async function writeExecutiveSummary(
         describeBudget(brief),
         describeClarifications(brief.clarifications),
         `${parts.summary.sceneCount} scenes, ${parts.summary.shootDays} shoot day(s), ${parts.summary.nightScenePct}% night/dawn, ${parts.summary.exteriorScenePct}% exterior, ${parts.summary.highComplexityPct}% high lighting complexity.`,
-        `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}`).join(', ')}.`,
+        `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}${isMarketItem(i) ? ' (market)' : ''}`).join(', ')}.`,
         `Department rationale: ${parts.equipment.rationale}`,
-        parts.dops.matches.length
-          ? `Top cinematographer matches: ${parts.dops.matches.map((d) => `${d.name} (${d.score})`).join(', ')}.`
-          : 'No cinematographer matches were available.',
         `Vendors: ${parts.vendorBudget.vendors.map((v) => v.companyName).join(', ') || 'none found'}.`,
         `Estimate ${parts.vendorBudget.low}–${parts.vendorBudget.high} ${parts.vendorBudget.budget.currency} (mid ${parts.vendorBudget.mid}).`,
         parts.criticIssues.length
@@ -731,7 +700,8 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
   await snapshotRecommendation(projectId, 'ANALYSIS');
 
   const data = {
-    recommendedEquipmentIds: sheet.equipment.package.map((i) => i.equipmentId),
+    // Catalog ids only: the column feeds the catalog's usage stats.
+    recommendedEquipmentIds: sheet.equipment.package.filter((i) => !isMarketItem(i)).map((i) => i.equipmentId),
     equipmentPackage: sheet.equipment.package as unknown as Prisma.InputJsonValue,
     equipmentRationale: sheet.equipment.rationale,
     matchedDops: sheet.dops.matches as unknown as Prisma.InputJsonValue,

@@ -15,18 +15,18 @@ import type {
   SceneSummary,
   VendorBudgetResult,
 } from './types';
+import { isMarketItem } from './types';
 
 export const CRITIC_SYSTEM = `You are the quality gate on an automated production breakdown. You have no tools: you reason only over the assembled sheet you are given.
 
 Check for:
 1. Budget tier violation — the estimate sits outside the declared tier's currency window.
-2. Weak DOP matches — similarity scores too low to be meaningful, or explanations that reference styles the DOP never claimed.
-3. Scene/equipment contradiction — e.g. a night-heavy breakdown with no high-output or low-light-capable gear, heavy gimbal work with no stabiliser, drone scenes with no aerial platform, exteriors with no grip/diffusion.
-4. Fabrication — any equipment, vendor, cinematographer, spec or price that does not trace back to a tool result. Every id you are given came from the database; a *missing* category is a real issue, an unfamiliar model name is not.
-5. Internal inconsistency — rental days exceeding the shoot length, crew roles missing for the work described, coverage claims that contradict the vendor list.
+2. Scene/equipment contradiction — e.g. a night-heavy breakdown with no high-output or low-light-capable gear, heavy gimbal work with no stabiliser, drone scenes with no aerial platform, exteriors with no grip/diffusion.
+3. Implausible market gear — items marked [market] come from the wider market with an estimated day rate. Flag one only if the product does not exist or its rate is far off a realistic Saudi rental price; an unfamiliar model name alone is not an issue.
+4. Internal inconsistency — rental days exceeding the shoot length, crew roles missing for the work described, coverage claims that contradict the vendor list.
 
 Severity: "blocker" only when the sheet would mislead a producer making a spending decision. "warning" when it needs a caveat. "info" for notes worth surfacing.
-Set passed=false only when at least one blocker exists. Assign each issue to the agent that must fix it: SCRIPT_ANALYST, EQUIPMENT, DOP_MATCH or VENDOR_BUDGET. Be specific and terse; the suggestion is fed back to that agent verbatim.`;
+Set passed=false only when at least one blocker exists. Assign each issue to the agent that must fix it: SCRIPT_ANALYST, EQUIPMENT or VENDOR_BUDGET. Be specific and terse; the suggestion is fed back to that agent verbatim.`;
 
 const criticSchema = z.object({
   passed: z.boolean(),
@@ -34,7 +34,7 @@ const criticSchema = z.object({
   issues: z
     .array(
       z.object({
-        agent: z.enum(['SCRIPT_ANALYST', 'EQUIPMENT', 'DOP_MATCH', 'VENDOR_BUDGET']),
+        agent: z.enum(['SCRIPT_ANALYST', 'EQUIPMENT', 'VENDOR_BUDGET']),
         severity: z.enum(['info', 'warning', 'blocker']),
         problem: z.string().max(300),
         suggestion: z.string().max(300),
@@ -94,23 +94,14 @@ export async function runCriticAgent(
           'RECOMMENDED PACKAGE:',
           ...parts.equipment.package.map(
             (i) =>
-              `- ${i.categorySlug}: ${i.brand} ${i.model} ×${i.quantity} for ${i.rentalDays} day(s) — ${i.reason}`,
+              `- ${i.categorySlug}: ${i.brand} ${i.model} ×${i.quantity} for ${i.rentalDays} day(s)${
+                isMarketItem(i) ? ` [market, est. ${i.estimatedDayRate} SAR/day]` : ''
+              } — ${i.reason}`,
           ),
           `Rationale: ${parts.equipment.rationale}`,
           parts.equipment.droppedHallucinatedIds.length
-            ? `NOTE: ${parts.equipment.droppedHallucinatedIds.length} selected id(s) were not in the catalog shortlist and were dropped before pricing.`
+            ? `NOTE: ${parts.equipment.droppedHallucinatedIds.length} selected item(s) were neither catalog ids nor priced market gear and were dropped before pricing.`
             : '',
-          '',
-          'DOP MATCHES:',
-          parts.dops.matches.length
-            ? parts.dops.matches
-                .map(
-                  (d) =>
-                    `- ${d.name} (score ${d.score}) tags: ${d.styleTags.join(', ') || '—'} — ${d.reason}`,
-                )
-                .join('\n')
-            : '- none returned',
-          parts.dops.note ? `Matching note: ${parts.dops.note}` : '',
           '',
           'VENDORS & BUDGET:',
           ...parts.vendorBudget.vendors.map(
@@ -191,7 +182,7 @@ function mechanicalChecks(
       agent: 'EQUIPMENT',
       severity: 'blocker',
       problem: 'The package contains no camera body.',
-      suggestion: 'Query the catalog for category camera-body and include one body sized to the budget tier.',
+      suggestion: 'Include one camera body sized to the budget — from the catalog or the market (category camera-body).',
     });
   }
   if (!categories.has('lighting') && summary.nightScenePct > 20) {
@@ -233,8 +224,8 @@ function mechanicalChecks(
     issues.push({
       agent: 'EQUIPMENT',
       severity: 'warning',
-      problem: `${equipment.droppedHallucinatedIds.length} recommended id(s) did not exist in the catalog and were removed.`,
-      suggestion: 'Select only ids present in the retrieved shortlist.',
+      problem: `${equipment.droppedHallucinatedIds.length} recommended item(s) were neither in the catalog nor named and priced as market gear, and were removed.`,
+      suggestion: 'Use shortlist ids for catalog gear; for market gear give brand, model, category and an estimated day rate.',
     });
   }
 

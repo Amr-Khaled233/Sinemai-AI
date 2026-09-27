@@ -60,17 +60,3 @@ export const rentalCompanySchema = z.object({
   crNumber: z.string().trim().max(40),
 });
 
-export const dopProfileSchema = z.object({
-  displayName: z.string().min(2).max(120),
-  displayNameAr: z.string().max(120).optional().or(z.literal('')),
-  bio: z.string().min(40).max(4000),
-  city: z.string().max(80).optional().or(z.literal('')),
-  dayRate: z.coerce.number().int().min(0).max(200_000).optional(),
-  yearsExperience: z.coerce.number().int().min(0).max(70).optional(),
-  // .url() alone accepts javascript:/data:/vbscript:, and these render as href
-  // in a producer's sheet — so the scheme is checked explicitly.
-  portfolioLinks: z
-    .array(z.string().max(400).refine(isSafeHttpUrl, { message: 'URL must start with http:// or https://' }))
-    .max(10),
-  styleTags: z.array(z.string().max(60)).min(1).max(10),
-});

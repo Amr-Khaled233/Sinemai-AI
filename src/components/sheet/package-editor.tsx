@@ -6,7 +6,7 @@ import { useRouter } from '@/i18n/routing';
 import { updateEquipmentPackage, type PackageEdit } from '@/app/actions/package';
 import { Select, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import type { PackageItem } from '@/agents/types';
+import { isMarketItem, type PackageItem } from '@/agents/types';
 
 export type CatalogOption = {
   id: string;
@@ -110,6 +110,11 @@ export function PackageEditor({
                 </td>
                 <td data-label={t('item')} className="font-medium text-strong">
                   {nameOf(line)}
+                  {isMarketItem(line) && (
+                    <span className="ms-2 inline-block rounded-full border border-line px-2 py-0.5 align-middle text-[10px] font-normal uppercase tracking-wider text-muted rtl:tracking-normal">
+                      {t('marketBadge')}
+                    </span>
+                  )}
                 </td>
                 <td data-label={t('quantity')} className="text-end">
                   <input

@@ -2,7 +2,6 @@ import { getTranslations, setRequestLocale } from 'next-intl/server';
 import { requireRole } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { equipmentName } from '@/lib/equipment-name';
-import { countEmbeddableDops } from '@/lib/embeddings';
 import { Badge, Card, Stat } from '@/components/ui';
 import { AnimatedNumber } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
@@ -22,8 +21,6 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
     projectCount,
     readyCount,
     vendorsApproved,
-    dopsApproved,
-    embedded,
     recommendations,
     recentRuns,
   ] = await Promise.all([
@@ -31,10 +28,8 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
     prisma.project.count(),
     prisma.project.count({ where: { status: 'READY' } }),
     prisma.vendor.count({ where: { status: 'APPROVED' } }),
-    prisma.dop.count({ where: { status: 'APPROVED' } }),
-    countEmbeddableDops().catch(() => 0),
     prisma.projectRecommendation.findMany({
-      select: { recommendedEquipmentIds: true, matchedDops: true },
+      select: { recommendedEquipmentIds: true },
       take: 500,
       orderBy: { generatedAt: 'desc' },
     }),
@@ -54,55 +49,35 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
     }),
   ]);
 
-  // Most-recommended equipment / most-matched DOPs, counted from stored sheets.
+  // Most-recommended catalog equipment, counted from stored sheets.
   const equipmentTally = new Map<string, number>();
-  const dopTally = new Map<string, number>();
   for (const row of recommendations) {
     for (const id of row.recommendedEquipmentIds) {
       equipmentTally.set(id, (equipmentTally.get(id) ?? 0) + 1);
     }
-    const dops = (row.matchedDops as unknown as Array<{ dopId?: string }>) ?? [];
-    for (const dop of dops) {
-      if (dop?.dopId) dopTally.set(dop.dopId, (dopTally.get(dop.dopId) ?? 0) + 1);
-    }
   }
 
   const topEquipmentIds = [...equipmentTally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
-  const topDopIds = [...dopTally.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
 
-  const [topEquipment, topDops] = await Promise.all([
-    prisma.equipment.findMany({
+  const topEquipment = await prisma.equipment.findMany({
       where: { id: { in: topEquipmentIds.map(([id]) => id) } },
       select: { id: true, brand: true, model: true, nameAr: true },
-    }),
-    prisma.dop.findMany({
-      where: { id: { in: topDopIds.map(([id]) => id) } },
-      select: { id: true, displayName: true, displayNameAr: true },
-    }),
-  ]);
+    });
 
   const equipmentNames = new Map(topEquipment.map((item) => [item.id, equipmentName(item, locale)]));
-  const dopNames = new Map(
-    topDops.map((item) => [item.id, locale === 'ar' && item.displayNameAr ? item.displayNameAr : item.displayName]),
-  );
 
   return (
     <div className="space-y-6">
       <h1 className="text-xl font-semibold text-strong">{t('overview')}</h1>
 
-      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-5">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3 lg:grid-cols-4">
         <Stat label={t('users')} value={<AnimatedNumber value={userCount} />} />
         <Stat label={t('projects')} value={<AnimatedNumber value={projectCount} />} />
         <Stat label={t('scriptsAnalyzed')} value={<AnimatedNumber value={readyCount} />} />
         <Stat label={t('vendorsApproved')} value={<AnimatedNumber value={vendorsApproved} />} />
-        <Stat
-          label={t('dopsApproved')}
-          value={<AnimatedNumber value={dopsApproved} />}
-          hint={dopsApproved > embedded ? t('missingCount', { count: dopsApproved - embedded }) : undefined}
-        />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div>
         <Card title={t('topEquipment')}>
           {topEquipmentIds.length === 0 ? (
             <p className="prose-sheet">—</p>
@@ -122,33 +97,6 @@ export default async function AdminHome({ params }: { params: Promise<{ locale: 
                       <td data-label={t('rank')} className="tabular-nums text-muted">{index + 1}</td>
                       <td data-label={t('item')} className="text-strong">{equipmentNames.get(id) ?? id}</td>
                       <td data-label={t('sheets')} className="text-end tabular-nums text-accent">{count}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-
-        <Card title={t('topDops')}>
-          {topDopIds.length === 0 ? (
-            <p className="prose-sheet">—</p>
-          ) : (
-            <div className="table-wrap">
-              <table className="grid-table grid-table-compact [--grid-cols:2.5rem_minmax(10rem,1fr)_6rem]">
-                <thead>
-                  <tr>
-                    <th>{t('rank')}</th>
-                    <th>{t('cinematographer')}</th>
-                    <th className="text-end">{t('matches')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {topDopIds.map(([id, count], index) => (
-                    <tr key={id}>
-                      <td data-label={t('rank')} className="tabular-nums text-muted">{index + 1}</td>
-                      <td data-label={t('cinematographer')} className="text-strong">{dopNames.get(id) ?? id}</td>
-                      <td data-label={t('matches')} className="text-end tabular-nums text-accent">{count}</td>
                     </tr>
                   ))}
                 </tbody>

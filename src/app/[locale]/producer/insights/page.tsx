@@ -7,7 +7,7 @@ import { Card, EmptyState, MeterBar, SectionTitle, Stat } from '@/components/ui'
 import { AnimatedNumber } from '@/components/motion';
 import { formatDate } from '@/lib/utils';
 import { moneyFormatter } from '@/lib/currency-server';
-import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneSummary } from '@/agents/types';
 import type { AppLocale } from '@/i18n/routing';
 
 /** How many of the producer's most recent projects the summary reads. */
@@ -52,7 +52,6 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
           estimatedBudgetHigh: true,
           currency: true,
           equipmentPackage: true,
-          matchedDops: true,
           budgetBreakdown: true,
           sceneSummary: true,
           generatedAt: true,
@@ -90,7 +89,6 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
     string,
     { equipmentId: string; brand: string; model: string; count: number; days: number }
   >();
-  const dopTally = new Map<string, { name: string; count: number; bestScore: number }>();
   const typeTally = new Map<string, number>();
   let shootDays = 0;
   let sceneCount = 0;
@@ -112,12 +110,6 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
       equipmentTally.set(key, existing);
     }
 
-    for (const dop of (recommendation.matchedDops as unknown as DopMatch[]) ?? []) {
-      const existing = dopTally.get(dop.dopId) ?? { name: dop.name, count: 0, bestScore: 0 };
-      existing.count += 1;
-      existing.bestScore = Math.max(existing.bestScore, dop.score);
-      dopTally.set(dop.dopId, existing);
-    }
 
     const budget = recommendation.budgetBreakdown as unknown as BudgetBreakdown | null;
     shootDays += budget?.shootDays ?? 0;
@@ -134,7 +126,6 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
   const topTally = [...equipmentTally.values()].sort((a, b) => b.count - a.count).slice(0, 8);
   const nameOf = await equipmentNamer(topTally.map((entry) => entry.equipmentId), locale);
   const topEquipment = topTally.map((entry) => ({ ...entry, label: nameOf(entry) }));
-  const topDops = [...dopTally.values()].sort((a, b) => b.count - a.count).slice(0, 6);
   const nightShare = sceneCount > 0 ? Math.round((nightWeighted / sceneCount) * 100) : 0;
 
   const typeSegments = [...typeTally.entries()].map(([type, count], index) => ({
@@ -188,34 +179,6 @@ export default async function ProducerInsightsPage({ params }: { params: Promise
             <MeterBar segments={typeSegments} />
           </Card>
 
-          <Card title={t('topDops')}>
-            {topDops.length === 0 ? (
-              <p className="prose-sheet">—</p>
-            ) : (
-              <div className="table-wrap">
-                <table className="grid-table grid-table-compact [--grid-cols:minmax(10rem,1fr)_6rem_7rem]">
-                  <thead>
-                    <tr>
-                      <th>{t('colCinematographer')}</th>
-                      <th className="text-end">{t('colProjects')}</th>
-                      <th className="text-end">{t('colBestMatch')}</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {topDops.map((entry) => (
-                      <tr key={entry.name}>
-                        <td data-label={t('colCinematographer')} className="text-strong">{entry.name}</td>
-                        <td data-label={t('colProjects')} className="text-end tabular-nums">{entry.count}</td>
-                        <td data-label={t('colBestMatch')} className="text-end tabular-nums text-accent">
-                          {Math.round(entry.bestScore * 100)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </Card>
         </div>
       </div>
 

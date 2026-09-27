@@ -11,10 +11,8 @@ import {
 } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { saveSettings, type PlatformSettings } from '@/lib/settings';
-import { dopProfileSchema, rentalCompanySchema } from '@/lib/validation';
-import { buildDopEmbeddingText, embedText, writeDopEmbedding } from '@/lib/embeddings';
+import { rentalCompanySchema } from '@/lib/validation';
 import { slugify } from '@/lib/utils';
-import { reportError } from '@/lib/observability';
 import { BASE_CURRENCY, isCurrencyCode, type CurrencyConfig } from '@/lib/currency';
 import { saveCurrencyConfig } from '@/lib/currency-server';
 import { checkOverride, flattenMessages, type Messages } from '@/lib/site-copy';
@@ -92,82 +90,6 @@ export async function deleteRentalCompany(vendorId: string) {
     // The company row owns the vendor row (cascade), which owns the stock.
     await prisma.company.delete({ where: { id: vendor.companyId } });
     revalidate(REVALIDATE.adminVendors, REVALIDATE.adminRentals, REVALIDATE.adminHome);
-  });
-}
-
-// ---------------------------------------------------------------- cinematographers
-
-/**
- * Cinematographer profiles, kept by the admin. Saving re-embeds the profile so
- * it can be matched; if the embedding call fails (no key, no credit) the save
- * still succeeds and the nightly job or the re-embed button catches up.
- */
-export async function saveCinematographer(formData: FormData) {
-  return runAction('saveCinematographer', async () => {
-    await requireAdmin();
-    const parsed = dopProfileSchema.safeParse({
-      displayName: formData.get('displayName'),
-      displayNameAr: formData.get('displayNameAr') ?? '',
-      bio: formData.get('bio'),
-      city: formData.get('city') ?? '',
-      dayRate: formData.get('dayRate') || undefined,
-      yearsExperience: formData.get('yearsExperience') || undefined,
-      portfolioLinks: String(formData.get('portfolioLinks') ?? '')
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean),
-      styleTags: formData.getAll('styleTags').map(String),
-    });
-    if (!parsed.success) throw new Error('INVALID_INPUT');
-    const data = parsed.data;
-    const fields = {
-      displayName: data.displayName,
-      displayNameAr: data.displayNameAr || null,
-      bio: data.bio,
-      city: data.city || null,
-      dayRate: data.dayRate ?? null,
-      yearsExperience: data.yearsExperience ?? null,
-      portfolioLinks: data.portfolioLinks,
-      styleTags: data.styleTags,
-    };
-
-    const id = String(formData.get('id') ?? '');
-    const select = { id: true, displayName: true, bio: true, styleTags: true, city: true, yearsExperience: true };
-    const dop = id
-      ? await prisma.dop.update({ where: { id }, data: fields, select })
-      : await prisma.dop.create({
-          data: { ...fields, status: ApprovalStatus.APPROVED, approvedAt: new Date() },
-          select,
-        });
-
-    if (process.env.OPENAI_API_KEY) {
-      try {
-        const text = buildDopEmbeddingText(dop);
-        await writeDopEmbedding(dop.id, text, await embedText(text));
-      } catch (error) {
-        reportError(error, { scope: 'admin:dop-embedding', severity: 'warning', extra: { dopId: dop.id } });
-      }
-    }
-    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
-  });
-}
-
-export async function setCinematographerActive(dopId: string, active: boolean) {
-  return runAction('setCinematographerActive', async () => {
-    await requireAdmin();
-    await prisma.dop.update({
-      where: { id: dopId },
-      data: { status: active ? ApprovalStatus.APPROVED : ApprovalStatus.REJECTED },
-    });
-    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
-  });
-}
-
-export async function deleteCinematographer(dopId: string) {
-  return runAction('deleteCinematographer', async () => {
-    await requireAdmin();
-    await prisma.dop.delete({ where: { id: dopId } });
-    revalidate(REVALIDATE.adminDops, REVALIDATE.adminHome);
   });
 }
 
@@ -263,8 +185,6 @@ export async function savePlatformSettings(formData: FormData) {
       defaultCity: String(formData.get('defaultCity') ?? '') || undefined,
       contingencyPct: numeric('contingencyPct'),
       weeklyRentalDiscountPct: numeric('weeklyRentalDiscountPct'),
-      dopMatchMinScore: numeric('dopMatchMinScore'),
-      dopMatchCount: numeric('dopMatchCount'),
       shootDayHours: numeric('shootDayHours'),
     };
 

@@ -231,12 +231,11 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
           ) : null}
         </View>
 
+        {/* Only sheets from before cinematographer matching was dropped carry any. */}
+        {data.dops.length > 0 && (
         <View style={styles.section}>
           <Text style={styles.h2}>{L.dopsTitle}</Text>
-          {data.dops.length === 0 ? (
-            <Text style={styles.body}>{L.dopsEmpty}</Text>
-          ) : (
-            data.dops.map((dop) => (
+          {data.dops.map((dop) => (
               <View key={dop.dopId} style={{ marginBottom: 7 }} wrap={false}>
                 <Text style={styles.bold}>
                   {dop.name} — {L.matchScore} {Math.round(dop.score * 100)}%
@@ -248,9 +247,9 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
                   <Text style={[styles.body, { color: '#0f766e' }]}>{safeHttpUrls(dop.portfolioLinks).join('  ·  ')}</Text>
                 )}
               </View>
-            ))
-          )}
+          ))}
         </View>
+        )}
 
         <View style={styles.section}>
           <Text style={styles.h2}>{L.vendorsTitle}</Text>

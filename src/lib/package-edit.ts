@@ -4,10 +4,16 @@ import { prisma } from '@/lib/prisma';
 import { getSettings } from '@/lib/settings';
 import { priceProject } from '@/agents/vendor-budget-agent';
 import { getCrewDayRates, queryVendorInventory } from '@/agents/tools/vendor-tools';
-import type { BudgetBreakdown, EquipmentResult, PackageItem, SceneSummary } from '@/agents/types';
+import { isMarketItem, marketId, type BudgetBreakdown, type EquipmentResult, type PackageItem, type SceneSummary } from '@/agents/types';
 import { snapshotRecommendation } from '@/lib/versions';
 
-export type PackageEditItem = { equipmentId: string; quantity: number; rentalDays: number };
+export type PackageEditItem = {
+  equipmentId: string;
+  quantity: number;
+  rentalDays: number;
+  /** Adding market gear (no catalog id): what it is and an estimated day rate in SAR. */
+  market?: { brand: string; model: string; category: string; estimatedDayRate: number };
+};
 
 /**
  * Replaces a sheet's equipment package and re-prices it.
@@ -38,18 +44,39 @@ export async function repricePackage(
   ]);
   if (!recommendation || !full) throw new Error('NOT_FOUND');
 
-  // Every id must still exist in the catalog, so an edited sheet cannot name
-  // equipment the platform does not actually know about.
+  // Catalog ids must still exist in the catalog; market gear carries its own
+  // name and estimate, either from the sheet already or from the edit.
   const catalog = await prisma.equipment.findMany({
-    where: { id: { in: items.map((item) => item.equipmentId) }, active: true },
+    where: { id: { in: items.filter((item) => !isMarketItem(item)).map((item) => item.equipmentId) }, active: true },
     select: { id: true, brand: true, model: true, category: { select: { slug: true } } },
   });
   const byId = new Map(catalog.map((row) => [row.id, row]));
 
   const previous = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
   const reasons = new Map(previous.map((item) => [item.equipmentId, item.reason]));
+  const previousMarket = new Map(previous.filter(isMarketItem).map((item) => [item.equipmentId, item]));
 
   const packageItems: PackageItem[] = items.flatMap((item) => {
+    if (item.market) {
+      const rate = Math.round(item.market.estimatedDayRate);
+      if (!item.market.model.trim() || !(rate > 0)) return [];
+      return [
+        {
+          equipmentId: marketId(item.market.brand, item.market.model),
+          categorySlug: item.market.category || 'other',
+          brand: item.market.brand.trim(),
+          model: item.market.model.trim(),
+          quantity: item.quantity,
+          rentalDays: item.rentalDays,
+          reason: addedReason,
+          estimatedDayRate: rate,
+        },
+      ];
+    }
+    if (isMarketItem(item)) {
+      const kept = previousMarket.get(item.equipmentId);
+      return kept ? [{ ...kept, quantity: item.quantity, rentalDays: item.rentalDays }] : [];
+    }
     const row = byId.get(item.equipmentId);
     if (!row) return [];
     return [
@@ -76,7 +103,7 @@ export async function repricePackage(
   const iso = (date: Date | null) => (date ? date.toISOString().slice(0, 10) : undefined);
   const [inventory, crew] = await Promise.all([
     queryVendorInventory({
-      equipmentIds: packageItems.map((item) => item.equipmentId),
+      equipmentIds: packageItems.filter((item) => !isMarketItem(item)).map((item) => item.equipmentId),
       startDate: iso(full.shootStartDate),
       endDate: iso(full.shootEndDate),
       city: full.city,
@@ -108,7 +135,7 @@ export async function repricePackage(
   await prisma.projectRecommendation.update({
     where: { projectId },
     data: {
-      recommendedEquipmentIds: packageItems.map((item) => item.equipmentId),
+      recommendedEquipmentIds: packageItems.filter((item) => !isMarketItem(item)).map((item) => item.equipmentId),
       equipmentPackage: packageItems as unknown as Prisma.InputJsonValue,
       matchedVendors: priced.vendors as unknown as Prisma.InputJsonValue,
       estimatedBudgetLow: priced.low,

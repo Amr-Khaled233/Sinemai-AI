@@ -24,7 +24,6 @@ const ADMIN_NAV: NavLink[] = [
   { href: '/admin/equipment', key: 'equipment' },
   { href: '/admin/rentals', key: 'rentals' },
   { href: '/admin/vendors', key: 'vendors' },
-  { href: '/admin/dops', key: 'dops' },
   { href: '/admin/content', key: 'content' },
   { href: '/admin/settings', key: 'settings' },
 ];

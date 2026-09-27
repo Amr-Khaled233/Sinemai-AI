@@ -1,7 +1,6 @@
 import { getTranslations } from 'next-intl/server';
 import type { BudgetTier, Prisma } from '@prisma/client';
 import { Badge, Card, MeterBar, Stat } from '@/components/ui';
-import { MeterFill } from '@/components/motion';
 import { PackageEditor, type CatalogOption } from '@/components/sheet/package-editor';
 import { ScheduleView } from '@/components/sheet/schedule-view';
 import { CurrencySwitcher } from '@/components/currency-switcher';
@@ -9,14 +8,13 @@ import { getDisplayCurrency } from '@/lib/currency-server';
 import { fxFor } from '@/lib/currency';
 import { AdviceSection } from '@/components/sheet/advice-section';
 import { equipmentNamer } from '@/lib/equipment-name-server';
+import { isMarketItem } from '@/agents/types';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
-import { safeHttpUrls } from '@/lib/security';
 import { cityName } from '@/lib/city-name';
 import type {
   Advice,
   BudgetBreakdown,
-  DopMatch,
   PackageItem,
   SceneSummary,
   VendorMatch,
@@ -80,7 +78,19 @@ const CATEGORY_LABELS: Record<string, { en: string; ar: string }> = {
   support: { en: 'Support', ar: 'حركة' },
   sound: { en: 'Sound', ar: 'صوت' },
   power: { en: 'Power', ar: 'طاقة' },
+  drone: { en: 'Drone', ar: 'درون' },
+  monitoring: { en: 'Monitoring', ar: 'شاشات' },
+  other: { en: 'Other', ar: 'أخرى' },
 };
+
+/** Marks gear chosen from the wider market, priced from an estimate. */
+function MarketBadge({ label }: { label: string }) {
+  return (
+    <span className="ms-2 inline-block rounded-full border border-line px-2 py-0.5 align-middle text-[10px] font-normal uppercase tracking-wider text-muted rtl:tracking-normal">
+      {label}
+    </span>
+  );
+}
 
 export async function ProductionSheet({
   locale,
@@ -114,7 +124,6 @@ export async function ProductionSheet({
 
   const pkg = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
   const advice = (recommendation.advice as unknown as Advice | null | undefined) ?? null;
-  const dops = (recommendation.matchedDops as unknown as DopMatch[]) ?? [];
   const vendors = (recommendation.matchedVendors as unknown as VendorMatch[]) ?? [];
   const budget = (recommendation.budgetBreakdown as unknown as BudgetExtras) ?? null;
   const summary = (recommendation.sceneSummary as unknown as SceneSummary) ?? null;
@@ -130,6 +139,15 @@ export async function ProductionSheet({
     ],
     locale,
   );
+  // Market gear is rented outside the platform at an estimated rate; only
+  // catalog gear that no company stocks is a gap worth a warning.
+  const unstocked = (budget?.uncoveredEquipment ?? []).filter((item) => !isMarketItem(item));
+  const marketRates = new Map(
+    (budget?.uncoveredEquipment ?? []).filter(isMarketItem).map((item) => [item.equipmentId, item.fallbackDayRate]),
+  );
+  const marketLines = pkg
+    .filter(isMarketItem)
+    .map((item) => ({ ...item, rate: marketRates.get(item.equipmentId) ?? null }));
   const categoryLabel = (slug: string) =>
     locale === 'ar' ? CATEGORY_LABELS[slug]?.ar ?? slug : CATEGORY_LABELS[slug]?.en ?? slug;
 
@@ -349,6 +367,7 @@ export async function ProductionSheet({
                   </td>
                   <td data-label={t('item')} className="font-medium text-strong">
                     {nameOf(item)}
+                    {isMarketItem(item) && <MarketBadge label={t('marketBadge')} />}
                   </td>
                   <td data-label={t('quantity')} className="text-end tabular-nums">{item.quantity}</td>
                   <td data-label={t('days')} className="text-end tabular-nums">{item.rentalDays}</td>
@@ -365,76 +384,6 @@ export async function ProductionSheet({
             <p className="label">{t('equipmentRationale')}</p>
             <p dir="auto" className="prose-sheet">{recommendation.equipmentRationale}</p>
           </div>
-        )}
-      </Card>
-
-      {/* ---------------------------------------------------------- DOPs */}
-      <Card title={t('dopsTitle')}>
-        {dops.length === 0 ? (
-          <p className="prose-sheet">{t('dopsEmpty')}</p>
-        ) : (
-          <ul className="grid gap-3 md:grid-cols-2">
-            {dops.map((dop) => (
-              <li
-                key={dop.dopId}
-                className="card card-interactive bg-surface-sunken/60 p-4"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h3 className="text-sm font-semibold text-strong">{dop.name}</h3>
-                    <p className="mt-0.5 text-xs text-muted">
-                      {[cityName(dop.city, locale), dop.yearsExperience ? t('years', { count: dop.yearsExperience }) : null]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </p>
-                  </div>
-                  <div className="text-end">
-                    <div className="text-xs text-muted">{t('matchScore')}</div>
-                    <div className="text-lg font-semibold tabular-nums text-accent">
-                      {Math.round(dop.score * 100)}%
-                    </div>
-                  </div>
-                </div>
-
-                <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-line/70">
-                  <MeterFill
-                    pct={Math.min(100, Math.max(4, dop.score * 100))}
-                    className="bg-gradient-to-r from-brass-600 to-brass-400"
-                  />
-                </div>
-
-                <p dir="auto" className="mt-3 text-sm leading-6 text-muted">{dop.reason}</p>
-
-                <div className="mt-3 flex flex-wrap gap-1.5">
-                  {dop.styleTags.slice(0, 5).map((tag) => (
-                    <span key={tag} className="chip text-[11px]">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-
-                <div className="mt-4 flex flex-wrap items-center gap-3 text-xs">
-                  {/* Rows written before scheme validation existed are filtered here too. */}
-                  {safeHttpUrls(dop.portfolioLinks).slice(0, 3).map((link) => (
-                    <a
-                      key={link}
-                      href={link}
-                      target="_blank"
-                      rel="noreferrer noopener"
-                      className="tap-link text-info hover:underline"
-                    >
-                      {t('portfolio')} ↗
-                    </a>
-                  ))}
-                  {dop.dayRate ? (
-                    <span className="text-muted">
-                      {t('dayRate')}: {money(dop.dayRate)}
-                    </span>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ul>
         )}
       </Card>
 
@@ -517,11 +466,42 @@ export async function ProductionSheet({
           </div>
         )}
 
-        {budget?.uncoveredEquipment && budget.uncoveredEquipment.length > 0 && (
+        {unstocked.length > 0 && (
           <p className="mt-4 rounded-lg border border-warning/40 bg-warning/10 p-3 text-xs text-warning">
             {t('uncovered')}:{' '}
-            {budget.uncoveredEquipment.map((item) => nameOf(item)).join(' · ')}
+            {unstocked.map((item) => nameOf(item)).join(' · ')}
           </p>
+        )}
+
+        {marketLines.length > 0 && (
+          <section className="mt-6">
+            <h3 className="text-sm font-semibold text-strong">{t('marketTitle')}</h3>
+            <p className="mb-3 mt-1 text-xs text-muted">{t('marketHint')}</p>
+            <div className="table-wrap">
+              <table className="grid-table grid-table-compact [--grid-cols:minmax(10rem,2fr)_4rem_4.5rem_minmax(7rem,1fr)]">
+                <thead>
+                  <tr>
+                    <th>{t('item')}</th>
+                    <th className="text-end">{t('quantity')}</th>
+                    <th className="text-end">{t('days')}</th>
+                    <th className="text-end">{t('estDayRate')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {marketLines.map((line) => (
+                    <tr key={line.equipmentId}>
+                      <td data-label={t('item')} className="font-medium text-strong" dir="auto">{nameOf(line)}</td>
+                      <td data-label={t('quantity')} className="text-end tabular-nums">{line.quantity}</td>
+                      <td data-label={t('days')} className="text-end tabular-nums">{line.rentalDays}</td>
+                      <td data-label={t('estDayRate')} className="text-end tabular-nums">
+                        {line.rate !== null ? `~${money(line.rate)}` : '—'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
         )}
       </Card>
 

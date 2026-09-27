@@ -11,7 +11,7 @@ const RISK_TONE = { safety: 'red', cost: 'amber', both: 'red' } as const;
 /**
  * The advisor's section of the sheet: how long the shoot takes, how the
  * estimate sits against the producer's budget, the scenes that cost or risk the
- * most with ways to handle each, several directors, actors and cinematographers
+ * most with ways to handle each, several directors and actors
  * to approach, equipment beyond the catalog, and savings. It says plainly that
  * these are suggestions — people and market prices to confirm — unlike the
  * priced tables, which come from the platform's own data.
@@ -106,9 +106,8 @@ export async function AdviceSection({ advice, locale, fx }: { advice: Advice; lo
         </section>
       )}
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6">
         <PeopleList title={t('suggestedDirectors')} people={advice.directors} />
-        <PeopleList title={t('suggestedCinematographers')} people={advice.cinematographers} />
       </div>
 
       {advice.cast.length > 0 && (

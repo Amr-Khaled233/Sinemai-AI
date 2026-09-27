@@ -33,7 +33,6 @@ export const REVALIDATE = {
   adminHome: '/[locale]/admin',
   adminEquipment: '/[locale]/admin/equipment',
   adminVendors: '/[locale]/admin/vendors',
-  adminDops: '/[locale]/admin/dops',
   adminSettings: '/[locale]/admin/settings',
   adminRentals: '/[locale]/admin/rentals',
   adminUsers: '/[locale]/admin/users',
