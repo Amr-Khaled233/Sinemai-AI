@@ -13,7 +13,6 @@ const STAGE_ORDER: ProgressStage[] = [
   'analyzing_scenes',
   'clarifying',
   'matching_equipment',
-  'matching_dops',
   'pricing',
   'reviewing',
   'researching',

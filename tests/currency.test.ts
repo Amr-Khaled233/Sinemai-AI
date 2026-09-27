@@ -27,7 +27,6 @@ const sheet = {
   matchedVendors: [
     { subtotal: 800, items: [{ dailyRate: 400, weeklyRate: null, lineTotal: 800, quantity: 1, rentalDays: 2 }] },
   ],
-  matchedDops: [{ name: 'A', dayRate: 5000, score: 0.8 }, { name: 'B', dayRate: null, score: 0.7 }],
   budgetBreakdown: {
     currency: 'SAR',
     shootDays: 3,
@@ -111,10 +110,6 @@ describe('convertSheet', () => {
     assert.equal(breakdown.shootDays, 3);
     assert.equal(breakdown.contingencyPct, 12);
     assert.equal(breakdown.crewBreakdown[0].headcount, 1);
-    const dops = converted.matchedDops as typeof sheet.matchedDops;
-    assert.equal(dops[0].score, 0.8);
-    assert.equal(dops[0].dayRate, 1250);
-    assert.equal(dops[1].dayRate, null);
   });
 
   it('leaves the original untouched and returns it as-is when nothing changes', () => {

@@ -141,27 +141,6 @@ export type EquipmentResult = {
   droppedHallucinatedIds: string[];
 };
 
-// ------------------------------------------------------------ DOP matching
-
-export type DopMatch = {
-  dopId: string;
-  name: string;
-  city: string | null;
-  score: number;
-  reason: string;
-  styleTags: string[];
-  portfolioLinks: string[];
-  dayRate: number | null;
-  yearsExperience: number | null;
-};
-
-export type DopResult = {
-  matches: DopMatch[];
-  queryText: string;
-  searchedCount: number;
-  note: string | null;
-};
-
 // ------------------------------------------------------------ vendors + budget
 
 export type VendorLine = {
@@ -253,8 +232,6 @@ export type Advice = {
   }>;
   directors: Array<{ name: string; knownFor: string; why: string }>;
   cast: Array<{ role: string; suggestions: Array<{ name: string; why: string }> }>;
-  /** Only on sheets made before cinematographer suggestions were dropped; no longer shown. */
-  cinematographers?: Array<{ name: string; knownFor: string; why: string }>;
   equipmentIdeas: Array<{ item: string; why: string; approxDayRateSar: number | null }>;
   savings: Array<{ idea: string; estimatedSavingSar: number | null }>;
   sources: Array<{ title: string; url: string }>;
@@ -269,7 +246,6 @@ export type ProductionSheet = {
   sceneSummary: SceneSummary;
   scenes: SceneRequirement[];
   equipment: EquipmentResult;
-  dops: DopResult;
   vendorBudget: VendorBudgetResult;
   critic: CriticResult;
   rationaleText: string;
@@ -285,7 +261,6 @@ export type ProgressStage =
   | 'clarifying'
   | 'awaiting_input'
   | 'matching_equipment'
-  | 'matching_dops'
   | 'pricing'
   | 'reviewing'
   | 'retrying'

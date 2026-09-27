@@ -1,6 +1,6 @@
 /**
  * Every piece of agent prose that reaches the producer — equipment rationale,
- * cinematographer match reasons, sourcing notes, reviewer findings, the
+ * sourcing notes, reviewer findings, the
  * executive summary — is written in the language the producer is using right
  * now, not the language stored on their account.
  *

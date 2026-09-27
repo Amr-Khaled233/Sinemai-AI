@@ -57,7 +57,7 @@ export const authOptions: NextAuthOptions = {
         token.locale = (user as { locale?: string }).locale ?? 'en';
         token.authAt = Math.floor(Date.now() / 1000);
       } else if (trigger === 'update' && token.id) {
-        // Role can change when an admin approves a vendor/DOP application.
+        // Role can change when the seed promotes or demotes the admin.
         const fresh = await prisma.user.findUnique({
           where: { id: token.id as string },
           select: { role: true, locale: true },
@@ -110,11 +110,7 @@ export async function requireUser(locale = 'en') {
   return session;
 }
 
-/**
- * There are two kinds of account: the admin, and everyone else. The VENDOR and
- * DOP roles are left in the schema for old rows only; they count as regular
- * users, so an old account lands in the user area instead of a dead end.
- */
+/** There are two kinds of account: the admin, and everyone else. */
 export function effectiveRole(role: Role): 'ADMIN' | 'PRODUCER' {
   return role === 'ADMIN' ? 'ADMIN' : 'PRODUCER';
 }

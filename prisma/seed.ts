@@ -48,6 +48,9 @@ const LEGACY_DEMO_TAGS = [
   'dop-tariq',
 ];
 
+/** Commercial registration numbers of the demo rental companies earlier seeds created. */
+const DEMO_COMPANY_CR_NUMBERS = ['1010000001', '4030000002'];
+
 function legacyDemoEmail(tag: string) {
   const [local, domain] = SEED_GMAIL.split('@');
   return `${local.split('+')[0]}+${tag}@${domain}`;
@@ -925,119 +928,18 @@ async function main() {
   });
   if (demoted.count) console.log(`  ${demoted.count} other admin account(s) are now regular users`);
 
-  // Companies and cinematographers no longer hang off accounts. Unlink them
-  // first so removing the old demo logins keeps the records they point to.
+  // ---------------------------------------------------------------- old data
+  // Earlier versions of this seed created demo logins and demo rental
+  // companies. They are removed outright, with everything hanging off them
+  // (their scripts; the companies' stock and bookings). The migrations remove
+  // the cinematographer tables and roles themselves.
+  console.log('→ removing old demo data');
   const legacyEmails = LEGACY_DEMO_TAGS.map(legacyDemoEmail).filter((email) => email !== SEED_GMAIL);
-  const legacyUsers = await prisma.user.findMany({ where: { email: { in: legacyEmails } }, select: { id: true } });
-  if (legacyUsers.length) {
-    const ids = legacyUsers.map((user) => user.id);
-    await prisma.vendor.updateMany({ where: { userId: { in: ids } }, data: { userId: null } });
-    await prisma.dop.updateMany({ where: { userId: { in: ids } }, data: { userId: null } });
-    await prisma.user.deleteMany({ where: { id: { in: ids } } });
-    console.log(`  removed ${ids.length} old demo account(s)`);
-  }
+  const removedAccounts = await prisma.user.deleteMany({ where: { email: { in: legacyEmails } } });
+  if (removedAccounts.count) console.log(`  removed ${removedAccounts.count} old demo account(s)`);
 
-  // ---- launch-partner vendors
-  const vendorSeeds = [
-    {
-      company: {
-        name: 'استوديوهات نجد للتأجير',
-        nameEn: 'Najd Studios Rentals',
-        crNumber: '1010000001',
-        city: 'Riyadh',
-        phone: '+966500000001',
-        website: 'https://example.com/najd',
-        verified: true,
-      },
-      // brand/model → [dailyRate, quantity]
-      stock: {
-        'ARRI|ALEXA 35': [5400, 2],
-        'ARRI|ALEXA Mini': [3400, 3],
-        'Sony|FX6': [700, 4],
-        'ARRI|Signature Prime set (5 lenses)': [3600, 1],
-        'ZEISS|Supreme Prime set (5 lenses)': [2400, 2],
-        'Sigma|Cine FF High Speed Prime set (5 lenses)': [750, 3],
-        'ARRI|SkyPanel S60-C': [950, 6],
-        'Aputure|LS 600d Pro': [450, 5],
-        'Astera|Titan Tube set (8 tubes)': [800, 2],
-        'Matthews|Standard grip package (stands, flags, clamps)': [380, 3],
-        'DJI|RS 4 Pro gimbal': [300, 3],
-        'Sound Devices|MixPre-10 II recorder': [320, 2],
-        'Anton/Bauer|Gold Mount battery package (6 batteries + chargers)': [220, 4],
-      } as Record<string, [number, number]>,
-    },
-    {
-      company: {
-        name: 'البحر الأحمر للإنتاج',
-        nameEn: 'Red Sea Production Services',
-        crNumber: '4030000002',
-        city: 'Jeddah',
-        phone: '+966500000002',
-        website: 'https://example.com/redsea',
-        verified: true,
-      },
-      stock: {
-        'RED|KOMODO 6K': [1450, 2],
-        'Sony|FX6': [620, 3],
-        'Canon|EOS C70': [520, 3],
-        'Blackmagic Design|Pocket Cinema Camera 6K Pro': [280, 4],
-        'Atlas Lens Co.|Orion Anamorphic 2x set (4 lenses)': [1900, 1],
-        'Sigma|Cine FF High Speed Prime set (5 lenses)': [680, 2],
-        'Fujinon|MK 18-55 T2.9 zoom': [300, 3],
-        'Aputure|LS 600d Pro': [400, 6],
-        'Aputure|amaran 200x bi-colour': [110, 8],
-        'Kino Flo|Diva-Lite 20 LED kit (2 heads)': [240, 3],
-        'Matthews|Standard grip package (stands, flags, clamps)': [330, 2],
-        'Matthews|12x12 butterfly kit (diffusion + solid)': [500, 2],
-        'DJI|Inspire 3 aerial platform': [2500, 1],
-        'Honda|EU70is generator (7 kVA, silenced)': [580, 2],
-        'Sennheiser|MKH 8060 shotgun + boom kit': [230, 2],
-      } as Record<string, [number, number]>,
-    },
-  ];
-
-  const equipmentByKey = new Map(
-    (await prisma.equipment.findMany({ select: { id: true, brand: true, model: true } })).map((e) => [
-      `${e.brand}|${e.model}`,
-      e.id,
-    ]),
-  );
-
-  for (const seed of vendorSeeds) {
-    const company = await prisma.company.upsert({
-      where: { crNumber: seed.company.crNumber },
-      create: seed.company,
-      update: seed.company,
-    });
-
-    const vendor = await prisma.vendor.upsert({
-      where: { companyId: company.id },
-      create: { companyId: company.id, status: 'APPROVED', verified: true, approvedAt: new Date() },
-      update: {},
-    });
-
-    for (const [key, [dailyRate, quantity]] of Object.entries(seed.stock)) {
-      const equipmentId = equipmentByKey.get(key);
-      if (!equipmentId) {
-        console.warn(`  ! no catalog entry for ${key}`);
-        continue;
-      }
-      const data = {
-        dailyRate,
-        weeklyRate: Math.round(dailyRate * 7 * 0.8),
-        monthlyRate: Math.round(dailyRate * 30 * 0.6),
-        quantityTotal: quantity,
-        quantityAvailable: quantity,
-        city: seed.company.city,
-        active: true,
-      };
-      await prisma.vendorInventoryItem.upsert({
-        where: { vendorId_equipmentId: { vendorId: vendor.id, equipmentId } },
-        create: { vendorId: vendor.id, equipmentId, ...data },
-        update: data,
-      });
-    }
-  }
+  const removedCompanies = await prisma.company.deleteMany({ where: { crNumber: { in: DEMO_COMPANY_CR_NUMBERS } } });
+  if (removedCompanies.count) console.log(`  removed ${removedCompanies.count} demo rental company(ies) and their stock`);
 
   console.log(`
 Seed complete.

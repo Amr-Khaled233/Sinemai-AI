@@ -2,8 +2,9 @@
 
 Film and advertising production intelligence. A producer uploads a screenplay or an ad brief;
 the platform returns a **Production & Equipment Sheet**: a scene-by-scene breakdown, a
-camera/lighting/grip package, cinematographers matched by visual style, rental vendors that
-actually stock the gear, and a costed budget — in Arabic (default, RTL) or English.
+camera/lighting/grip package chosen from the platform's catalog and the wider market, the rental
+companies that stock it, a costed budget, and advice on directors, cast, risky scenes and savings —
+in English (default) or Arabic (RTL).
 
 Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay heading conventions
 (`مشهد ٣ - داخلي - ... - ليل`) alongside Fountain, Final Draft and PDF.
@@ -16,8 +17,8 @@ Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay head
 | --- | --- |
 | Framework | Next.js 15 App Router, TypeScript, Server Actions |
 | AI | Vercel AI SDK 5 (`ai`) + `@ai-sdk/openai` — gpt-4o for reasoning, gpt-4o-mini for narrow agents |
-| Database | Postgres + `pgvector` (Vercel Postgres / Neon) via Prisma |
-| Auth | NextAuth (credentials, JWT sessions) with `PRODUCER · VENDOR · DOP · ADMIN` roles |
+| Database | Postgres (Neon) via Prisma |
+| Auth | NextAuth (credentials, JWT sessions); one admin account, everyone else a regular user |
 | Files | Vercel Blob (scripts, equipment photos) |
 | Email | Gmail SMTP with an App Password via `nodemailer` (falls back to console logging in dev) |
 | PDF | `@react-pdf/renderer` with an embedded IBM Plex Sans Arabic — Arabic and English, no headless browser |
@@ -33,15 +34,15 @@ Built for the Saudi market: SAR pricing, Arabic-first UI, Arabic screenplay head
 ```bash
 cp .env.example .env          # fill DATABASE_URL and OPENAI_API_KEY at minimum
 npm install
-npm run db:setup              # pgvector extension → schema push → HNSW index → seed
+npm run db:setup              # migrations → seed
 npm run dev
 ```
 
 `db:setup` is migrations followed by the seed:
 
 ```bash
-npm run db:deploy   # applies prisma/migrations — includes the pgvector extension and HNSW index
-npm run db:seed     # catalog, crew rates, style tags, launch partners, demo accounts
+npm run db:deploy   # applies prisma/migrations
+npm run db:seed     # catalog, crew rates, style tags, the admin account; removes old demo data
 ```
 
 The schema is versioned as a migration history rather than pushed, so production
@@ -56,22 +57,17 @@ The history is covered by a test: `tests/migration.test.ts` applies every migrat
 real Postgres running in-process, so a migration that would not apply fails locally rather
 than at deploy time against the production database.
 
-### Seeded accounts
-
-Demo accounts are built from one real Gmail address with plus-addressing, so every
-approval mail, inquiry and password reset lands in a single inbox and each account can
-actually be signed into:
+### The seed
 
 ```bash
 SEED_GMAIL=you@gmail.com SEED_PASSWORD='choose-one' npm run db:seed
 ```
 
-| Email | Role |
-| --- | --- |
-| `you+admin@gmail.com` | ADMIN |
-| `you+producer@gmail.com` | PRODUCER |
-| `you+vendor-riyadh@gmail.com` · `you+vendor-jeddah@gmail.com` | VENDOR (approved, with inventory) |
-| `you+dop-faisal@gmail.com` … `you+dop-tariq@gmail.com` | DOP (approved, 5 profiles) |
+It creates exactly one account, the admin, at `SEED_GMAIL`; everyone else signs up as a regular
+user. Any other admin is demoted. It is safe to run again, and each run also removes what earlier
+versions of the seed left behind: the plus-addressed demo logins and the demo rental companies,
+with their stock. (Cinematographer profiles, the vendor and DOP roles and every trace of them in
+stored sheets were removed by the `20260927180000_remove_cinematographers` migration.)
 
 **No password is committed to this repository.** With `SEED_PASSWORD` unset the seed
 generates a strong one and prints it once — save it from that output. Forgot the password
@@ -80,18 +76,14 @@ later? Use the reset flow on the sign-in page.
 The seed ships ~30 catalog entries compiled from public manufacturer spec sheets
 (ARRI, RED, Sony, Canon, Blackmagic, Aputure, Astera, Nanlux, Kino Flo, DJI, Matthews,
 Sound Devices, Sennheiser, Honda). **`indicativeDayRate` values are placeholder market
-estimates** used only when no approved vendor stocks an item — vendors set the real prices, and
-an admin can edit these in the catalog screen.
-
-DOP embeddings are generated during the seed when `OPENAI_API_KEY` is set. Without it the
-profiles are stored unembedded and cannot be matched until the nightly job or the admin
-"Re-embed cinematographers" button runs.
+estimates** used only when no rental company stocks an item. Rental companies and their prices
+are added by the admin.
 
 ---
 
 ## The AI engine
 
-Six agents, not one prompt. Each one has a narrow job, its own system prompt, and only the tools
+Several agents, not one prompt. Each one has a narrow job, its own system prompt, and only the tools
 it needs.
 
 ```
@@ -106,13 +98,13 @@ Script Analyst Agent ....... parseScriptFile, segmentScenes
         ▼
 Clarify step ............... askProducer → pauses the run until the producer
         │                    answers (or skips) what the brief leaves open
-        ├──────────────┬─────────────────────┐
-        ▼              ▼                     │  Equipment and DOP matching
-Equipment Agent   DOP Matching Agent         │  run concurrently
- queryEquipment    embedText,                │
- Catalog           vectorSearchDOPs          │
-        └──────┬───────┘                     │
-               ▼                             │
+        ▼
+Visual style step .......... picks the look from the script
+        │
+        ▼
+Equipment Agent ............ queryEquipmentCatalog; catalog gear by id,
+        │                    market gear by name with an estimated day rate
+        ▼
     Vendor & Budget Agent  ← needs the package
      queryVendorInventory, getCrewDayRates
                │
@@ -121,6 +113,9 @@ Equipment Agent   DOP Matching Agent         │  run concurrently
                │
                ▼
     Critic Agent (no tools) → one targeted retry per flagged agent
+               │
+               ▼
+    Advisor .................. web research → directors, cast, costly scenes, savings
                │
                ▼
     Production & Equipment Sheet → UI + PDF
@@ -133,9 +128,12 @@ The hallucination surface is closed structurally, not by asking the model nicely
 - **Facts come from tool results, not model prose.** Every tool call is wrapped
   ([`loggedTool`](src/agents/runtime.ts)), and downstream code reads the recorded results.
   The model chooses *filters* and *selections*; the database supplies names, specs and prices.
-- **Selection is validated against the retrieved set.** The Equipment Agent picks ids from the
-  catalog shortlist it retrieved; any id outside that set is dropped before pricing and reported
-  to the Critic (`droppedHallucinatedIds`).
+- **Catalog and market are kept apart.** The Equipment Agent picks catalog gear by id from the
+  shortlist it retrieved, priced from real rental-company rates. Gear the catalog lacks comes in
+  as a `market:` item with an exact product name and an estimated Saudi day rate; it is marked on
+  the sheet, and its high-end price allows 30% above the estimate. Anything that is neither a valid
+  id nor named and priced is dropped before pricing and reported to the Critic
+  (`droppedHallucinatedIds`).
 - **Parsing is deterministic.** [`src/lib/script/parse.ts`](src/lib/script/parse.ts) decides what
   the scenes *are*; the analyst only decides what each scene *needs*.
 - **All arithmetic is code.** Scene aggregates, rental allocation, weekly-rate maths, crew
@@ -159,7 +157,7 @@ matter for this production and, if any do, calls the `askProducer` tool
 The run then pauses at `AWAITING_INPUT` and the project page shows the questions, with
 suggested answers where it is a choice. Every question carries the assumption the run will use
 if it is left blank, so "skip" is always an option and a producer is never stuck. The answers go
-into every agent after the pause — equipment, cinematographers, vendors, the reviewer and the
+into every agent after the pause — equipment, vendors, the reviewer, the advisor and the
 executive summary — as facts about the production.
 
 A pause costs nothing while it waits: no request is made until the producer answers, the
@@ -172,14 +170,15 @@ goes with the assumptions.
 The run carries the locale the producer is actually reading, not the one stored on their
 account, and every agent that writes prose for a human gets a language directive appended to
 its system prompt ([`src/agents/language.ts`](src/agents/language.ts)). Equipment rationale,
-cinematographer match reasons, sourcing caveats, reviewer findings and the executive summary
+sourcing caveats, reviewer findings and the executive summary
 come back in Arabic on `/ar` and English on `/en`. Ids, enum values, numbers and equipment
 model names stay exactly as the database has them — the UI translates those itself.
 
 ### Editing the package
 
 The agents propose, the producer decides. Quantities and rental days are editable on the sheet,
-items can be removed, and anything in the catalog can be added.
+items can be removed, anything in the catalog can be added, and the project chat can add market
+gear with an estimated rate.
 
 Saving does not re-run the agent graph: the script has not changed, so there is nothing for a
 model to re-reason about. It re-queries vendor stock and crew rates and runs the same
@@ -203,8 +202,7 @@ travel times, so it is the starting point a scheduler edits rather than the fina
 Every replacement of a sheet freezes the outgoing one first — a full re-analysis and a package
 edit both snapshot into `RecommendationVersion` — so "what did that change actually cost" has an
 answer. The compare view diffs a stored version against the live sheet: budget movement with a
-direction (a saving is green), the package line by line as added, removed, changed or untouched,
-and which cinematographers came and went. Snapshotting never fails the operation that triggered
+direction (a saving is green), and the package line by line as added, removed, changed or untouched. Snapshotting never fails the operation that triggered
 it; a lost snapshot is a missing history entry, not a failed analysis.
 
 ### Spreadsheet export
@@ -221,7 +219,7 @@ budget column still sums in Excel. Tab names and headers follow the reader's loc
 `/producer/insights` answers the questions a producer asks across projects rather than inside
 one: how many sheets have been costed, what they total, the average budget, total shoot days,
 the share of night work, which equipment keeps coming back and how many rental days it accounts
-for, which cinematographers keep matching, and the budget band per project.
+for, and the budget band per project.
 
 It is counted from the sheets themselves, with no separate analytics table, so it is exactly as
 accurate as the sheets are — and a package edit shows up in it immediately.
@@ -238,7 +236,7 @@ and the same step is never executed, or billed, twice.
 ### Resumable execution and streaming
 
 The orchestrator is a **state machine, not one long call**. Each step does one unit of work
-(parse, *one batch of 12 scenes*, equipment+DOP, pricing, review, one retry, assemble) and
+(parse, *one batch of 12 scenes*, equipment, pricing, review, one retry, research, advice, assemble) and
 checkpoints to `AnalysisState`. `POST /api/projects/:id/analyze` runs as many steps as fit in
 a 40s budget, streams newline-delimited JSON progress events, and closes with a `checkpoint`
 event telling the client whether to call again.
@@ -252,7 +250,7 @@ reloaded page can rejoin a run already in flight.
 ### Tests
 
 ```bash
-npm test      # 192 unit tests, no database and no API calls
+npm test      # unit tests, no database and no API calls
 npm run verify  # typecheck + lint + tests + parser smoke, the pre-push gate
 ```
 
@@ -276,7 +274,7 @@ rows rather than reaching for Prisma.
 
 ```bash
 npm run agents:smoke            # parses every file in ./samples — no API calls, no DB writes
-npm run agents:smoke -- --full  # creates a throwaway project and runs all six agents
+npm run agents:smoke -- --full  # creates a throwaway project and runs every agent
 ```
 
 `samples/` covers Fountain, Final Draft `.fdx`, an English ad brief with `Scene N —` headings, and
@@ -293,12 +291,8 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
   `budgetTier[]`, `dayNightSuitability`, `specialCapabilities[]`, `isCore`.
 - `VendorInventoryItem` holds the real prices and quantities; `AvailabilityBlock` holds
   rented-out date ranges, which the vendor tool intersects with the shoot dates.
-- `Dop.embedding` is a `vector(1536)` column. text-embedding-3-large is **shortened to 1536
-  dimensions** via the provider's `dimensions` parameter because pgvector's HNSW index tops out
-  at 2000 dims. Prisma cannot read `Unsupported` columns, so embedding writes and similarity
-  search use raw SQL in [`src/lib/embeddings.ts`](src/lib/embeddings.ts).
-- `ProjectRecommendation` stores the whole sheet (package, matches, budget breakdown, critic
-  notes, model provenance) so it renders, exports and shares without re-running any agent.
+- `ProjectRecommendation` stores the whole sheet (package, rental companies, budget breakdown,
+  advice, critic notes, model provenance) so it renders, exports and shares without re-running any agent.
 - `RecommendationVersion` is an append-only copy of a sheet as it stood before it was replaced,
   keyed `(projectId, version)` and stamped with why it was superseded (a re-analysis or a hand
   edit), which is what makes the compare view possible after the fact.
@@ -318,8 +312,7 @@ an Arabic screenplay with Arabic-Indic scene numbers. The parse-only mode is the
    `DATABASE_URL="<direct url>" npm run db:deploy`, then the same with `npm run db:seed`.
    Every later schema change is one more `npm run db:deploy` before (or right after) the push that
    ships it.
-4. Deploy. `vercel.json` registers two cron jobs:
-   - `/api/cron/reembed-dops` daily at 03:00 — re-embeds profiles edited since their last vector.
+4. Deploy. `vercel.json` registers one cron job:
    - `/api/cron/availability-cleanup` at 03:30 — prunes old availability blocks and fails
      analyses left hanging by a timed-out function (a run paused on questions is left alone).
 5. No plan upgrade is needed: the analyze route declares `maxDuration = 60` and the run is
@@ -334,9 +327,9 @@ move the PDF route.
 
 ## Known limits, deliberately
 
-- **Indicative day rates are placeholders.** They exist so a sheet can still be costed when a
-  needed item has no vendor. Real prices come from vendor onboarding.
-- **Proximity is a soft signal.** Same-city DOPs and vendors get a small ranking nudge, never a
+- **Market rates are estimates.** Gear from outside the catalog is priced from the model's
+  estimate of a Saudi rental rate; the sheet says so and asks the producer to confirm it.
+- **Proximity is a soft signal.** Same-city rental companies get a small ranking nudge, never a
   hard filter — Saudi crews travel between cities routinely.
 - **Scene numbers per scene are estimates.** Page eighths come from line counts, not from a
   paginated layout engine, so they approximate rather than replace a scheduling package.
@@ -358,8 +351,8 @@ visit opens dark. The choice is stored in `localStorage` and applied by a tiny i
 `<head>` before first paint, so the page never flashes the wrong theme. Every storage read and
 write is wrapped in try/catch, because private windows throw.
 
-Public sign-up creates producer accounts only; there is no role field for the browser to set.
-Vendor and cinematographer accounts come from the seed or an admin.
+Public sign-up creates regular accounts only; there is no role field for the browser to set.
+The one admin account comes from the seed.
 
 ## Arabic PDF
 
@@ -404,8 +397,7 @@ walks the action layer and every route handler, and fails on one that reaches fo
 nor a documented stand-in (a share token, the cron secret, NextAuth's own handler). A new action
 cannot quietly ship without a guard.
 
-**Injection and XSS.** Prisma parameterises everything, including the two raw pgvector queries,
-whose vector literal is built from validated numbers. React escapes the UI, but three places bypass
+**Injection and XSS.** Prisma parameterises everything. React escapes the UI, but three places bypass
 it and are handled explicitly:
 
 - **Email.** Every template lives in [`src/lib/email.ts`](src/lib/email.ts) and escapes every
@@ -415,7 +407,7 @@ it and are handled explicitly:
   literal written outside that module.
 - **Links.** Anything rendered as an `href` is scheme-checked: `z.string().url()` accepts
   `javascript:`, `data:` and `vbscript:`, which would otherwise be stored XSS through a
-  cinematographer's portfolio links. The exports apply the same allow-list, so a hostile URL cannot
+  rental company's website link. The exports apply the same allow-list, so a hostile URL cannot
   ride out inside a PDF or a spreadsheet cell either.
 - **Spreadsheet cells.** User text goes in as inline strings, never formulas, so a project named
   `=HYPERLINK(...)` opens as text in Excel instead of executing. Asserted by unzipping a generated
@@ -442,8 +434,7 @@ landing page ships 1.3 KB and no admin strings.
 The risk in scoping is a namespace someone forgets, so
 [`tests/i18n-scopes.test.ts`](tests/i18n-scopes.test.ts) walks each page's real import graph, finds
 the client components it renders, and fails if one asks for a namespace its area does not serve —
-and also if an area serves one nothing under it uses. It found a real coupling immediately: the
-cinematographer's profile imported a picker out of the producer's form module.
+and also if an area serves one nothing under it uses.
 
 **Request integrity.** Server Actions get Next's built-in CSRF protection; route handlers do not,
 so every state-changing handler checks the request origin as well, behind the SameSite=Lax session

@@ -9,9 +9,9 @@ import { PGlite } from '@electric-sql/pglite';
  *
  * A migration that does not apply is only discovered at deploy time otherwise,
  * against the production database, which is the worst possible moment. PGlite
- * has no pgvector, so the two vector-specific statements are swapped for
- * equivalents and asserted separately — everything else runs exactly as
- * written, which is what catches a malformed or inconsistent migration.
+ * has no pgvector, so the baseline's vector-specific statements (for a table a
+ * later migration drops) are swapped for equivalents — everything else runs
+ * exactly as written, which is what catches a malformed or inconsistent migration.
  */
 
 const MIGRATIONS_DIR = join(process.cwd(), 'prisma', 'migrations');
@@ -101,14 +101,26 @@ describe('migration history', () => {
     assert.equal(rows[0]?.delete_rule, 'CASCADE');
   });
 
-  it('declares the pgvector column and its index', () => {
-    // Not executable here, so asserted on the SQL itself.
-    const all = migrationFiles()
-      .map((file) => file.sql)
-      .join('\n');
-    assert.match(all, /CREATE EXTENSION IF NOT EXISTS "vector"/);
-    assert.match(all, /"embedding" vector\(1536\)/);
-    assert.match(all, /USING hnsw \(embedding vector_cosine_ops\)/);
+  it('leaves nothing of the cinematographers behind', async () => {
+    const tables = await db.query<{ table_name: string }>(
+      `SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'Dop'`,
+    );
+    assert.equal(tables.rows.length, 0);
+
+    const columns = await db.query<{ column_name: string }>(
+      `SELECT column_name FROM information_schema.columns
+       WHERE table_schema = 'public' AND column_name IN ('matchedDops', 'dops', 'userId') AND table_name IN
+         ('ProjectRecommendation', 'RecommendationVersion', 'AnalysisState', 'Vendor')`,
+    );
+    assert.deepEqual(columns.rows, []);
+
+    const labels = await db.query<{ enumlabel: string }>(
+      `SELECT e.enumlabel FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid
+       WHERE t.typname IN ('Role', 'AgentName', 'AnalysisStage')`,
+    );
+    const names = labels.rows.map((row) => row.enumlabel);
+    for (const gone of ['VENDOR', 'DOP', 'DOP_MATCH', 'DOPS']) assert.ok(!names.includes(gone), gone);
+    for (const kept of ['ADMIN', 'PRODUCER', 'VENDOR_BUDGET', 'ADVISE']) assert.ok(names.includes(kept), kept);
   });
 
   it('has a provider lock so a second engine cannot be applied by accident', () => {

@@ -23,7 +23,6 @@ const side = (over: Partial<Parameters<typeof compareSheets>[0]> = {}) => ({
   mid: 55_000,
   high: 60_000,
   equipmentPackage: [item()] as unknown as Prisma.JsonValue,
-  matchedDops: [] as unknown as Prisma.JsonValue,
   budgetBreakdown: {
     shootDays: 4,
     equipmentRental: 20_000,
@@ -98,22 +97,11 @@ describe('sheet comparison', () => {
     assert.ok(['added', 'removed'].includes(diff.packageRows[0].change));
   });
 
-  it('reports which cinematographers came and went', () => {
-    const diff = compareSheets(
-      side({ matchedDops: [{ name: 'Faisal' }, { name: 'Noura' }] as unknown as Prisma.JsonValue }),
-      side({ matchedDops: [{ name: 'Noura' }, { name: 'Layla' }] as unknown as Prisma.JsonValue }),
-    );
-    assert.equal(diff.dopsChanged, true);
-    assert.deepEqual(diff.addedDops, ['Layla']);
-    assert.deepEqual(diff.removedDops, ['Faisal']);
-  });
-
   it('survives a version stored before a field existed', () => {
     const diff = compareSheets(
-      side({ budgetBreakdown: null as unknown as Prisma.JsonValue, matchedDops: null as unknown as Prisma.JsonValue }),
+      side({ budgetBreakdown: null as unknown as Prisma.JsonValue }),
       side(),
     );
     assert.equal(diff.budget.crewDelta, 30_000);
-    assert.equal(diff.dopsChanged, false);
   });
 });

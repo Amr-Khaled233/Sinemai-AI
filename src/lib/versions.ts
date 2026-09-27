@@ -1,7 +1,7 @@
 import 'server-only';
 import { Prisma, type PrismaClient } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import type { BudgetBreakdown, DopMatch, PackageItem } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem } from '@/agents/types';
 import { BASE_CURRENCY, convertSheet, type Fx } from '@/lib/currency';
 import { equipmentNamer } from '@/lib/equipment-name-server';
 
@@ -53,7 +53,6 @@ export async function snapshotRecommendation(
         version,
         reason,
         equipmentPackage: current.equipmentPackage ?? Prisma.JsonNull,
-        matchedDops: current.matchedDops ?? Prisma.JsonNull,
         matchedVendors: current.matchedVendors ?? Prisma.JsonNull,
         budgetBreakdown: current.budgetBreakdown ?? Prisma.JsonNull,
         sceneSummary: current.sceneSummary ?? Prisma.JsonNull,
@@ -100,9 +99,6 @@ export type SheetComparison = {
     shootDaysDelta: number;
   };
   packageRows: PackageDiffRow[];
-  dopsChanged: boolean;
-  addedDops: string[];
-  removedDops: string[];
 };
 
 type Side = {
@@ -114,7 +110,6 @@ type Side = {
   mid: number;
   high: number;
   equipmentPackage: Prisma.JsonValue;
-  matchedDops: Prisma.JsonValue;
   budgetBreakdown: Prisma.JsonValue;
 };
 
@@ -166,8 +161,6 @@ export function compareSheets(left: Side, right: Side): SheetComparison {
   const leftBudget = (left.budgetBreakdown as unknown as BudgetBreakdown) ?? null;
   const rightBudget = (right.budgetBreakdown as unknown as BudgetBreakdown) ?? null;
 
-  const leftDops = ((left.matchedDops as unknown as DopMatch[]) ?? []).map((dop) => dop.name);
-  const rightDops = ((right.matchedDops as unknown as DopMatch[]) ?? []).map((dop) => dop.name);
 
   return {
     left: {
@@ -193,9 +186,6 @@ export function compareSheets(left: Side, right: Side): SheetComparison {
       shootDaysDelta: (rightBudget?.shootDays ?? 0) - (leftBudget?.shootDays ?? 0),
     },
     packageRows,
-    dopsChanged: leftDops.join('|') !== rightDops.join('|'),
-    addedDops: rightDops.filter((name) => !leftDops.includes(name)),
-    removedDops: leftDops.filter((name) => !rightDops.includes(name)),
   };
 }
 
@@ -227,7 +217,6 @@ export async function loadComparison(
       mid: version.estimatedBudgetMid,
       high: version.estimatedBudgetHigh,
       equipmentPackage: version.equipmentPackage,
-      matchedDops: version.matchedDops,
       budgetBreakdown: version.budgetBreakdown,
     },
     {
@@ -239,7 +228,6 @@ export async function loadComparison(
       mid: current.estimatedBudgetMid,
       high: current.estimatedBudgetHigh,
       equipmentPackage: current.equipmentPackage,
-      matchedDops: current.matchedDops,
       budgetBreakdown: current.budgetBreakdown,
     },
   );

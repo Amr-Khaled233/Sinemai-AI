@@ -99,7 +99,6 @@ function convertNullable<T extends number | null | undefined>(amount: T, fx: Fx)
 type MoneyLine = { dayRate: number; total: number };
 type VendorItem = { dailyRate: number; weeklyRate: number | null; lineTotal: number };
 type Vendor = { subtotal: number; items: VendorItem[] };
-type Dop = { dayRate: number | null };
 type Breakdown = {
   currency?: string;
   equipmentRental?: number;
@@ -117,7 +116,6 @@ export type SheetMoney = {
   estimatedBudgetMid: number;
   estimatedBudgetHigh: number;
   matchedVendors: unknown;
-  matchedDops: unknown;
   budgetBreakdown: unknown;
 };
 
@@ -142,10 +140,6 @@ export function convertSheet<T extends SheetMoney>(sheet: T, fx: Fx): T {
         })),
       }))
     : sheet.matchedVendors;
-
-  const dops = Array.isArray(sheet.matchedDops)
-    ? (sheet.matchedDops as Dop[]).map((dop) => ({ ...dop, dayRate: convertNullable(dop.dayRate, fx) }))
-    : sheet.matchedDops;
 
   const raw = (sheet.budgetBreakdown ?? {}) as Breakdown;
   const breakdown: Breakdown = {
@@ -173,7 +167,6 @@ export function convertSheet<T extends SheetMoney>(sheet: T, fx: Fx): T {
     estimatedBudgetMid: convert(sheet.estimatedBudgetMid, fx),
     estimatedBudgetHigh: convert(sheet.estimatedBudgetHigh, fx),
     matchedVendors: vendors,
-    matchedDops: dops,
     budgetBreakdown: breakdown,
   };
 }

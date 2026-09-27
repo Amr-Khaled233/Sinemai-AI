@@ -1,26 +1,19 @@
 // Sinemai AI — production intelligence platform
-// Postgres + pgvector (Vercel Postgres / Neon).
-//
-// The `Dop` table and its pgvector `embedding` column remain for old sheets;
-// cinematographers are no longer matched or managed.
+// Postgres (Neon).
 
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["postgresqlExtensions"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
-  provider   = "postgresql"
-  url        = env("DATABASE_URL")
-  extensions = [vector]
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 // ---------------------------------------------------------------- enums
 
 enum Role {
   PRODUCER
-  VENDOR
-  DOP
   ADMIN
 }
 
@@ -95,7 +88,6 @@ enum AgentName {
   ORCHESTRATOR
   SCRIPT_ANALYST
   EQUIPMENT
-  DOP_MATCH
   VENDOR_BUDGET
   CRITIC
 }
@@ -125,8 +117,6 @@ model User {
   updatedAt         DateTime  @updatedAt
 
   projects       Project[]
-  dop            Dop?
-  vendor         Vendor?
   supportThreads  SupportThread[]
   supportMessages SupportMessage[]
   accounts       Account[]
@@ -197,11 +187,9 @@ model Company {
   vendor Vendor?
 }
 
-/// A rental company. The admin manages it; it has no login of its own
-/// (userId is kept only for rows created before that change).
+/// A rental company. The admin manages it; it has no login of its own.
 model Vendor {
   id         String         @id @default(cuid())
-  userId     String?        @unique
   companyId  String         @unique
   status     ApprovalStatus @default(PENDING)
   verified   Boolean        @default(false)
@@ -210,38 +198,8 @@ model Vendor {
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
 
-  user      User?                 @relation(fields: [userId], references: [id], onDelete: SetNull)
   company   Company               @relation(fields: [companyId], references: [id], onDelete: Cascade)
   inventory VendorInventoryItem[]
-
-  @@index([status])
-}
-
-/// A cinematographer profile the admin manages; no login of its own.
-model Dop {
-  id              String                       @id @default(cuid())
-  userId          String?                      @unique
-  displayName     String
-  displayNameAr   String?
-  bio             String                       @default("")
-  bioAr           String?
-  city            String?
-  country         String                       @default("SA")
-  dayRate         Int? // SAR/day — used by the budget agent when present
-  yearsExperience Int?
-  portfolioLinks  String[]                     @default([])
-  styleTags       String[]                     @default([])
-  reelThumbUrl    String?
-  status          ApprovalStatus               @default(PENDING)
-  approvedAt      DateTime?
-  // pgvector column, 1536 dims: text-embedding-3-large shortened so HNSW can index it.
-  embedding       Unsupported("vector(1536)")?
-  embeddingText   String?
-  embeddedAt      DateTime?
-  createdAt       DateTime                     @default(now())
-  updatedAt       DateTime                     @updatedAt
-
-  user      User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([status])
 }
@@ -417,8 +375,6 @@ model ProjectRecommendation {
   equipmentPackage        Json     @default("[]")
   equipmentRationale      String   @default("")
 
-  /// [{ dopId, name, score, reason, portfolioLinks, styleTags }]
-  matchedDops    Json @default("[]")
   /// [{ vendorId, companyName, city, items: [...], subtotal, coveragePct }]
   matchedVendors Json @default("[]")
 
@@ -557,7 +513,7 @@ model AgentToolCall {
 
 // ---------------------------------------------------------------- admin-configurable data
 
-/// Visual style tags offered to producers, also used as DOP style vocabulary.
+/// The visual style vocabulary the assistant picks a look from.
 model StyleTag {
   id        String  @id @default(cuid())
   slug      String  @unique
@@ -609,7 +565,6 @@ model RecommendationVersion {
   label     String?
 
   equipmentPackage    Json
-  matchedDops         Json
   matchedVendors      Json
   budgetBreakdown     Json
   sceneSummary        Json
@@ -648,7 +603,6 @@ enum AnalysisStage {
   /// Paused on the questions in AnalysisState.questions until the producer answers.
   AWAITING_INPUT
   EQUIPMENT
-  DOPS
   VENDOR_BUDGET
   CRITIC
   RETRY
@@ -675,7 +629,6 @@ model AnalysisState {
   sceneTotal    Int           @default(0)
   summary       Json?
   equipment     Json?
-  dops          Json?
   vendorBudget  Json?
   critic        Json?
   /// Questions the run paused on (ClarifyQuestion[]), and what the producer

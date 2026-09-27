@@ -5,7 +5,7 @@ import { isSafeHttpUrl } from '@/lib/security';
 /**
  * Public sign-up creates producer accounts only. There is no role field on
  * purpose: a role sent by the browser would be a role the browser chose.
- * Vendor and cinematographer accounts are provisioned by an admin.
+ * The one admin account comes from the seed.
  */
 export const registerSchema = z.object({
   name: z.string().min(2).max(120),

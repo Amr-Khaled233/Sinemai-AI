@@ -1,8 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
-import { safeHttpUrls } from '@/lib/security';
 import { fontsFor, registerPdfFonts } from './fonts';
 import { cityName } from '@/lib/city-name';
-import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 
 /**
  * PDF export built with @react-pdf/renderer — no headless browser, so it fits
@@ -34,9 +33,6 @@ export type PdfLabels = {
   quantity: string;
   days: string;
   reason: string;
-  dopsTitle: string;
-  dopsEmpty: string;
-  matchScore: string;
   vendorsTitle: string;
   vendorsEmpty: string;
   coverage: string;
@@ -79,7 +75,6 @@ export type SheetPdfData = {
   }>;
   equipment: PackageItem[];
   equipmentRationale: string;
-  dops: DopMatch[];
   vendors: VendorMatch[];
   budget: BudgetBreakdown | null;
   low: number;
@@ -230,26 +225,6 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
             <Text style={[styles.body, { marginTop: 8 }]}>{data.equipmentRationale}</Text>
           ) : null}
         </View>
-
-        {/* Only sheets from before cinematographer matching was dropped carry any. */}
-        {data.dops.length > 0 && (
-        <View style={styles.section}>
-          <Text style={styles.h2}>{L.dopsTitle}</Text>
-          {data.dops.map((dop) => (
-              <View key={dop.dopId} style={{ marginBottom: 7 }} wrap={false}>
-                <Text style={styles.bold}>
-                  {dop.name} — {L.matchScore} {Math.round(dop.score * 100)}%
-                  {dop.city ? ` · ${cityName(dop.city, data.locale)}` : ''}
-                  {dop.dayRate ? ` · ${L.dayRate} ${money(dop.dayRate, cur)}` : ''}
-                </Text>
-                <Text style={styles.body}>{dop.reason}</Text>
-                {dop.portfolioLinks.length > 0 && (
-                  <Text style={[styles.body, { color: '#0f766e' }]}>{safeHttpUrls(dop.portfolioLinks).join('  ·  ')}</Text>
-                )}
-              </View>
-          ))}
-        </View>
-        )}
 
         <View style={styles.section}>
           <Text style={styles.h2}>{L.vendorsTitle}</Text>

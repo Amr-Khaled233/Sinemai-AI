@@ -21,7 +21,6 @@ import type {
   ClarifyQuestion,
   CriticIssue,
   CriticResult,
-  DopResult,
   EquipmentResult,
   ProductionSheet,
   ProgressReporter,
@@ -49,16 +48,12 @@ Write 3–5 sentences for the director/producer who will act on this sheet. Lead
  * and the critic still gets one targeted retry per agent.
  */
 
-/** Sheets no longer carry cinematographer matches; the slot stays for old sheets. */
-const NO_DOPS: DopResult = { matches: [], queryText: '', searchedCount: 0, note: null };
-
 const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage }> = {
   PARSE: { pct: 8, stage: 'parsing' },
   SCENES: { pct: 20, stage: 'analyzing_scenes' },
   CLARIFY: { pct: 48, stage: 'clarifying' },
   AWAITING_INPUT: { pct: 48, stage: 'awaiting_input' },
   EQUIPMENT: { pct: 50, stage: 'matching_equipment' },
-  DOPS: { pct: 60, stage: 'matching_dops' },
   VENDOR_BUDGET: { pct: 70, stage: 'pricing' },
   CRITIC: { pct: 80, stage: 'reviewing' },
   RETRY: { pct: 86, stage: 'retrying' },
@@ -150,7 +145,6 @@ export async function beginAnalysis(projectId: string, locale: string) {
     sceneTotal: 0,
     summary: Prisma.DbNull,
     equipment: Prisma.DbNull,
-    dops: Prisma.DbNull,
     vendorBudget: Prisma.DbNull,
     critic: Prisma.DbNull,
     questions: Prisma.DbNull,
@@ -316,16 +310,6 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         await save(projectId, {
           stage: AnalysisStage.VENDOR_BUDGET,
           equipment: equipment as unknown as Prisma.InputJsonValue,
-          dops: NO_DOPS as unknown as Prisma.InputJsonValue,
-        });
-        return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
-      }
-
-      // Cinematographers are no longer matched; a run saved at this stage moves on.
-      case AnalysisStage.DOPS: {
-        await save(projectId, {
-          stage: AnalysisStage.VENDOR_BUDGET,
-          dops: NO_DOPS as unknown as Prisma.InputJsonValue,
         });
         return { done: false, stage: AnalysisStage.VENDOR_BUDGET, pct: STAGE_PROGRESS.VENDOR_BUDGET.pct };
       }
@@ -483,7 +467,6 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         const rationaleText = await writeExecutiveSummary(brief, {
           summary: parts.summary,
           equipment: parts.equipment,
-          dops: parts.dops,
           vendorBudget: parts.vendorBudget,
           criticIssues: critic.issues,
         });
@@ -492,7 +475,6 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
           sceneSummary: parts.summary,
           scenes: await loadSceneRequirements(projectId),
           equipment: parts.equipment,
-          dops: parts.dops,
           vendorBudget: parts.vendorBudget,
           critic,
           rationaleText,
@@ -507,7 +489,6 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
           output: {
             sceneCount: sheet.sceneSummary.sceneCount,
             packageSize: sheet.equipment.package.length,
-            dopMatches: sheet.dops.matches.length,
             vendors: sheet.vendorBudget.vendors.length,
             criticPassed: critic.passed,
             mid: sheet.vendorBudget.mid,
@@ -601,12 +582,6 @@ export async function runProductionAnalysis(
       rationale: recommendation.equipmentRationale,
       droppedHallucinatedIds: [],
     },
-    dops: {
-      matches: recommendation.matchedDops as unknown as DopResult['matches'],
-      queryText: '',
-      searchedCount: 0,
-      note: null,
-    },
     vendorBudget: {
       vendors: recommendation.matchedVendors as unknown as VendorBudgetResult['vendors'],
       budget: recommendation.budgetBreakdown as unknown as VendorBudgetResult['budget'],
@@ -644,10 +619,9 @@ function reportAwaiting(report: ProgressReporter, questions: ClarifyQuestion[]):
 function readParts(state: StateRow) {
   const summary = readJson<SceneSummary>(state.summary);
   const equipment = readJson<EquipmentResult>(state.equipment);
-  const dops = readJson<DopResult>(state.dops);
   const vendorBudget = readJson<VendorBudgetResult>(state.vendorBudget);
-  if (!summary || !equipment || !dops || !vendorBudget) throw new Error('INCOMPLETE_ANALYSIS_STATE');
-  return { summary, equipment, dops, vendorBudget };
+  if (!summary || !equipment || !vendorBudget) throw new Error('INCOMPLETE_ANALYSIS_STATE');
+  return { summary, equipment, vendorBudget };
 }
 
 async function save(projectId: string, data: Prisma.AnalysisStateUpdateInput) {
@@ -659,7 +633,6 @@ async function writeExecutiveSummary(
   parts: {
     summary: SceneSummary;
     equipment: EquipmentResult;
-    dops: DopResult;
     vendorBudget: VendorBudgetResult;
     criticIssues: CriticIssue[];
   },
@@ -704,7 +677,6 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
     recommendedEquipmentIds: sheet.equipment.package.filter((i) => !isMarketItem(i)).map((i) => i.equipmentId),
     equipmentPackage: sheet.equipment.package as unknown as Prisma.InputJsonValue,
     equipmentRationale: sheet.equipment.rationale,
-    matchedDops: sheet.dops.matches as unknown as Prisma.InputJsonValue,
     matchedVendors: sheet.vendorBudget.vendors as unknown as Prisma.InputJsonValue,
     estimatedBudgetLow: sheet.vendorBudget.low,
     estimatedBudgetMid: sheet.vendorBudget.mid,
@@ -714,7 +686,6 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
       ...sheet.vendorBudget.budget,
       notes: sheet.vendorBudget.notes,
       uncoveredEquipment: sheet.vendorBudget.uncoveredEquipment,
-      dopQuery: sheet.dops.queryText,
     } as unknown as Prisma.InputJsonValue,
     rationaleText: sheet.rationaleText,
     locale,

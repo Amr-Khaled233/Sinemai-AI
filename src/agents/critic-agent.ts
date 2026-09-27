@@ -9,7 +9,6 @@ import { describeClarifications } from './clarifications';
 import type {
   CriticIssue,
   CriticResult,
-  DopResult,
   EquipmentResult,
   ProjectBrief,
   SceneSummary,
@@ -49,7 +48,6 @@ export async function runCriticAgent(
   parts: {
     summary: SceneSummary;
     equipment: EquipmentResult;
-    dops: DopResult;
     vendorBudget: VendorBudgetResult;
   },
   options: { attempt?: number } = {},
@@ -159,7 +157,6 @@ function mechanicalChecks(
   parts: {
     summary: SceneSummary;
     equipment: EquipmentResult;
-    dops: DopResult;
     vendorBudget: VendorBudgetResult;
   },
   tier: { minTotal: number; maxTotal: number; currency: string; label: string },

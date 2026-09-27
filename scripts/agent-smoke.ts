@@ -102,7 +102,6 @@ async function runFullPipeline() {
   console.log(`  night ratio     : ${sheet.sceneSummary.nightScenePct}%`);
   console.log(`  package         : ${sheet.equipment.package.map((i) => `${i.brand} ${i.model}`).join(', ')}`);
   console.log(`  dropped ids     : ${sheet.equipment.droppedHallucinatedIds.length}`);
-  console.log(`  DOP matches     : ${sheet.dops.matches.map((d) => `${d.name} ${d.score}`).join(', ') || 'none'}`);
   console.log(`  vendors         : ${sheet.vendorBudget.vendors.map((v) => v.companyName).join(', ') || 'none'}`);
   console.log(
     `  budget          : ${sheet.vendorBudget.low} / ${sheet.vendorBudget.mid} / ${sheet.vendorBudget.high} ${sheet.vendorBudget.budget.currency}`,

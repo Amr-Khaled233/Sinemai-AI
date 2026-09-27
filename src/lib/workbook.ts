@@ -1,8 +1,7 @@
 import 'server-only';
 import writeXlsxFile from 'write-excel-file/node';
-import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 import type { Schedule } from '@/lib/schedule';
-import { safeHttpUrls } from '@/lib/security';
 
 /**
  * Spreadsheet export.
@@ -51,7 +50,6 @@ export type WorkbookData = {
   schedule: Schedule;
   equipment: PackageItem[];
   equipmentRationale: string;
-  dops: DopMatch[];
   vendors: VendorMatch[];
   budget: BudgetBreakdown | null;
   low: number;
@@ -172,17 +170,6 @@ export async function buildWorkbook(data: WorkbookData) {
         money(line.lineTotal),
       ]),
     ),
-    [],
-    ...data.dops.map((dop) => [
-      text(L.cinematographer),
-      text(dop.name),
-      num(Math.round(dop.score * 100)),
-      text(dop.city),
-      text(dop.styleTags.join(', ')),
-      text(safeHttpUrls(dop.portfolioLinks)[0] ?? ''),
-      money(dop.dayRate),
-      text(''),
-    ]),
   ];
 
   const budget: Cell[][] = [

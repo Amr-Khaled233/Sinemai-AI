@@ -12,7 +12,7 @@ import {
 import { convertSheet } from '@/lib/currency';
 import { displayFx } from '@/lib/currency-server';
 import { equipmentNamer } from '@/lib/equipment-name-server';
-import type { BudgetBreakdown, DopMatch, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
 import messagesAr from '../../../../../../messages/ar.json';
 import messagesEn from '../../../../../../messages/en.json';
 
@@ -94,7 +94,6 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     schedule: buildSchedule(scenes as ScheduleScene[], { shootDayHours: settings.shootDayHours }),
     equipment: named((recommendation.equipmentPackage as unknown as PackageItem[]) ?? []),
     equipmentRationale: recommendation.equipmentRationale,
-    dops: (recommendation.matchedDops as unknown as DopMatch[]) ?? [],
     vendors: ((recommendation.matchedVendors as unknown as VendorMatch[]) ?? []).map((vendor) => ({
       ...vendor,
       items: named(vendor.items),

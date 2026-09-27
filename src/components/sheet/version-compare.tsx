@@ -174,22 +174,6 @@ export async function VersionComparison({
         )}
       </Card>
 
-      {comparison.dopsChanged && (
-        <Card title={tSheet('dopsTitle')}>
-          <ul className="space-y-1.5 text-sm">
-            {comparison.addedDops.map((name) => (
-              <li key={name} className="text-success">
-                + {name}
-              </li>
-            ))}
-            {comparison.removedDops.map((name) => (
-              <li key={name} className="text-danger">
-                − {name}
-              </li>
-            ))}
-          </ul>
-        </Card>
-      )}
     </div>
   );
 }

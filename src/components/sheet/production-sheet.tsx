@@ -32,7 +32,6 @@ export type SheetProject = {
 export type SheetRecommendation = {
   equipmentPackage: Prisma.JsonValue;
   equipmentRationale: string;
-  matchedDops: Prisma.JsonValue;
   matchedVendors: Prisma.JsonValue;
   estimatedBudgetLow: number;
   estimatedBudgetMid: number;

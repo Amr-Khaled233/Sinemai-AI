@@ -15,9 +15,7 @@ export type PlatformSettings = {
   /** Discount applied when a rental spans a full week (vendor weekly rates win when present). */
   weeklyRentalDiscountPct: number;
   /** Below this cosine similarity a DOP match is not shown to the producer. */
-  dopMatchMinScore: number;
   /** How many DOPs the matching agent returns. */
-  dopMatchCount: number;
   /** Hours per shoot day used to convert scene hours into shoot days. */
   shootDayHours: number;
 };
@@ -27,8 +25,6 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   currency: 'SAR',
   contingencyPct: 12,
   weeklyRentalDiscountPct: 20,
-  dopMatchMinScore: 0.22,
-  dopMatchCount: 5,
   shootDayHours: 10,
 };
 
