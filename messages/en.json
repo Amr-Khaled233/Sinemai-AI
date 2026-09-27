@@ -121,7 +121,9 @@
     "scenes": "Scenes",
     "updated": "Updated",
     "fullSheet": "Full sheet",
-    "views": "Views"
+    "views": "Views",
+    "visualStyle": "Visual style",
+    "visualStyleHint": "Optional. It steers the camera, lens and lighting choices and which cinematographers are suggested."
   },
   "analysis": {
     "title": "Building your production sheet",
@@ -244,7 +246,8 @@
     "generatedLabel": "Generated",
     "notesShort": "Notes",
     "email": "Email",
-    "showIn": "Show prices in"
+    "showIn": "Show prices in",
+    "weekRate": "Week rate"
   },
   "vendor": {
     "title": "Vendor dashboard",

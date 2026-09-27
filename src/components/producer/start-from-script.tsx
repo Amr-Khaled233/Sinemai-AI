@@ -1,10 +1,11 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { startFromScript } from '@/app/actions/projects';
 import { Spinner } from '@/components/ui';
+import { StyleTagPicker, type StyleTag } from '@/components/style-tag-picker';
 import { cn } from '@/lib/utils';
 
 const ACCEPT = '.fountain,.fdx,.pdf,.txt,.md,application/pdf,text/plain,text/xml,application/xml';
@@ -19,13 +20,18 @@ type Option = { value: string; label: string; hint?: string };
 export function StartFromScript({
   types,
   tiers,
+  styleTags,
   defaultCity,
 }: {
   types: Option[];
   tiers: Option[];
+  /** The visual style vocabulary; it steers the equipment and the cinematographer match. */
+  styleTags: StyleTag[];
   defaultCity: string;
 }) {
   const t = useTranslations('project');
+  const locale = useLocale();
+  const [style, setStyle] = useState<string[]>([]);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<'file' | 'paste'>('file');
@@ -177,6 +183,14 @@ export function StartFromScript({
           <input id="start-city" name="city" className="input" dir="auto" placeholder={defaultCity} />
         </div>
       </div>
+
+      {styleTags.length > 0 && (
+        <fieldset className="mt-6">
+          <legend className="label">{t('visualStyle')}</legend>
+          <StyleTagPicker tags={styleTags} locale={locale} selected={style} onChange={setStyle} />
+          <p className="mt-2 text-[11px] text-muted">{t('visualStyleHint')}</p>
+        </fieldset>
+      )}
 
       {error && <p className="alert-danger mt-5">{error}</p>}
 

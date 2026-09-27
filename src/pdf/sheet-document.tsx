@@ -265,14 +265,18 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
                 </Text>
                 {vendor.items.map((line) => (
                   <View key={line.equipmentId} style={styles.row} wrap={false}>
-                    <Text style={[styles.cell, { width: '50%' }]}>
+                    <Text style={[styles.cell, { width: '34%' }]}>
                       {line.brand} {line.model}
                     </Text>
-                    <Text style={[styles.cell, { width: '12%' }]}>×{line.quantity}</Text>
-                    <Text style={[styles.cell, { width: '13%' }]}>
+                    <Text style={[styles.cell, { width: '8%' }]}>×{line.quantity}</Text>
+                    <Text style={[styles.cell, { width: '12%' }]}>
                       {line.rentalDays} {L.days}
                     </Text>
-                    <Text style={[styles.cell, { width: '25%' }]}>{money(line.lineTotal, cur)}</Text>
+                    <Text style={[styles.cell, { width: '15%' }]}>{money(line.dailyRate, cur)}</Text>
+                    <Text style={[styles.cell, { width: '15%' }]}>
+                      {line.weeklyRate ? money(line.weeklyRate, cur) : '—'}
+                    </Text>
+                    <Text style={[styles.cell, { width: '16%' }]}>{money(line.lineTotal, cur)}</Text>
                   </View>
                 ))}
               </View>

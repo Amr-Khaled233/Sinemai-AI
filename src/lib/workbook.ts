@@ -158,7 +158,7 @@ export async function buildWorkbook(data: WorkbookData) {
   ];
 
   const vendors: Cell[][] = [
-    header([L.vendor, L.city, L.coverage, L.item, L.quantity, L.days, L.rate, L.total]),
+    header([L.vendor, L.city, L.coverage, L.item, L.quantity, L.days, L.rate, L.weekRate, L.total]),
     ...data.vendors.flatMap((vendor) =>
       vendor.items.map((line, index) => [
         index === 0 ? text(vendor.companyName) : text(''),
@@ -168,6 +168,7 @@ export async function buildWorkbook(data: WorkbookData) {
         num(line.quantity),
         num(line.rentalDays),
         money(line.dailyRate),
+        line.weeklyRate ? money(line.weeklyRate) : text(''),
         money(line.lineTotal),
       ]),
     ),

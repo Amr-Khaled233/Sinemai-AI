@@ -7,7 +7,7 @@ import { Badge, Card } from '@/components/ui';
 import { StartFromScript } from '@/components/producer/start-from-script';
 import { formatDate } from '@/lib/utils';
 import { moneyFormatter } from '@/lib/currency-server';
-import { getBudgetTierConfigs, getSettings } from '@/lib/settings';
+import { getBudgetTierConfigs, getSettings, getStyleTags } from '@/lib/settings';
 import { cityName } from '@/lib/city-name';
 import type { AppLocale } from '@/i18n/routing';
 
@@ -27,12 +27,13 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, money, tiers, settings, projects] = await Promise.all([
+  const [t, tEnum, money, tiers, settings, styleTags, projects] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
     moneyFormatter(locale),
     getBudgetTierConfigs(),
     getSettings(),
+    getStyleTags(),
     prisma.project.findMany({
       where: { ownerId: session.user.id },
       orderBy: { updatedAt: 'desc' },
@@ -56,6 +57,7 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
     <div className="space-y-10">
       <StartFromScript
         defaultCity={cityName(settings.defaultCity, locale)}
+        styleTags={styleTags.map((tag) => ({ slug: tag.slug, labelEn: tag.labelEn, labelAr: tag.labelAr }))}
         types={Object.values(ProjectType).map((value) => ({ value, label: tEnum(`type.${value}`) }))}
         tiers={Object.values(BudgetTier).map((value) => {
           const tier = tierByKey.get(value);

@@ -467,13 +467,14 @@ export async function ProductionSheet({
                 </div>
 
                 <div className="table-wrap mt-3">
-                  <table className="grid-table grid-table-compact [--grid-cols:minmax(11rem,2.5fr)_4rem_4.5rem_7rem_7.5rem]">
+                  <table className="grid-table grid-table-compact [--grid-cols:minmax(10rem,2.5fr)_3.5rem_4rem_6.5rem_6.5rem_7rem]">
                     <thead>
                       <tr>
                         <th>{t('item')}</th>
                         <th className="text-end">{t('quantity')}</th>
                         <th className="text-end">{t('days')}</th>
                         <th className="text-end">{t('rate')}</th>
+                        <th className="text-end">{t('weekRate')}</th>
                         <th className="text-end">{t('total')}</th>
                       </tr>
                     </thead>
@@ -489,6 +490,9 @@ export async function ProductionSheet({
                           <td data-label={t('quantity')} className="text-end tabular-nums">{line.quantity}</td>
                           <td data-label={t('days')} className="text-end tabular-nums">{line.rentalDays}</td>
                           <td data-label={t('rate')} className="text-end tabular-nums">{money(line.dailyRate)}</td>
+                          <td data-label={t('weekRate')} className="text-end tabular-nums text-muted">
+                            {line.weeklyRate ? money(line.weeklyRate) : '—'}
+                          </td>
                           <td data-label={t('total')} className="text-end tabular-nums text-strong">{money(line.lineTotal)}</td>
                         </tr>
                       ))}

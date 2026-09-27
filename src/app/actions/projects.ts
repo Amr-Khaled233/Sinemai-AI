@@ -21,7 +21,15 @@ const startSchema = z.object({
   type: z.nativeEnum(ProjectType),
   budgetTier: z.nativeEnum(BudgetTier),
   city: z.string().trim().max(80),
+  visualStyleTags: z.array(z.string().max(60)).max(8),
 });
+
+async function knownStyleTags(slugs: string[]) {
+  if (slugs.length === 0) return [];
+  const rows = await prisma.styleTag.findMany({ where: { slug: { in: slugs }, active: true }, select: { slug: true } });
+  const known = new Set(rows.map((row) => row.slug));
+  return slugs.filter((slug) => known.has(slug));
+}
 
 /** A readable name from the file name, or the first line of pasted text. */
 function nameFromScript(fileName: string | null, pasted: string) {
@@ -53,6 +61,7 @@ export async function startFromScript(formData: FormData) {
       type: formData.get('type'),
       budgetTier: formData.get('budgetTier'),
       city: formData.get('city') ?? '',
+      visualStyleTags: formData.getAll('visualStyleTags').map(String),
     });
     if (!parsed.success) throw new Error('INVALID_INPUT');
 
@@ -68,7 +77,8 @@ export async function startFromScript(formData: FormData) {
         type: parsed.data.type,
         budgetTier: parsed.data.budgetTier,
         city: parsed.data.city || settings.defaultCity,
-        visualStyleTags: [],
+        // Only tags the platform knows; anything else would mislead the agents.
+        visualStyleTags: await knownStyleTags(parsed.data.visualStyleTags),
       },
       select: { id: true },
     });
