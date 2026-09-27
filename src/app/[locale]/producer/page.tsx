@@ -7,7 +7,6 @@ import { Badge, Card } from '@/components/ui';
 import { StartFromScript } from '@/components/producer/start-from-script';
 import { formatDate } from '@/lib/utils';
 import { getDisplayCurrency, moneyFormatter } from '@/lib/currency-server';
-import { getStyleTags } from '@/lib/settings';
 import type { AppLocale } from '@/i18n/routing';
 
 const STATUS_TONE = {
@@ -26,12 +25,11 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
   setRequestLocale(locale as AppLocale);
 
   const session = await requireRole(['PRODUCER', 'ADMIN'], locale);
-  const [t, tEnum, money, currency, styleTags, projects] = await Promise.all([
+  const [t, tEnum, money, currency, projects] = await Promise.all([
     getTranslations('project'),
     getTranslations('enum'),
     moneyFormatter(locale),
     getDisplayCurrency(),
-    getStyleTags(),
     prisma.project.findMany({
       where: { ownerId: session.user.id },
       orderBy: { updatedAt: 'desc' },
@@ -54,7 +52,6 @@ export default async function ProducerHome({ params }: { params: Promise<{ local
     <div className="space-y-10">
       <StartFromScript
         currency={currency.code}
-        styleTags={styleTags.map((tag) => ({ slug: tag.slug, labelEn: tag.labelEn, labelAr: tag.labelAr }))}
         types={Object.values(ProjectType).map((value) => ({ value, label: tEnum(`type.${value}`) }))}
       />
 

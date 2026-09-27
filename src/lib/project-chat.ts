@@ -59,7 +59,7 @@ You help them plan the whole production — what the script needs, how long the 
 PROJECT
 - Name: ${project.name}
 - Type: ${project.type}; budget: ${budget}; city: ${project.city}
-- Visual style: ${project.visualStyleTags.join(', ') || 'none chosen'}
+- Visual style: ${project.visualStyleTags.join(', ') || 'not chosen yet — the analysis picks the look that fits the script'}
 - Shoot dates: ${dates}
 - Synopsis: ${project.synopsis ?? 'none'}
 - Script: ${args.scriptFile ? `${args.scriptFile}, ${args.sceneCount} scenes` : 'not uploaded yet'}

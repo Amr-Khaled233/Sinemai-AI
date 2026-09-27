@@ -16,7 +16,10 @@
     "content": "Content",
     "rentals": "Rentals",
     "users": "Users",
-    "support": "Support"
+    "support": "Support",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "languageLabel": "Language"
   },
   "landing": {
     "heroKicker": "Script to shooting package",
@@ -122,8 +125,6 @@
     "updated": "Updated",
     "fullSheet": "Full sheet",
     "views": "Views",
-    "visualStyle": "Visual style",
-    "visualStyleHint": "Optional. It steers the camera, lens and lighting choices and which cinematographers are suggested.",
     "budgetRange": "Budget ({currency}) — optional",
     "budgetFrom": "From",
     "budgetTo": "To",

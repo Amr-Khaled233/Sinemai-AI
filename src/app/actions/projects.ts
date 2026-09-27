@@ -22,15 +22,7 @@ import {
 const startSchema = z.object({
   type: z.nativeEnum(ProjectType),
   budget: z.string().max(80),
-  visualStyleTags: z.array(z.string().max(60)).max(8),
 });
-
-async function knownStyleTags(slugs: string[]) {
-  if (slugs.length === 0) return [];
-  const rows = await prisma.styleTag.findMany({ where: { slug: { in: slugs }, active: true }, select: { slug: true } });
-  const known = new Set(rows.map((row) => row.slug));
-  return slugs.filter((slug) => known.has(slug));
-}
 
 /** A readable name from the file name, or the first line of pasted text. */
 function nameFromScript(fileName: string | null, pasted: string) {
@@ -62,7 +54,6 @@ export async function startFromScript(formData: FormData) {
       type: formData.get('type'),
       // Two optional boxes, read as one range; typed in the reader's currency.
       budget: [formData.get('budgetMin'), formData.get('budgetMax')].filter(Boolean).join(' - '),
-      visualStyleTags: formData.getAll('visualStyleTags').map(String),
     });
     if (!parsed.success) throw new Error('INVALID_INPUT');
 
@@ -86,8 +77,7 @@ export async function startFromScript(formData: FormData) {
         budgetMax: range?.max ?? null,
         // Where it shoots is asked in the conversation; until then, the default city.
         city: settings.defaultCity,
-        // Only tags the platform knows; anything else would mislead the agents.
-        visualStyleTags: await knownStyleTags(parsed.data.visualStyleTags),
+        // The look is chosen by the assistant once it has read the script.
       },
       select: { id: true },
     });

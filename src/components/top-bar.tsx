@@ -6,6 +6,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Logo } from '@/components/logo';
 import { SignOutButton } from '@/components/sign-out-button';
 import { NavLinks, type NavLink } from '@/components/nav-links';
+import { MobileMenu } from '@/components/mobile-menu';
 import { unreadThreadCount } from '@/lib/support';
 
 /** Everyone who is not the admin is a regular user with the same menu. */
@@ -52,27 +53,26 @@ export async function TopBar({ locale }: { locale: string }) {
 
         <div className="ms-auto flex shrink-0 items-center gap-1 sm:gap-2">
           <ThemeToggle />
-          <LocaleSwitcher locale={locale} />
-          {session?.user ? (
-            <SignOutButton label={t('logout')} locale={locale} />
-          ) : (
-            <>
-              <Link href="/login" className="btn-ghost hidden text-xs sm:inline-flex">
-                {t('login')}
-              </Link>
-              <Link href="/register" className="btn-primary px-4 text-xs">
-                {t('register')}
-              </Link>
-            </>
-          )}
+          {/* Desktop: everything side by side. */}
+          <div className="hidden items-center gap-2 md:flex">
+            <LocaleSwitcher locale={locale} />
+            {session?.user ? (
+              <SignOutButton label={t('logout')} locale={locale} />
+            ) : (
+              <>
+                <Link href="/login" className="btn-ghost text-xs">
+                  {t('login')}
+                </Link>
+                <Link href="/register" className="btn-primary px-4 text-xs">
+                  {t('register')}
+                </Link>
+              </>
+            )}
+          </div>
+          {/* Phone: one menu with the pages, the language and the account actions. */}
+          <MobileMenu links={links} badges={{ support: unread }} locale={locale} signedIn={Boolean(session?.user)} />
         </div>
       </div>
-
-      {links.length > 0 && (
-        <nav className="no-scrollbar flex gap-1.5 overflow-x-auto border-t border-line/60 px-4 py-2 md:hidden">
-          <NavLinks links={links} variant="pills" badges={{ support: unread }} />
-        </nav>
-      )}
     </header>
   );
 }

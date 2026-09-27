@@ -8,6 +8,7 @@ import { runDopAgent } from './dop-agent';
 import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
 import { runClarifyAgent } from './clarify-agent';
+import { chooseVisualStyle } from './style-agent';
 import { runAdvisor, runAdvisorResearch } from './advisor-agent';
 import { describeBudget, describeClarifications, resolveAnswers } from './clarifications';
 import { languageDirective, languageName } from './language';
@@ -284,6 +285,8 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         const summary = readJson<SceneSummary>(state.summary);
         if (!summary) throw new Error('MISSING_SCENE_SUMMARY');
 
+        // The look is the assistant's call, made once before anything it steers.
+        brief.visualStyleTags = await chooseVisualStyle(ctx, brief, summary);
         const questions = await runClarifyAgent(ctx, brief, summary);
         if (questions.length === 0) {
           await save(projectId, { stage: AnalysisStage.EQUIPMENT });

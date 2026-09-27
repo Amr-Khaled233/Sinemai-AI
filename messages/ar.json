@@ -16,7 +16,10 @@
     "content": "المحتوى",
     "rentals": "الإيجارات",
     "users": "المستخدمون",
-    "support": "الدعم"
+    "support": "الدعم",
+    "openMenu": "فتح القائمة",
+    "closeMenu": "إغلاق القائمة",
+    "languageLabel": "اللغة"
   },
   "landing": {
     "heroKicker": "من النص إلى حزمة التصوير",
@@ -122,8 +125,6 @@
     "updated": "آخر تحديث",
     "fullSheet": "الورقة كاملة",
     "views": "العرض",
-    "visualStyle": "الرؤية البصرية",
-    "visualStyleHint": "اختياري. يوجّه اختيار الكاميرا والعدسات والإضاءة ومديري التصوير المقترحين.",
     "budgetRange": "الميزانية ({currency}) — اختياري",
     "budgetFrom": "من",
     "budgetTo": "إلى",
