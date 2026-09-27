@@ -399,6 +399,8 @@ model ProjectRecommendation {
   /// risky and costly scenes with savings, suggested directors, cast and crew,
   /// and equipment not in the catalog. Suggestions, not priced facts.
   advice        Json?
+  /// Scenes that need attention: danger, special cameras, long scenes, locations (SceneFlag[]).
+  sceneFlags    Json?
   modelVersions Json      @default("{}")
   generatedAt   DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
@@ -598,6 +600,8 @@ model Setting {
 enum AnalysisStage {
   PARSE
   SCENES
+  /// Flags the scenes the producer must hear about (danger, special cameras, long scenes, locations).
+  FLAG_SCENES
   /// One pass that decides whether anything must be asked before pricing.
   CLARIFY
   /// Paused on the questions in AnalysisState.questions until the producer answers.
@@ -635,6 +639,8 @@ model AnalysisState {
   /// answered (ClarifyAnswer[]). Every agent after the pause reads the answers.
   questions     Json?
   answers       Json?
+  /// Scenes flagged for attention after the breakdown (SceneFlag[]).
+  sceneFlags    Json?
   /// The advisor's web research notes (with sources), then its structured advice.
   adviceNotes   Json?
   advice        Json?

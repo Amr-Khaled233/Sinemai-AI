@@ -22,6 +22,7 @@ const brief = (over: Partial<ProjectBrief> = {}): ProjectBrief => ({
   budgetMax: null,
   locale: 'en',
   clarifications: [],
+  sceneFlags: [],
   ...over,
 });
 

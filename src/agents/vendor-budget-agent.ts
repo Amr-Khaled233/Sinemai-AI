@@ -7,6 +7,7 @@ import { makeVendorTools, queryVendorInventory, getCrewDayRates } from './tools/
 import type { CrewRateRow, VendorInventoryResult, VendorInventoryRow } from './tools/vendor-tools';
 import { withLanguage } from './language';
 import { describeClarifications } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import { isMarketItem } from './types';
 import type {
   CrewLine,
@@ -80,6 +81,7 @@ export async function runVendorBudgetAgent(
             ? `Shoot dates: ${iso(brief.shootStartDate)} to ${iso(brief.shootEndDate ?? brief.shootStartDate)}.`
             : 'Shoot dates are not fixed yet; check general availability.',
           describeClarifications(brief.clarifications),
+          describeSceneFlags(brief.sceneFlags),
           '',
           catalogItems.length ? 'Recommended package (catalog gear):' : 'No catalog gear in this package; only pull the crew rates.',
           ...catalogItems.map(
@@ -123,6 +125,7 @@ export async function runVendorBudgetAgent(
         prompt: [
           `Production: ${brief.type}, ${summary.shootDays} shoot day(s) in ${brief.city}, budget tier ${brief.budgetTier}.`,
           describeClarifications(brief.clarifications),
+          describeSceneFlags(brief.sceneFlags),
           `Night/dawn scenes: ${summary.nightScenePct}%. Exteriors: ${summary.exteriorScenePct}%. Movement: gimbal ${summary.movementMix.STEADICAM_GIMBAL}, crane/dolly ${summary.movementMix.CRANE_DOLLY}, drone ${summary.movementMix.DRONE}.`,
           '',
           'Vendor coverage returned by the tool:',

@@ -5,12 +5,14 @@ import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from '@/i18n/routing';
 import { CheckIcon, Spinner } from '@/components/ui';
 import { cn } from '@/lib/utils';
-import type { ClarifyQuestion, ProgressEvent, ProgressStage } from '@/agents/types';
+import { SceneFlags } from '@/components/sheet/scene-flags';
+import type { ClarifyQuestion, ProgressEvent, ProgressStage, SceneFlag } from '@/agents/types';
 
 const STAGE_ORDER: ProgressStage[] = [
   'queued',
   'parsing',
   'analyzing_scenes',
+  'flagging_scenes',
   'clarifying',
   'matching_equipment',
   'pricing',
@@ -39,6 +41,8 @@ type State = {
   watching: boolean;
   /** The run is paused until the producer answers these. */
   questions: ClarifyQuestion[];
+  /** Scenes flagged for attention once the breakdown is done. */
+  flags: SceneFlag[];
 };
 
 const INITIAL: State = {
@@ -50,6 +54,7 @@ const INITIAL: State = {
   requests: 0,
   watching: false,
   questions: [],
+  flags: [],
 };
 
 /** How often to re-check a run that another client is driving. */
@@ -129,6 +134,8 @@ export function AnalysisRunner({
                 return { ...current, logs: [...current.logs, `${event.count} scenes`] };
               case 'questions':
                 return { ...current, questions: event.questions };
+              case 'flags':
+                return { ...current, flags: event.flags };
               case 'log':
                 return { ...current, logs: [...current.logs, event.message] };
               case 'error':
@@ -167,7 +174,8 @@ export function AnalysisRunner({
       abortRef.current?.abort();
       const controller = new AbortController();
       abortRef.current = controller;
-      setState({ ...INITIAL, running: true });
+      // Flags survive answering the questions; a fresh run clears them.
+      setState((s) => ({ ...INITIAL, running: true, flags: start ? [] : s.flags }));
 
       try {
         // Each request executes as many steps as fit in its budget, then hands
@@ -227,12 +235,19 @@ export function AnalysisRunner({
         driven?: boolean;
         awaiting?: boolean;
         questions?: ClarifyQuestion[];
+        sceneFlags?: SceneFlag[];
       };
       if (cancelled || !status.running) return;
 
       // Paused on questions: show them, and spend no request until they are answered.
       if (status.awaiting) {
-        setState({ ...INITIAL, stage: 'awaiting_input', pct: 48, questions: status.questions ?? [] });
+        setState({
+          ...INITIAL,
+          stage: 'awaiting_input',
+          pct: 48,
+          questions: status.questions ?? [],
+          flags: status.sceneFlags ?? [],
+        });
         return;
       }
 
@@ -266,11 +281,18 @@ export function AnalysisRunner({
         errorText?: string | null;
         awaiting?: boolean;
         questions?: ClarifyQuestion[];
+        sceneFlags?: SceneFlag[];
       };
       if (cancelled) return;
 
       if (status.awaiting) {
-        setState({ ...INITIAL, stage: 'awaiting_input', pct: 48, questions: status.questions ?? [] });
+        setState({
+          ...INITIAL,
+          stage: 'awaiting_input',
+          pct: 48,
+          questions: status.questions ?? [],
+          flags: status.sceneFlags ?? [],
+        });
         return;
       }
 
@@ -337,6 +359,10 @@ export function AnalysisRunner({
           </>
         )}
       </button>
+
+      {/* What stands out in the script, before the questions about it. Once the
+          sheet exists the page shows its own copy, so this one steps aside. */}
+      {state.flags.length > 0 && state.stage !== 'done' && <SceneFlags flags={state.flags} className="mt-5" />}
 
       {awaiting && <ClarifyForm questions={state.questions} onSubmit={answer} />}
 

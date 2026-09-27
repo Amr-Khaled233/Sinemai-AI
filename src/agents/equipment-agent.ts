@@ -5,6 +5,7 @@ import { allToolResults, model, MODELS, withAgentRun, type RunContext } from './
 import { makeEquipmentTools, queryEquipmentCatalog } from './tools/equipment-tools';
 import { withLanguage } from './language';
 import { describeBudget, describeClarifications } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import { marketId, type CatalogItem, type EquipmentResult, type PackageItem, type ProjectBrief, type SceneSummary } from './types';
 
 /** The categories the sheet knows how to label; market gear is filed under one of them. */
@@ -28,6 +29,7 @@ You are now committing to the package. For each item either give the exact id fr
 - a one-line reason tied to the scene statistics (night ratio, lighting complexity, movement mix), not to marketing language
 
 Cover at minimum: one camera body, a lens set, and a lighting package. Add grip/support only when the movement mix demands it.
+Cover every flagged scene that needs a special camera or rig (underwater housing, high-speed camera, drone, car mount, crane…), renting it only for the days those scenes shoot, and say which scene it is for in the reason.
 The rationale must cite concrete numbers from the breakdown, e.g. "62% of scenes are night interiors".`;
 
 const packageSchema = z.object({
@@ -188,6 +190,7 @@ function buildRetrievalPrompt(brief: ProjectBrief, summary: SceneSummary, critic
     brief.visualStyleTags.length ? `Visual style: ${brief.visualStyleTags.join(', ')}.` : '',
     describeBudget(brief),
     describeClarifications(brief.clarifications),
+    describeSceneFlags(brief.sceneFlags),
     '',
     'Scene breakdown statistics:',
     describeSummary(summary),
@@ -233,6 +236,7 @@ function buildSelectionPrompt(
     brief.visualStyleTags.length ? `Visual style: ${brief.visualStyleTags.join(', ')}.` : '',
     describeBudget(brief),
     describeClarifications(brief.clarifications),
+    describeSceneFlags(brief.sceneFlags),
     '',
     'Scene breakdown statistics:',
     describeSummary(summary),

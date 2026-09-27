@@ -112,8 +112,10 @@ export function ProjectChat({
           </div>
         )}
 
-        {messages.map((message) => {
+        {messages.map((message, messageIndex) => {
           const mine = message.role === 'user';
+          // A question is open until the producer has said something after it.
+          const answered = messages.slice(messageIndex + 1).some((later) => later.role === 'user');
           return (
             <div key={message.id} className={cn('flex', mine ? 'justify-end' : 'justify-start')}>
               <div
@@ -128,6 +130,19 @@ export function ProjectChat({
                       <p key={index} className="whitespace-pre-wrap" dir="auto">
                         {part.text}
                       </p>
+                    );
+                  }
+                  if (part.type === 'tool-askUser') {
+                    const input = 'input' in part ? (part.input as AskInput | undefined) : undefined;
+                    if (!input?.question) return null;
+                    return (
+                      <AskCard
+                        key={index}
+                        input={input}
+                        disabled={answered || busy}
+                        onAnswer={send}
+                        hint={t('askHint')}
+                      />
                     );
                   }
                   const label = TOOL_LABELS[part.type];
@@ -201,6 +216,58 @@ export function ProjectChat({
           )}
         </div>
       </form>
+    </div>
+  );
+}
+
+type AskInput = { question: string; options?: string[]; why?: string };
+
+/**
+ * A question the assistant asked through its askUser tool: tap an answer, or
+ * type one in the box below. Tapping sends the answer as the producer's next
+ * message, so the conversation (and its stored history) reads naturally.
+ */
+function AskCard({
+  input,
+  disabled,
+  onAnswer,
+  hint,
+}: {
+  input: AskInput;
+  disabled: boolean;
+  onAnswer: (answer: string) => void;
+  hint: string;
+}) {
+  return (
+    <div className="rounded-md border border-accent/40 bg-accent/[0.06] p-3">
+      <p className="flex items-start gap-2 text-sm font-medium text-strong" dir="auto">
+        <span aria-hidden className="mt-0.5 grid size-5 shrink-0 place-items-center rounded-full bg-brass-500 text-[11px] font-bold text-ink-950">
+          ?
+        </span>
+        {input.question}
+      </p>
+      {input.why && (
+        <p className="mt-1 ps-7 text-[11px] text-muted" dir="auto">
+          {input.why}
+        </p>
+      )}
+      {(input.options?.length ?? 0) > 0 && (
+        <div className="mt-2.5 flex flex-wrap gap-1.5 ps-7">
+          {input.options!.map((option) => (
+            <button
+              key={option}
+              type="button"
+              className="chip text-xs"
+              disabled={disabled}
+              onClick={() => onAnswer(option)}
+              dir="auto"
+            >
+              {option}
+            </button>
+          ))}
+        </div>
+      )}
+      {!disabled && <p className="mt-2 ps-7 text-[11px] text-muted/80">{hint}</p>}
     </div>
   );
 }

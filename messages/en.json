@@ -135,6 +135,7 @@
       "queued": "Starting up",
       "parsing": "Parsing the script",
       "analyzing_scenes": "Analyzing scenes",
+      "flagging_scenes": "Spotting scenes that need attention",
       "clarifying": "Checking what is unclear",
       "awaiting_input": "Waiting for your answers",
       "matching_equipment": "Matching equipment",
@@ -282,7 +283,33 @@
     "marketBadge": "Market",
     "marketTitle": "Rent from outside the platform",
     "marketHint": "Gear the assistant chose from the wider market. Prices are estimated Saudi rental rates — confirm them with rental houses.",
-    "estDayRate": "Est. day rate"
+    "estDayRate": "Est. day rate",
+    "flags": {
+      "title": "Scenes that need attention",
+      "hint": "Spotted in your script before anything is priced. They shape the budget, the safety plan and the schedule.",
+      "scenes": "Sc. {list}",
+      "needs": "What it takes",
+      "severity": {
+        "high": "High",
+        "medium": "Plan ahead",
+        "low": "Good to know"
+      },
+      "kind": {
+        "danger": "Danger",
+        "special_camera": "Special camera",
+        "long_scene": "Long scene",
+        "special_location": "Special location",
+        "vfx": "Visual effects",
+        "crowd": "Crowd",
+        "animals": "Animals",
+        "water": "Water",
+        "vehicles": "Vehicles",
+        "weather": "Weather",
+        "children": "Children",
+        "permit": "Permit",
+        "other": "Other"
+      }
+    }
   },
   "vendor": {
     "title": "Vendor dashboard",
@@ -651,6 +678,7 @@
     "rateLimited": "Too many messages in a short time. Wait a little and try again.",
     "kickoff": "Give me the briefing: what this script needs, the alternatives, and where I can save.",
     "toolAlternatives": "Looked for alternatives",
-    "toolWeb": "Searched the web"
+    "toolWeb": "Searched the web",
+    "askHint": "Tap an answer, or type your own below."
   }
 }

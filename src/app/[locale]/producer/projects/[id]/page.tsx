@@ -15,6 +15,8 @@ import { DeleteProjectButton } from '@/components/producer/danger-zone';
 import { VersionHistory } from '@/components/sheet/version-compare';
 import { ProductionSheet } from '@/components/sheet/production-sheet';
 import { ProjectChat } from '@/components/producer/project-chat';
+import { SceneFlags } from '@/components/sheet/scene-flags';
+import type { SceneFlag } from '@/agents/types';
 import { listVersions } from '@/lib/versions';
 import { convert, convertSheet, type Fx } from '@/lib/currency';
 import { displayFx, moneyFormatter } from '@/lib/currency-server';
@@ -82,6 +84,9 @@ export default async function ProjectPage({
     project.analysisState.stage !== 'DONE' &&
     project.analysisState.stage !== 'FAILED';
   const showSheet = tab === 'sheet' && ready;
+  const sceneFlags = Array.isArray(project.recommendation?.sceneFlags)
+    ? (project.recommendation.sceneFlags as unknown as SceneFlag[])
+    : [];
 
   const chatRows = await prisma.projectChatMessage.findMany({
     where: { projectId: project.id },
@@ -159,6 +164,9 @@ export default async function ProjectPage({
               )}
             </Card>
           )}
+
+          {/* The scenes to know about, where the conversation about them happens. */}
+          {ready && !inFlight && <SceneFlags flags={sceneFlags} />}
 
           <section className="card overflow-hidden">
             <ProjectChat

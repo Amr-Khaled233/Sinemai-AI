@@ -12,7 +12,7 @@ import {
 import { convertSheet } from '@/lib/currency';
 import { displayFx } from '@/lib/currency-server';
 import { equipmentNamer } from '@/lib/equipment-name-server';
-import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneFlag, SceneSummary, VendorMatch } from '@/agents/types';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
@@ -87,6 +87,7 @@ export async function GET(request: Request, context: { params: Promise<{ id: str
     mid: recommendation.estimatedBudgetMid,
     high: recommendation.estimatedBudgetHigh,
     criticNotes: recommendation.criticNotes,
+    sceneFlags: Array.isArray(recommendation.sceneFlags) ? (recommendation.sceneFlags as unknown as SceneFlag[]) : [],
   };
 
   // createElement instead of JSX so this stays a plain .ts route handler.

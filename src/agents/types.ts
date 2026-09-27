@@ -26,13 +26,54 @@ export type ProjectBrief = {
   locale: string;
   /** What the producer answered when the run paused to ask — empty until then. */
   clarifications: ClarifyAnswer[];
+  /** Scenes flagged for attention after the breakdown — empty until then. */
+  sceneFlags: SceneFlag[];
+};
+
+// ------------------------------------------------------------ scenes that need attention
+
+/** Why a scene stands out from the rest of the shoot. */
+export const SCENE_FLAG_KINDS = [
+  'danger',
+  'special_camera',
+  'long_scene',
+  'special_location',
+  'vfx',
+  'crowd',
+  'animals',
+  'water',
+  'vehicles',
+  'weather',
+  'children',
+  'permit',
+  'other',
+] as const;
+
+export type SceneFlagKind = (typeof SCENE_FLAG_KINDS)[number];
+
+/**
+ * A scene (or a run of scenes) the producer should know about before the
+ * shoot is planned: dangerous action, a special camera just for that moment, a
+ * very long scene, a location that has to be found and booked, and so on.
+ */
+export type SceneFlag = {
+  id: string;
+  kind: SceneFlagKind;
+  severity: 'high' | 'medium' | 'low';
+  /** Scene numbers as the script counts them. */
+  scenes: number[];
+  title: string;
+  /** What happens in the scene and why it matters for the shoot. */
+  detail: string;
+  /** What it will take: gear, people, permits, preparation. */
+  needs: string[];
 };
 
 // ------------------------------------------------------------ clarification
 
 /** One thing the brief and the script leave open that would change the sheet. */
 /** What a question is about; budget and location answers are written back to the project. */
-export type ClarifyTopic = 'budget' | 'release' | 'schedule' | 'location' | 'cast' | 'other';
+export type ClarifyTopic = 'budget' | 'release' | 'schedule' | 'location' | 'cast' | 'scene' | 'other';
 
 export type ClarifyQuestion = {
   id: string;
@@ -258,6 +299,7 @@ export type ProgressStage =
   | 'queued'
   | 'parsing'
   | 'analyzing_scenes'
+  | 'flagging_scenes'
   | 'clarifying'
   | 'awaiting_input'
   | 'matching_equipment'
@@ -286,6 +328,7 @@ export type ProgressEvent =
   | { type: 'log'; message: string }
   | { type: 'scenes'; count: number }
   | { type: 'questions'; questions: ClarifyQuestion[] }
+  | { type: 'flags'; flags: SceneFlag[] }
   | { type: 'done'; projectId: string }
   | { type: 'error'; message: string };
 

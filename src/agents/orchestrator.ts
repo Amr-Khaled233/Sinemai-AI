@@ -8,8 +8,10 @@ import { runVendorBudgetAgent } from './vendor-budget-agent';
 import { runCriticAgent } from './critic-agent';
 import { runClarifyAgent } from './clarify-agent';
 import { chooseVisualStyle } from './style-agent';
+import { runSceneFlagAgent } from './scene-flag-agent';
 import { runAdvisor, runAdvisorResearch } from './advisor-agent';
 import { describeBudget, describeClarifications, resolveAnswers } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import { languageDirective, languageName } from './language';
 import { snapshotRecommendation } from '@/lib/versions';
 import { getBudgetTierConfigs } from '@/lib/settings';
@@ -29,7 +31,7 @@ import type {
   SceneSummary,
   VendorBudgetResult,
 } from './types';
-import { isMarketItem } from './types';
+import { isMarketItem, type SceneFlag } from './types';
 
 export const ORCHESTRATOR_SYSTEM = `You are the supervising producer of an automated breakdown. You have no database access: you delegate to specialist agents and then write the short executive summary that opens the Production & Equipment Sheet.
 
@@ -51,6 +53,7 @@ Write 3–5 sentences for the director/producer who will act on this sheet. Lead
 const STAGE_PROGRESS: Record<AnalysisStage, { pct: number; stage: ProgressStage }> = {
   PARSE: { pct: 8, stage: 'parsing' },
   SCENES: { pct: 20, stage: 'analyzing_scenes' },
+  FLAG_SCENES: { pct: 46, stage: 'flagging_scenes' },
   CLARIFY: { pct: 48, stage: 'clarifying' },
   AWAITING_INPUT: { pct: 48, stage: 'awaiting_input' },
   EQUIPMENT: { pct: 50, stage: 'matching_equipment' },
@@ -149,6 +152,7 @@ export async function beginAnalysis(projectId: string, locale: string) {
     critic: Prisma.DbNull,
     questions: Prisma.DbNull,
     answers: Prisma.DbNull,
+    sceneFlags: Prisma.DbNull,
     adviceNotes: Prisma.DbNull,
     advice: Prisma.DbNull,
     retriedAgents: [],
@@ -229,7 +233,12 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
     return { done: true, stage: state.stage, pct: 100, failed: true };
   }
 
-  const brief = await loadBrief(projectId, state.locale, readJson<ClarifyAnswer[]>(state.answers) ?? []);
+  const brief = await loadBrief(
+    projectId,
+    state.locale,
+    readJson<ClarifyAnswer[]>(state.answers) ?? [],
+    readJson<SceneFlag[]>(state.sceneFlags) ?? [],
+  );
   const ctx = createRunContext(projectId, report);
   const progress = STAGE_PROGRESS[state.stage];
 
@@ -269,10 +278,21 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
         if (requirements.length === 0) throw new Error('NO_SCENES_ANALYSED');
         const summary = await summariseScenes(projectId, requirements);
         await save(projectId, {
-          stage: AnalysisStage.CLARIFY,
+          stage: AnalysisStage.FLAG_SCENES,
           sceneCursor: batch.sceneTotal,
           summary: summary as unknown as Prisma.InputJsonValue,
         });
+        return { done: false, stage: AnalysisStage.FLAG_SCENES, pct: STAGE_PROGRESS.FLAG_SCENES.pct };
+      }
+
+      // ---- 2a. flag the scenes the producer must hear about: danger, special cameras, long scenes, locations
+      case AnalysisStage.FLAG_SCENES: {
+        const flags = await runSceneFlagAgent(ctx, brief, await loadSceneRequirements(projectId));
+        await save(projectId, {
+          stage: AnalysisStage.CLARIFY,
+          sceneFlags: flags as unknown as Prisma.InputJsonValue,
+        });
+        if (flags.length) report({ type: 'flags', flags });
         return { done: false, stage: AnalysisStage.CLARIFY, pct: STAGE_PROGRESS.CLARIFY.pct };
       }
 
@@ -481,7 +501,7 @@ async function runSingleStep(projectId: string, report: ProgressReporter): Promi
           modelVersions: ctx.modelVersions,
         };
 
-        await persistSheet(projectId, sheet, brief.locale, readJson<Advice>(state.advice));
+        await persistSheet(projectId, sheet, brief.locale, readJson<Advice>(state.advice), brief.sceneFlags);
         await save(projectId, { stage: AnalysisStage.DONE });
 
         await finishRun(handle, {
@@ -647,6 +667,7 @@ async function writeExecutiveSummary(
         brief.visualStyleTags.length ? `Requested look: ${brief.visualStyleTags.join(', ')}.` : '',
         describeBudget(brief),
         describeClarifications(brief.clarifications),
+        describeSceneFlags(brief.sceneFlags),
         `${parts.summary.sceneCount} scenes, ${parts.summary.shootDays} shoot day(s), ${parts.summary.nightScenePct}% night/dawn, ${parts.summary.exteriorScenePct}% exterior, ${parts.summary.highComplexityPct}% high lighting complexity.`,
         `Package: ${parts.equipment.package.map((i) => `${i.brand} ${i.model}${isMarketItem(i) ? ' (market)' : ''}`).join(', ')}.`,
         `Department rationale: ${parts.equipment.rationale}`,
@@ -668,7 +689,13 @@ async function writeExecutiveSummary(
   }
 }
 
-async function persistSheet(projectId: string, sheet: ProductionSheet, locale: string, advice: Advice | null) {
+async function persistSheet(
+  projectId: string,
+  sheet: ProductionSheet,
+  locale: string,
+  advice: Advice | null,
+  sceneFlags: SceneFlag[],
+) {
   // Freeze whatever is being replaced, so the producer can see what changed.
   await snapshotRecommendation(projectId, 'ANALYSIS');
 
@@ -688,6 +715,7 @@ async function persistSheet(projectId: string, sheet: ProductionSheet, locale: s
       uncoveredEquipment: sheet.vendorBudget.uncoveredEquipment,
     } as unknown as Prisma.InputJsonValue,
     rationaleText: sheet.rationaleText,
+    sceneFlags: sceneFlags as unknown as Prisma.InputJsonValue,
     locale,
     criticNotes: sheet.critic.issues.map(
       (i) => `[${i.severity}] ${i.agent}: ${i.problem} → ${i.suggestion}`,
@@ -713,6 +741,7 @@ async function loadBrief(
   projectId: string,
   locale: string,
   clarifications: ClarifyAnswer[],
+  sceneFlags: SceneFlag[],
 ): Promise<ProjectBrief> {
   const project = await prisma.project.findUnique({
     where: { id: projectId },
@@ -737,5 +766,6 @@ async function loadBrief(
     // sheet comes back in whatever language the producer is using right now.
     locale: locale || project.owner.locale,
     clarifications,
+    sceneFlags,
   };
 }

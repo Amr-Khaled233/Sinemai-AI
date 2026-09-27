@@ -152,6 +152,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     // Paused on the producer: the page shows these instead of a progress bar.
     awaiting: state?.stage === AnalysisStage.AWAITING_INPUT,
     questions: state?.stage === AnalysisStage.AWAITING_INPUT ? (state.questions ?? []) : [],
+    // Flagged scenes, shown with the questions so a rejoining page sees both.
+    sceneFlags: state?.sceneFlags ?? [],
     sceneCursor: state?.sceneCursor ?? 0,
     sceneTotal: state?.sceneTotal ?? 0,
     errorText: state?.errorText ?? null,

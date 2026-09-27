@@ -14,6 +14,12 @@ export function pdfLabels(locale: string): PdfLabels {
   const sheet = messages.sheet;
 
   return {
+    flagsTitle: sheet.flags.title,
+    flagsNeeds: sheet.flags.needs,
+    // "Sc. {list}" → the prefix alone; the PDF joins the numbers itself.
+    flagScenes: sheet.flags.scenes.replace('{list}', '').trim(),
+    flagKind: sheet.flags.kind,
+    flagSeverity: sheet.flags.severity,
     title: sheet.title,
     summary: sheet.summary,
     sceneBreakdown: sheet.sceneBreakdown,

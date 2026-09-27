@@ -8,7 +8,8 @@ import { getDisplayCurrency } from '@/lib/currency-server';
 import { fxFor } from '@/lib/currency';
 import { AdviceSection } from '@/components/sheet/advice-section';
 import { equipmentNamer } from '@/lib/equipment-name-server';
-import { isMarketItem } from '@/agents/types';
+import { isMarketItem, type SceneFlag } from '@/agents/types';
+import { SceneFlags } from '@/components/sheet/scene-flags';
 import { buildSchedule, type ScheduleScene } from '@/lib/schedule';
 import { formatDate, formatMoney, truncate } from '@/lib/utils';
 import { cityName } from '@/lib/city-name';
@@ -46,6 +47,8 @@ export type SheetRecommendation = {
   modelVersions: Prisma.JsonValue;
   /** The advisor's suggestions (amounts in SAR); absent on older sheets. */
   advice?: Prisma.JsonValue | null;
+  /** Scenes flagged for attention; absent on older sheets. */
+  sceneFlags?: Prisma.JsonValue | null;
   generatedAt: Date;
 };
 
@@ -123,6 +126,16 @@ export async function ProductionSheet({
 
   const pkg = (recommendation.equipmentPackage as unknown as PackageItem[]) ?? [];
   const advice = (recommendation.advice as unknown as Advice | null | undefined) ?? null;
+  const flags = Array.isArray(recommendation.sceneFlags) ? (recommendation.sceneFlags as unknown as SceneFlag[]) : [];
+  // Scene number → what it was flagged for, to mark it in the breakdown table.
+  const flaggedKinds = new Map<number, string>();
+  for (const flag of flags) {
+    for (const order of flag.scenes) {
+      const label = t(`flags.kind.${flag.kind}`);
+      const existing = flaggedKinds.get(order);
+      flaggedKinds.set(order, existing ? `${existing} · ${label}` : label);
+    }
+  }
   const vendors = (recommendation.matchedVendors as unknown as VendorMatch[]) ?? [];
   const budget = (recommendation.budgetBreakdown as unknown as BudgetExtras) ?? null;
   const summary = (recommendation.sceneSummary as unknown as SceneSummary) ?? null;
@@ -189,6 +202,9 @@ export async function ProductionSheet({
           </div>
         )}
       </header>
+
+      {/* ---------------------------------------------------------- flagged scenes */}
+      <SceneFlags flags={flags} />
 
       {/* ---------------------------------------------------------- advisor */}
       {advice && (
@@ -287,7 +303,16 @@ export async function ProductionSheet({
               <tbody>
                 {scenes.map((scene) => (
                   <tr key={scene.order}>
-                    <td data-label={t('sceneNumber')} className="tabular-nums text-muted">{scene.order}</td>
+                    <td data-label={t('sceneNumber')} className="tabular-nums text-muted">
+                      {scene.order}
+                      {flaggedKinds.has(scene.order) && (
+                        <span
+                          className="ms-1 inline-block size-1.5 rounded-full bg-warning align-middle"
+                          title={flaggedKinds.get(scene.order)}
+                          aria-label={flaggedKinds.get(scene.order)}
+                        />
+                      )}
+                    </td>
                     <td data-label={t('heading')} className="text-strong">
                       <div className="font-medium md:truncate">{truncate(scene.heading, 70)}</div>
                       {scene.lightingNotes && (

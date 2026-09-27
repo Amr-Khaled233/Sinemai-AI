@@ -5,6 +5,7 @@ import { AgentName } from '@prisma/client';
 import { model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { withLanguage } from './language';
 import { describeBudget, describeClarifications } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import { describeSummary } from './equipment-agent';
 import type {
   Advice,
@@ -102,6 +103,7 @@ function describeProduction(
     brief.synopsis ? `Synopsis: ${brief.synopsis.slice(0, 1200)}` : '',
     describeBudget(brief),
     describeClarifications(brief.clarifications),
+    describeSceneFlags(brief.sceneFlags),
     '',
     'Breakdown:',
     describeSummary(summary),
@@ -186,7 +188,7 @@ export async function runAdvisor(
           '',
           notes?.text ? `Research notes:\n${notes.text}` : 'No web research was available; rely on what you know and say where you are unsure.',
           '',
-          `Write the advice. Shoot duration: start from the platform's ${parts.summary.shootDays} day(s) and adjust for company moves, night work and risky scenes; give a realistic range. Budget fit: compare the mid estimate with the producer's budget. Costly scenes: the scenes that drive cost or carry safety risk, each with 2–4 ways to handle it for less. People: several options each, names exactly as found.`,
+          `Write the advice. Costly scenes: start from the flagged scenes above (every high-severity flag must appear), then add any others. Shoot duration: start from the platform's ${parts.summary.shootDays} day(s) and adjust for company moves, night work and risky scenes; give a realistic range. Budget fit: compare the mid estimate with the producer's budget. Costly scenes: the scenes that drive cost or carry safety risk, each with 2–4 ways to handle it for less. People: several options each, names exactly as found.`,
         ].join('\n'),
       });
       return { output: { ...object, sources: notes?.sources ?? [] } };

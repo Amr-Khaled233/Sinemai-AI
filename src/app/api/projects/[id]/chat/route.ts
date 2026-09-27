@@ -1,4 +1,4 @@
-import { convertToModelMessages, createIdGenerator, stepCountIs, streamText, type UIMessage } from 'ai';
+import { convertToModelMessages, createIdGenerator, hasToolCall, stepCountIs, streamText, type UIMessage } from 'ai';
 import { z } from 'zod';
 import type { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
@@ -93,7 +93,8 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
     }),
     messages: convertToModelMessages(messages),
     tools: makeChatTools({ projectId: id, locale, fx }),
-    stopWhen: stepCountIs(6),
+    // A question to the producer ends the turn: the answer is their next message.
+    stopWhen: [stepCountIs(6), hasToolCall('askUser')],
     temperature: 0.3,
   });
 

@@ -72,20 +72,23 @@ TWO KINDS OF KNOWLEDGE — keep them apart
 
 HOW TO WORK
 - Always give more than one option: several directors, several actors per role, several ways to handle a scene, several ways to save — with what each option trades off.
-- When something important is unclear (budget, where it will be shown, dates, cast, locations), ask first — one or two plain questions at a time — then answer with the best fit.
+- When something important is unclear or you need a confirmation — budget, where it will be shown, dates, cast, a location, whether a dangerous scene is really performed, whether to apply a change — do not guess: call askUser with one plain question and two to four short answers they can tap. Then stop and wait; their answer arrives as the next message. Ask one question at a time, and only when the answer changes what you recommend.
+- Before changing the package in a way that adds real cost, confirm with askUser first.
 - Equipment is not limited to the catalog: recommend the right gear from the whole market. To change the package, call updatePackage — with ids from getSheet, searchCatalog or findAlternatives, or with a market item (brand, model, category, estimated Saudi day rate in SAR) for gear the catalog lacks — then report the new totals.
 - If there is no script yet, tell them to upload it above. If there is a script but no sheet, the analysis is running or needs "Run breakdown".
 - Be clear and structured: short headings and lists, numbers from the tools.
+- The sheet flags scenes that need attention (danger, special cameras, long scenes, special locations…). Bring them up whenever they matter, name the scene, and say what each will take.
 
 THE OPENING BRIEFING
 When asked for the briefing (the first message once the sheet is ready), call getSheet (it includes the advisor's research) and getScenes, then findAlternatives for the two or three most expensive items, and write, with headings:
-1. What this script needs — the essentials by department, each with why the scenes need it.
-2. How long the shoot takes — days and a realistic range.
-3. The costly and risky scenes — each with two or three ways to handle it for less or more safely.
-4. Who could make it — several directors and actors for the lead roles, each with what they are known for.
-5. Alternatives and where to save — options with the amount each saves, and the new estimate.
-6. The budget — how the estimate compares with theirs.
-End with one or two questions that would sharpen the plan, and offer to apply any of the savings.
+1. Scenes that need your attention — every flagged scene from getSheet, most serious first: what happens, why it matters, what it will take.
+2. What this script needs — the essentials by department, each with why the scenes need it.
+3. How long the shoot takes — days and a realistic range.
+4. The costly and risky scenes — each with two or three ways to handle it for less or more safely.
+5. Who could make it — several directors and actors for the lead roles, each with what they are known for.
+6. Alternatives and where to save — options with the amount each saves, and the new estimate.
+7. The budget — how the estimate compares with theirs.
+Then call askUser with the one question that would sharpen the plan most (often about a flagged scene), and offer to apply any of the savings.
 
 ${languageDirective(args.locale)}`;
 }
@@ -155,6 +158,8 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
               highLightingPct: summary.highComplexityPct,
             }
           : null,
+        // Scenes flagged after the breakdown: danger, special cameras, long scenes, locations.
+        flaggedScenes: Array.isArray(rec.sceneFlags) ? rec.sceneFlags : [],
         reviewerNotes: rec.criticNotes.map((note) => note.replace(/^\[\w+\]\s*[A-Z_]+:\s*/, '')),
         // The advisor's research: suggestions, not platform facts.
         advisor: advice
@@ -372,5 +377,18 @@ export function makeChatTools(args: { projectId: string; locale: string; fx: Fx 
     userLocation: { type: 'approximate', country: 'SA' },
   });
 
-  return { getSheet, getScenes, searchCatalog, findAlternatives, updatePackage, web_search };
+  // Asking is a tool call too: the page shows the question with one-tap answers,
+  // and the answer comes back as the producer's next message.
+  const askUser = tool({
+    description:
+      'Ask the producer one plain question when you need an answer or a confirmation before going on. Offer two to four short answers they can tap. After calling it, stop and wait for their reply.',
+    inputSchema: z.object({
+      question: z.string().min(5).max(300),
+      options: z.array(z.string().min(1).max(80)).min(2).max(4),
+      why: z.string().max(200).optional().describe('In plain words, what the answer changes.'),
+    }),
+    execute: async () => ({ asked: true, note: 'Shown to the producer. Wait for their reply in the next message.' }),
+  });
+
+  return { getSheet, getScenes, searchCatalog, findAlternatives, updatePackage, askUser, web_search };
 }

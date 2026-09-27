@@ -6,6 +6,7 @@ import { model, MODELS, withAgentRun, type RunContext } from './runtime';
 import { describeSummary } from './equipment-agent';
 import { withLanguage } from './language';
 import { describeClarifications } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import type {
   CriticIssue,
   CriticResult,
@@ -85,6 +86,7 @@ export async function runCriticAgent(
           `PROJECT: "${brief.name}" — ${brief.type}, budget ${window.minTotal}–${window.maxTotal} ${window.currency} (${window.label}), ${brief.city}.`,
           brief.visualStyleTags.length ? `Requested visual style: ${brief.visualStyleTags.join(', ')}.` : '',
           describeClarifications(brief.clarifications),
+          describeSceneFlags(brief.sceneFlags),
           '',
           'SCENE BREAKDOWN:',
           describeSummary(parts.summary),

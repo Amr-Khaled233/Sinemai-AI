@@ -5,6 +5,7 @@ import { lastToolResult, loggedTool, model, MODELS, withAgentRun, type RunContex
 import { describeSummary } from './equipment-agent';
 import { withLanguage } from './language';
 import { detectGaps, MAX_QUESTIONS, normaliseQuestions } from './clarifications';
+import { describeSceneFlags } from './scene-flags';
 import type { ClarifyQuestion, ProjectBrief, SceneSummary } from './types';
 
 export const CLARIFY_SYSTEM = `You are an experienced producer meeting someone about their script. They may be a seasoned producer or someone making their very first film, so speak plainly and never use technical film jargon (no lenses, lighting setups, drones, frame rates — you and your team work those out from the script yourselves).
@@ -14,10 +15,11 @@ The script has been read. Before you plan the shoot and the money, call askProdu
 - where the work will be shown (cinema, TV, a streaming platform, social media, festivals) and when it should come out,
 - when they want to shoot and whether there is a hard deadline,
 - where they will shoot (which city, what kinds of places),
-- what kind of cast they have in mind (known stars, a mix, new faces, non-actors).
+- what kind of cast they have in mind (known stars, a mix, new faces, non-actors),
+- the flagged scenes, when an answer changes the plan: whether a dangerous scene is really performed or suggested off-screen, whether they already have access to a special location, whether a scene can be shorter — still in plain words, never about gear.
 
 Rules:
-- Skip anything the brief already answers. Three to five questions, most important first.
+- Skip anything the brief already answers. Three to five questions, most important first; at most two about flagged scenes, naming the scene ("the car chase in scene 12").
 - Each question is short, friendly and answerable with one tap: always give two to four options.
 - Tag each question with its topic.
 - Every question carries the assumption you will work from if they skip it — a sensible default, never "unknown".`;
@@ -26,7 +28,7 @@ const askSchema = z.object({
   questions: z
     .array(
       z.object({
-        topic: z.enum(['budget', 'release', 'schedule', 'location', 'cast', 'other']),
+        topic: z.enum(['budget', 'release', 'schedule', 'location', 'cast', 'scene', 'other']),
         question: z.string().min(8).max(300),
         why: z.string().max(200).describe('In plain words, what the answer helps with.'),
         options: z.array(z.string().min(1).max(80)).max(4).describe('Suggested answers, when it is a choice.'),
@@ -90,6 +92,8 @@ export async function runClarifyAgent(
             '',
             'Scene breakdown statistics:',
             describeSummary(summary),
+            '',
+            describeSceneFlags(brief.sceneFlags),
             '',
             gaps.length ? `Candidate gaps spotted by code:\n${gaps.map((gap) => `- ${gap}`).join('\n')}` : 'Code found no obvious gaps.',
           ]

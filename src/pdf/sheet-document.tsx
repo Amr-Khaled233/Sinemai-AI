@@ -1,7 +1,7 @@
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
 import { fontsFor, registerPdfFonts } from './fonts';
 import { cityName } from '@/lib/city-name';
-import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/agents/types';
+import type { BudgetBreakdown, PackageItem, SceneFlag, SceneSummary, VendorMatch } from '@/agents/types';
 
 /**
  * PDF export built with @react-pdf/renderer — no headless browser, so it fits
@@ -14,6 +14,11 @@ import type { BudgetBreakdown, PackageItem, SceneSummary, VendorMatch } from '@/
  */
 
 export type PdfLabels = {
+  flagsTitle: string;
+  flagsNeeds: string;
+  flagScenes: string;
+  flagKind: Record<string, string>;
+  flagSeverity: Record<string, string>;
   title: string;
   summary: string;
   sceneBreakdown: string;
@@ -81,6 +86,7 @@ export type SheetPdfData = {
   mid: number;
   high: number;
   criticNotes: string[];
+  sceneFlags: SceneFlag[];
 };
 
 const money = (value: number, currency: string) =>
@@ -168,6 +174,26 @@ export function SheetDocument({ data }: { data: SheetPdfData }) {
             <Text style={styles.body}>{data.summaryText}</Text>
           </View>
         ) : null}
+
+        {data.sceneFlags.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.h2}>{L.flagsTitle}</Text>
+            {data.sceneFlags.map((flag) => (
+              <View key={flag.id} style={{ marginBottom: 6 }} wrap={false}>
+                <Text style={styles.bold}>
+                  {flag.title} — {L.flagKind[flag.kind] ?? flag.kind} · {L.flagScenes} {flag.scenes.join(', ')} ·{' '}
+                  {L.flagSeverity[flag.severity] ?? flag.severity}
+                </Text>
+                {flag.detail ? <Text style={styles.body}>{flag.detail}</Text> : null}
+                {flag.needs.length > 0 ? (
+                  <Text style={styles.body}>
+                    {L.flagsNeeds}: {flag.needs.join(' · ')}
+                  </Text>
+                ) : null}
+              </View>
+            ))}
+          </View>
+        )}
 
         {data.sceneSummary && (
           <View style={styles.section}>
